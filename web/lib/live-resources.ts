@@ -107,7 +107,7 @@ export const listFetch = {
       primeCache(cursorKey(accountsKey(teamId)), r.nextCursor)
       return r.accounts
     }),
-  // R14: help is PAGED — the fetchers below load page ONE and park the next
+  // R14: help is PAGED — the fetcher below loads page ONE and parks the next
   // cursor in its sidecar; <LoadMore> appends from there. A fresh load (or a
   // reconnect catch-up) resets to page one, which is what a reconnect should do.
   // R14: sources are PAGED — the agency's own history is thousands of rows on
@@ -128,25 +128,28 @@ export const listFetch = {
       // every ticket page, so the strip costs nothing extra to draw.
       primeCache(`help-by-type:${teamId}`, r.byType)
       primeCache(`help-by-status:${teamId}`, r.byStatus)
+      // The third facet — which client is generating the most work — rides the
+      // same read. The door has answered it since 2026-08-28; this is the first
+      // screen that reads it (workers/content/src/lib/help.ts's own note on it).
+      primeCache(`help-by-account:${teamId}`, r.byAccount)
       return r.tickets
     }),
-  // PUT AWAY, AND FINDABLE. The archived view is its own paged read, and it has
-  // to exist: archive shipped as a door with no button, and giving it a button
-  // without giving the put-away pile a screen would only move the dead end one
-  // step along. Its `total` is the count over THIS view (the door counts the
-  // same question it listed), so it never collides with the live badge.
-  helpArchived: (teamId: string) =>
-    contentApi.help({ view: "archived" }).then((r) => {
-      primeCache(totalKey("help-archived", teamId), r.total)
-      primeCache(cursorKey(helpKey(teamId, "archived")), r.nextCursor)
-      return r.tickets
-    }),
+  // PUT AWAY, AND FINDABLE — archive shipped as a door with no button, and
+  // giving it a button without giving the put-away pile a screen would only
+  // move the dead end one step along. It used to be its own RESTING paged read
+  // (a dedicated "Archived" tab), retired 2026-08-31 with that tab: archived is
+  // now a toolbar FILTER (COLLECTION_FILTERS.help, field `view`), which is an
+  // ACTIVE search question rather than a screen the person is resting on — so
+  // it goes through `helpFacet`/`PagedFind`'s own find-cache, the same road the
+  // search box and the sort control already take, and needs no resting fetcher
+  // of its own. `helpKey(teamId, "archived")` still resolves (nothing calls it
+  // today; nothing stops something from choosing to).
   /** ONE SUB-TAB'S PAGE (CHECKLIST 5.1). Same door, same paging, same exact
    * totals — the narrowing is the door's, not the browser's, because the list
    * pages and filtering a loaded page would answer "the questions among the
    * newest fifty" under a badge counting all of them (R14 + R16).
    *
-   * `byType` / `byStatus` are primed from EVERY ticket read, including this one:
+   * `byType` / `byStatus` / `byAccount` are primed from EVERY ticket read, including this one:
    * they are counted over the list ignoring the kind and stage facets, so the
    * strip's badges stay right whichever sub-tab is open. */
   helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
@@ -162,6 +165,7 @@ export const listFetch = {
         primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
         primeCache(`help-by-type:${teamId}`, r.byType)
         primeCache(`help-by-status:${teamId}`, r.byStatus)
+        primeCache(`help-by-account:${teamId}`, r.byAccount)
         return r.tickets
       })
   },
@@ -275,12 +279,20 @@ export const listFetch = {
    * CALENDAR_MONTH_PAGES: a month past that is not a calendar, it is an import
    * gone wrong, and drawing 500 chips in a grid would help nobody. What it
    * cannot show it does not pretend to — the count above the calendar is the
-   * door's own and stays honest either way. */
-  meetingsMonth: async (_teamId: string, month: string) => {
+   * door's own and stays honest either way.
+   *
+   * `narrowing` is the meetings screen's OWN search box + facets — `q`,
+   * `accountId`, `purposeId` — spread onto the SAME door call, ANDed with the
+   * month the same way the door ANDs every other filter it parses
+   * (`filterFrom` in workers/content/src/routes/meetings.ts). Without it the
+   * grid always drew the whole month regardless of what was typed above it:
+   * the toolbar was structurally there and visibly did nothing the moment the
+   * calendar tab was open. */
+  meetingsMonth: async (_teamId: string, month: string, narrowing: Record<string, string> = {}) => {
     const rows: Meeting[] = []
     let cursor: string | null = null
     for (let page = 0; page < CALENDAR_MONTH_PAGES; page++) {
-      const r = await contentApi.meetings({ view: "all", month, cursor })
+      const r = await contentApi.meetings({ view: "all", month, cursor, ...narrowing })
       rows.push(...r.meetings)
       cursor = r.nextCursor ?? null
       if (!cursor) break
@@ -414,9 +426,24 @@ export function meetingsKey(teamId: string, view?: MeetingListView): string {
  * the agenda both showed an empty month over a badge reading 436. The week view
  * had exactly this fault and was fixed on its own; the calendar reads the same
  * page and was not, which is why this comment names the shape rather than the
- * instance. */
-export function meetingsMonthKey(teamId: string, month: string): string {
-  return `meetings-month:${teamId}:${month}`
+ * instance.
+ *
+ * `narrowing` folds the same search+facet question `listFetch.meetingsMonth`
+ * forwards to the door into the key itself, canonically ordered like
+ * `findKeyFor` in paged-find.tsx — so a search and its month are one cache
+ * entry, a cleared search reads back the whole month's own warm answer rather
+ * than treating it as a still-narrowed one, and the answer for "Confia" in
+ * August cannot collide with the answer for "Confia" in September or with
+ * August unsearched. Still under the `meetings-` prefix (R15), so a meeting
+ * that moves patches the search a person is looking at exactly as it patches
+ * the unfiltered month. */
+export function meetingsMonthKey(teamId: string, month: string, narrowing: Record<string, string> = {}): string {
+  const asked = Object.keys(narrowing)
+    .filter((k) => narrowing[k])
+    .sort()
+    .map((k) => `${k}=${narrowing[k]}`)
+    .join("&")
+  return asked ? `meetings-month:${teamId}:${month}:${asked}` : `meetings-month:${teamId}:${month}`
 }
 
 /** WHICH OF ONE MEETING'S GUESTS WE KNOW — its own key because it is its own

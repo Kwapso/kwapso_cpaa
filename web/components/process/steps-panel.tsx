@@ -38,6 +38,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
 import { useT } from "@shared/web/language"
@@ -84,7 +85,7 @@ export type StepsPanelActions = {
   onAgainst: (versionId: string | null) => void
   onAddStep: () => void
   onEditStep: (step: ProcessStep | null) => void
-  onConfirm: (c: Confirm | null) => void
+  onConfirm: (c: Confirm) => void
 }
 
 /** WHAT THE READER MAY DO. Four answers the host already has — a panel that
@@ -232,7 +233,7 @@ export function StepsPanel({
           server refuses the write regardless — this is the sentence,
           not the lock. */}
       {!isCurrent && (
-        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-xs">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] p-3 text-xs">
           {t("This is how the work was described when")}{" "}
           {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
           {t("was cut")}
@@ -244,12 +245,16 @@ export function StepsPanel({
       {shown.error ? (
         // A version that can't be read says so and offers the way back
         // — a skeleton that never resolves is the same screen as a hang.
-        <div className="flex flex-col items-start gap-2">
-          <p className="text-destructive text-sm">{t("Couldn't load that version.")}</p>
-          <Button variant="secondary" size="sm" onClick={() => onShowVersion(null)}>
-            {t("Show the current version")}
-          </Button>
-        </div>
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load that version.") }}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => onShowVersion(null)}>
+              {t("Show the current version")}
+            </Button>
+          }
+        />
       ) : shownSteps === undefined ? (
         <Skeleton variant="list" lines={4} />
       ) : stepView === "flow" ? (
@@ -317,7 +322,7 @@ export function StepsPanel({
             : t("This version has no steps recorded.")}
         </p>
       ) : (
-        <div className="rounded-[var(--radius)] border">
+        <div className="rounded-[var(--radius)] bg-surface-panel">
           {/* ONE STEP, AS A TITLE AND A META LINE (K1), and it used to
               be eight things on one sweep: number, name, "no longer
               done", minutes each time, runs a month, hours a month,
@@ -493,7 +498,7 @@ export function StepsPanel({
           there is, and a comparison that showed only surviving steps
           would leave it out. */}
       {saving && saving.steps.length > 0 && (
-        <div className="rounded-[var(--radius)] border p-4">
+        <div className="rounded-[var(--radius)] bg-surface-panel p-4">
           <p className="text-muted-foreground text-sm">
             {t("Time given back, measured from")} {auditDate}
           </p>

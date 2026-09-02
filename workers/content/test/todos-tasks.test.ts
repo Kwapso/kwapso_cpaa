@@ -87,7 +87,6 @@ async function askFor(title: string, accountId = IDS.victimAccount): Promise<str
 beforeEach(() => {
   holder.db = buildSpineDb()
   sent.emails = []
-  db().exec(`UPDATE accounts SET code = 'BERG' WHERE id = '${IDS.victimAccount}';`)
 })
 
 describe("a to-do is aimed at the client", () => {
@@ -95,7 +94,7 @@ describe("a to-do is aimed at the client", () => {
     const id = await askFor("Send us your brand logo as an SVG")
     const row = todoRows()[0]
     expect(row.account_id).toBe(IDS.victimAccount)
-    expect(row.ref).toBe("BERG-D0001")
+    expect(row.ref).toBe("I0001")
     expect(row.completed_at).toBe(null)
     void id
 
@@ -307,8 +306,9 @@ describe("a task is ours, and a client never learns one exists", () => {
     expect(res.status).toBe(200)
     const row = db().prepare(`SELECT * FROM tasks`).get() as Record<string, string | null>
     expect(row.account_id).toBe(null)
-    // A reference is built out of an ACCOUNT's short code, and our own admin has
-    // no account. A number nobody can quote is worse than none.
+    // A task mints no reference at all (2026-08-31 ruling) — same no-reference
+    // category as a process, a role or a dropdown value, regardless of
+    // whether it names a client.
     expect(row.ref).toBe(null)
     expect(row.status).toBe("open")
   })

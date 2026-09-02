@@ -73,7 +73,13 @@ const COMPANY_VOCABULARY: { type: string; value: string }[] = [
  * front of German clients; every other language comes from the translation
  * layer, which is why there is no third column here and never will be.
  * `Assessment` arrives bare — the legacy row had no mark, no German name and no
- * length, and inventing three would be worse than carrying a thin row honestly. */
+ * length, and inventing three would be worse than carrying a thin row honestly.
+ *
+ * THE MARK IS A TWO-LETTER CODE, not a pictograph — the client's ruling,
+ * 2026-08-31: "i said no emojis. why are there still emojis? kill them!" The
+ * legacy catalogue carried an emoji per type; this is the same ten types, the
+ * same one-glyph-per-type shape, with the glyph made of letters instead, the
+ * same substitution `shared/app-stages.ts` made for the app stages. */
 export const SPRINT_TYPE_CATALOGUE: {
   value: string
   mark: string | null
@@ -82,15 +88,15 @@ export const SPRINT_TYPE_CATALOGUE: {
   standardDays: number | null
 }[] = [
   { value: "Assessment", mark: null, nameDe: null, description: null, standardDays: null },
-  { value: "Diagnostic", mark: "🔎", nameDe: "Prozessanalyse", description: "We map the organisation around the solution, the tool stack, the data architecture, the way the work is done today and the main user stories behind it, and we set out what it costs in time and money now, alongside the needs and expectations.", standardDays: 14 },
-  { value: "Process Optimization", mark: "🎯", nameDe: "Prozessoptimierung", description: "Working from the diagnostic, we design the improved process, removing steps, simplifying them, automating them, and produce the assets and the solution paper that meet the needs and expectations and bring the running cost down.", standardDays: 7 },
-  { value: "Data Migration", mark: "🗂️", nameDe: "Datenpflege", description: null, standardDays: 7 },
-  { value: "Foundation", mark: "🛠️", nameDe: "Fundament", description: "Your data, in your app. This is the foundation everything else is built on.", standardDays: 7 },
-  { value: "Implementation", mark: "💎", nameDe: "Umsetzung", description: "We build everything designed during the process optimization, on top of the foundation.", standardDays: 21 },
-  { value: "Validation", mark: "👀", nameDe: "Validierung", description: "The stakeholders watch the walkthrough, and at the end of the week we meet so you can show us how you use the app. We answer your questions, find what can still be improved, and write the tickets together, though you can raise one at any moment.", standardDays: 14 },
-  { value: "Refinement", mark: "✨", nameDe: "Anpassung", description: null, standardDays: 14 },
-  { value: "Training", mark: "🎓", nameDe: "Schulung", description: "One live online training with the main stakeholders, and a follow-up meeting a few days later to answer what came up.", standardDays: 7 },
-  { value: "Enhancement", mark: "🚀", nameDe: "Erweiterung", description: "An enhancement cycle adds new steps around what is already live, better automations, new screens, new user stories. It covers a fixed number of tickets and is priced on its own. It opens with one clarification and ideation meeting where we adjust the process map and agree expectations, and closes with a recording of what was built and one follow-up meeting for questions and training.", standardDays: 21 },
+  { value: "Diagnostic", mark: "DG", nameDe: "Prozessanalyse", description: "We map the organisation around the solution, the tool stack, the data architecture, the way the work is done today and the main user stories behind it, and we set out what it costs in time and money now, alongside the needs and expectations.", standardDays: 14 },
+  { value: "Process Optimization", mark: "PO", nameDe: "Prozessoptimierung", description: "Working from the diagnostic, we design the improved process, removing steps, simplifying them, automating them, and produce the assets and the solution paper that meet the needs and expectations and bring the running cost down.", standardDays: 7 },
+  { value: "Data Migration", mark: "DM", nameDe: "Datenpflege", description: null, standardDays: 7 },
+  { value: "Foundation", mark: "FN", nameDe: "Fundament", description: "Your data, in your app. This is the foundation everything else is built on.", standardDays: 7 },
+  { value: "Implementation", mark: "IM", nameDe: "Umsetzung", description: "We build everything designed during the process optimization, on top of the foundation.", standardDays: 21 },
+  { value: "Validation", mark: "VL", nameDe: "Validierung", description: "The stakeholders watch the walkthrough, and at the end of the week we meet so you can show us how you use the app. We answer your questions, find what can still be improved, and write the tickets together, though you can raise one at any moment.", standardDays: 14 },
+  { value: "Refinement", mark: "RF", nameDe: "Anpassung", description: null, standardDays: 14 },
+  { value: "Training", mark: "TR", nameDe: "Schulung", description: "One live online training with the main stakeholders, and a follow-up meeting a few days later to answer what came up.", standardDays: 7 },
+  { value: "Enhancement", mark: "EN", nameDe: "Erweiterung", description: "An enhancement cycle adds new steps around what is already live, better automations, new screens, new user stories. It covers a fixed number of tickets and is priced on its own. It opens with one clarification and ideation meeting where we adjust the process map and agree expectations, and closes with a recording of what was built and one follow-up meeting for questions and training.", standardDays: 21 },
 ]
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
@@ -2366,8 +2372,13 @@ SELECT lower(hex(randomblob(16))), r.id, 'all_tasks', r.is_default, r.is_default
     // with no glyph yet are touched, so a team that has already chosen one keeps
     // it. Sprint types already carry theirs (0025).
     //
+    // THE GLYPH IS A TWO-LETTER CODE, not a pictograph — the client's ruling,
+    // 2026-08-31: "i said no emojis. why are there still emojis? kill them!"
+    // (`shared/workers/validate.ts`'s `optionalMark` is the door that refuses
+    // one going forward; this migration is the seed side of the same ruling.)
+    //
     // Extra and Requirements deliberately get none: the agency's legacy data has
-    // no pictograph for either, and an invented one would be a guess wearing the
+    // no glyph for either, and an invented one would be a guess wearing the
     // authority of a seeded default. A missing mark costs nothing — the WORD is
     // always beside it (condition three), so it is never the only thing carrying
     // the meaning.
@@ -2380,12 +2391,12 @@ SELECT lower(hex(randomblob(16))), 'Ticket type', 'Requirements', 1, datetime('n
 UPDATE selectable_data SET deactivated_at = datetime('now'), deactivator_name = 'System'
  WHERE type = 'Ticket type' AND value IN ('Feedback', 'Bug') AND deactivated_at IS NULL;
 
-UPDATE selectable_data SET mark = '❓' WHERE type = 'Ticket type' AND value = 'Question' AND mark IS NULL;
-UPDATE selectable_data SET mark = '⚠️' WHERE type = 'Ticket type' AND value = 'Issue' AND mark IS NULL;
-UPDATE selectable_data SET mark = '💭' WHERE type = 'Ticket type' AND value = 'Request' AND mark IS NULL;
-UPDATE selectable_data SET mark = '🐛' WHERE type = 'Story type' AND value = 'Fix' AND mark IS NULL;
-UPDATE selectable_data SET mark = '✨' WHERE type = 'Story type' AND value = 'Feature' AND mark IS NULL;
-UPDATE selectable_data SET mark = '🔀' WHERE type = 'Story type' AND value = 'Change' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'Q' WHERE type = 'Ticket type' AND value = 'Question' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'IS' WHERE type = 'Ticket type' AND value = 'Issue' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'RQ' WHERE type = 'Ticket type' AND value = 'Request' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'FX' WHERE type = 'Story type' AND value = 'Fix' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'FT' WHERE type = 'Story type' AND value = 'Feature' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'CH' WHERE type = 'Story type' AND value = 'Change' AND mark IS NULL;
 `,
   },
   {
@@ -2902,20 +2913,24 @@ UPDATE brand_assets
     // Also the two ticket types that shipped without a glyph. Only where the
     // mark is still NULL, so a team that has already chosen its own keeps it.
     //
+    // THE GLYPH IS A TWO-LETTER CODE, not a pictograph — the client's ruling,
+    // 2026-08-31: "i said no emojis. why are there still emojis? kill them!"
+    // Same substitution as 0034 above.
+    //
     // Re-runnable: every statement is guarded on the row being absent or unset.
     version: "0044_a_sprint_state_has_a_face",
     sql: `
 INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_name)
 SELECT lower(hex(randomblob(16))), 'Sprint status', v.value, 1, v.mark, datetime('now'), 'kwapso'
-  FROM (SELECT 'Running now' AS value, '🏃' AS mark
-        UNION ALL SELECT 'Coming up', '📅'
-        UNION ALL SELECT 'Wrapped', '✅') v
+  FROM (SELECT 'Running now' AS value, 'RN' AS mark
+        UNION ALL SELECT 'Coming up', 'CU'
+        UNION ALL SELECT 'Wrapped', 'WR') v
  WHERE NOT EXISTS (
    SELECT 1 FROM selectable_data s WHERE s.type = 'Sprint status' AND s.value = v.value
  );
 
-UPDATE selectable_data SET mark = '➕' WHERE type = 'Ticket type' AND value = 'Extra' AND mark IS NULL;
-UPDATE selectable_data SET mark = '📘' WHERE type = 'Ticket type' AND value = 'Requirements' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'EX' WHERE type = 'Ticket type' AND value = 'Extra' AND mark IS NULL;
+UPDATE selectable_data SET mark = 'RM' WHERE type = 'Ticket type' AND value = 'Requirements' AND mark IS NULL;
 `,
   },
   {
@@ -3815,6 +3830,77 @@ ALTER TABLE google_connections ADD COLUMN scope_mode TEXT NOT NULL DEFAULT 'ever
 ALTER TABLE google_connections ADD COLUMN scope_event_types TEXT NOT NULL DEFAULT '';
 `,
   },
+  {
+    // THE 2026-08-31 RULING: ticket / story / sprint / meeting references drop
+    // the account-code prefix and mint TEAM-WIDE instead of per account — see
+    // shared/workers/refs.ts for the full reasoning. Short version: once the
+    // account code is gone from the string, two different clients' tickets can
+    // both mint "T0001", and the ticket triage queue (tickets-collection.tsx)
+    // shows exactly that kind of cross-account list with nothing but the ref on
+    // the row — so the counter has to be scoped so that collision cannot
+    // happen, not merely made unlikely. STORY's letter moves to `B` (its old
+    // `S` goes to SPRINT, which also drops the three-letter `SPR`). TASK stops
+    // minting a reference at all — it never reached a screen, same category as
+    // a process, a role or a dropdown value. APP and WAVE gain a reference for
+    // the first time.
+    version: "0059_the_reference_drops_the_account",
+    sql: `
+-- ONE COUNTER PER KIND, TEAM-WIDE — the new home for ticket, story, sprint,
+-- meeting, app and wave references. Same race-safety as ref_counters below
+-- (INSERT … ON CONFLICT DO UPDATE … RETURNING is one statement, so two
+-- simultaneous mints of the same kind cannot land on the same number); the
+-- only difference is there is no account_id in the key, because the team's
+-- own database already IS the boundary a "per team" counter needs.
+CREATE TABLE team_ref_counters (
+  kind TEXT PRIMARY KEY,        -- 'T' ticket, 'B' story, 'S' sprint, 'M' meeting, 'A' app, 'W' wave
+  next_no INTEGER NOT NULL
+);
+
+-- ref_counters IS NOW THE TO-DO'S ALONE. Every other kind it ever held (T
+-- ticket, S story, SPR sprint, M meeting, K task) either moved to
+-- team_ref_counters above or, for the task's K, stopped minting altogether —
+-- so their rows here are dead counter state, not a customer's own record.
+-- Deleting them costs nothing and a team that mints a new ticket tomorrow
+-- starts team_ref_counters fresh regardless of what this row used to say.
+DELETE FROM ref_counters WHERE kind <> 'D';
+
+-- APP AND WAVE GAIN A REFERENCE FOR THE FIRST TIME. Nullable, like every ref
+-- column before it (help's own note, migration 0011): existing rows get none
+-- — there is nothing to mint one FROM after the fact — only an app or a wave
+-- created from here on carries one. Partial unique index so the many null
+-- rows already on the books never collide with each other.
+ALTER TABLE apps ADD COLUMN ref TEXT;
+CREATE UNIQUE INDEX idx_apps_ref ON apps (ref) WHERE ref IS NOT NULL;
+ALTER TABLE waves ADD COLUMN ref TEXT;
+CREATE UNIQUE INDEX idx_waves_ref ON waves (ref) WHERE ref IS NOT NULL;
+`,
+  },
+  {
+    // THE CLIENT'S OWN FOLLOW-UP, a moment after 0059: the to-do (renamed Input
+    // on both screens) was the one kind that ruling deliberately left alone,
+    // because nobody had asked for it yet. She has now, by name — same team-wide,
+    // no-account-code shape as every other kind, kind letter `I`. See
+    // shared/workers/refs.ts for the full reasoning `nextTeamRef` already
+    // carries; this migration only needs to retire what the old shape leaves
+    // behind.
+    //
+    // `todos.ref` and its unique index (`idx_todos_ref`) already exist —
+    // migration 0016 gave the table both the moment it was created, and
+    // `nextTeamRef` writes the same column, just from a different counter. There
+    // is no new column to add.
+    //
+    // `ref_counters` IS NOW EMPTY OF LIVE WORK. 0059 already cut every kind but
+    // the to-do's own ('D') out of it; the to-do minting team-wide is the last
+    // reader and the last writer this table ever had, so the table itself is
+    // dead rather than merely smaller — kept around it would be a second
+    // reference-counter mechanism with nothing left to count. Dropped whole,
+    // the same way 0059 judged its dead rows: a team that mints a new Input
+    // tomorrow reads `team_ref_counters` and nothing here.
+    version: "0060_the_last_holdout_gets_a_name",
+    sql: `
+DROP TABLE ref_counters;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -3847,19 +3933,24 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // Existing teams keep their rows — migration 0034 DEACTIVATES those two rather
   // than deleting them, so every historic ticket still reads correctly.
   //
+  // THE GLYPH IS A TWO-LETTER CODE, not a pictograph — the client's ruling,
+  // 2026-08-31: "i said no emojis. why are there still emojis? kill them!"
+  // Same substitution as 0034/0044 above; `optionalMark` refuses a pictograph
+  // going forward, and this is the seed side of the same ruling.
+  //
   // It is still an EDITABLE list, not an enum: a team adds its own on the
   // Dropdown values screen, and sets its own glyph beside each word there.
-  { type: "Ticket type", value: "Question", mark: "❓" },
-  { type: "Ticket type", value: "Issue", mark: "⚠️" },
-  { type: "Ticket type", value: "Request", mark: "💭" },
+  { type: "Ticket type", value: "Question", mark: "Q" },
+  { type: "Ticket type", value: "Issue", mark: "IS" },
+  { type: "Ticket type", value: "Request", mark: "RQ" },
   { type: "Ticket type", value: "Extra" },
   { type: "Ticket type", value: "Requirements" },
   // THE THREE KINDS OF WORK (CHECKLIST 2.2), same shape and same reason. They
   // reached existing teams through migration 0028 and were never in the seed, so
   // a brand-new team's story form offered an empty picker.
-  { type: "Story type", value: "Fix", mark: "🐛" },
-  { type: "Story type", value: "Feature", mark: "✨" },
-  { type: "Story type", value: "Change", mark: "🔀" },
+  { type: "Story type", value: "Fix", mark: "FX" },
+  { type: "Story type", value: "Feature", mark: "FT" },
+  { type: "Story type", value: "Change", mark: "CH" },
   // Display-only labels for the five built-in states. The status the code trusts
   // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
   // on screen, and renaming one can never move a ticket.
@@ -3870,9 +3961,9 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // can never be set from here, so these rows carry only what a person reads —
   // the word and the mark beside it. Renaming one can never move a sprint, and
   // changing a glyph on the Dropdown values screen reaches every sprint at once.
-  { type: "Sprint status", value: "Running now", mark: "🏃" },
-  { type: "Sprint status", value: "Coming up", mark: "📅" },
-  { type: "Sprint status", value: "Wrapped", mark: "✅" },
+  { type: "Sprint status", value: "Running now", mark: "RN" },
+  { type: "Sprint status", value: "Coming up", mark: "CU" },
+  { type: "Sprint status", value: "Wrapped", mark: "WR" },
   { type: "Ticket status", value: "New" },
   { type: "Ticket status", value: "Triaged" },
   { type: "Ticket status", value: "In progress" },

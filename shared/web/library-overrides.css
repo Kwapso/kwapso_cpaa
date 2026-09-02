@@ -62,7 +62,24 @@
  * subtler and left the same bug for somebody to find again in November.
  *
  * BEFORE YOU ADD AN OVERRIDE HERE, check whether the library already does what
- * you want. This one was fighting a fix that had already shipped. */
+ * you want. This one was fighting a fix that had already shipped.
+ *
+ * ── AND THE LOOP CLOSED ONCE, ON 2026-09-02 ───────────────────────────────
+ *
+ * Three overrides lived here between 31 Aug and 2 Sep, each ending in its own
+ * "delete this the day the kit ships it" line: `--focus-offset: 0px`, the
+ * AgentChat composer's focus ring, and `items-start` on an AgentChat turn.
+ * All three were client rulings on kit behaviour rather than app behaviour, so
+ * all three were owed upstream from the day they were written — and none had
+ * moved. An audit found them sitting here with their own instructions
+ * unfollowed, which is the exact failure the post-mortem above describes,
+ * caught earlier this time.
+ *
+ * The kit shipped all three in v1.2.24 and the blocks were deleted the same
+ * day. What made it work was not noticing harder: the client made it a
+ * standing rule that an approved fix goes back to the kit BEFORE the next
+ * thing, and `npm run kit:drift` now reports what the app has changed since
+ * the last sync. A note that says "logged for Aurora" is not a mechanism. */
 
 /* ── shared/web IS A SOURCE, AND TAILWIND HAD NEVER BEEN TOLD ──────────────
  *

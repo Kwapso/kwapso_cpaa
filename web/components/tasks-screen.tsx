@@ -22,9 +22,11 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type {
   ScreenActionContext,
   ScreenIntent,
@@ -33,13 +35,13 @@ import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recip
 import { type CollectionConfig } from "@shared/web/screen-engine/config"
 import { Inbox } from "@shared/ui/foundations/icons"
 
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { RecordTable, visibleActions } from "@/components/record-table"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
@@ -54,12 +56,13 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatDateSortable } from "@shared/web/format"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
 
 /** One task, as a row. Every column the six views need is on it, so the two
  * column sets below are a CHOICE of what to show rather than two shapings that
  * could disagree about what a task is. */
-function shapeTasks(tasks: Task[]) {
+function shapeTasks(tasks: Task[], lang: Language) {
   return {
     rows: tasks.map((t) => {
       const mark = departmentGlyph(t.department)
@@ -70,13 +73,15 @@ function shapeTasks(tasks: Task[]) {
         // into that word, which is a pictograph inside a sentence, and invisible
         // on the list view where the column is not shown at all.
         mark: <RecordMark mark={mark || null} name={t.title} />,
-        name: t.ref ? `${t.ref} · ${t.title}` : t.title,
+        // NO REFERENCE PREFIX — the 2026-08-31 ruling puts a task in the same
+        // no-reference category as a process, a role or a dropdown value.
+        name: t.title,
         detail:
           [
             t.status === "done" ? "Done" : "Open",
             PRIORITY_LABEL[t.priority],
             t.assigneeName ?? "nobody yet",
-            t.dueOn ? `deadline ${formatDate(t.dueOn)}` : null,
+            t.dueOn ? `deadline ${formatDate(t.dueOn, lang)}` : null,
           ]
             .filter(Boolean)
             .join(" · ") || "—",
@@ -184,7 +189,7 @@ export function TasksScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const tasksQ = useCached<Task[]>(tasksKey(teamId, view), () => listFetch.tasks(teamId, view))
   const options = useTaskFormOptions(teamId)
   // WHOSE LIST THIS IS (4.9). The DOOR decides — a caller without
@@ -264,10 +269,22 @@ export function TasksScreen({
     </section>
   )
 
-  if (tasksQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the tasks.")}</p>
+  if (tasksQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the tasks.") }}
+        action={
+          <Button variant="secondary" onClick={() => tasksQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (tasksQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
-  const data = shapeTasks(tasksQ.data)
+  const data = shapeTasks(tasksQ.data, lang)
   const columns = view === "completed" ? COMPLETED_COLUMNS : EVERYDAY_COLUMNS
   // A TABLE, not a two-line list, and that is what makes the four priority levels
   // distinct: each is its own sortable, filterable column rather than the fourth
@@ -314,7 +331,8 @@ export function TasksScreen({
     .map((r) => ({
       id: r.id,
       day: (r.dueOn as string).slice(0, 10),
-      title: r.ref ? `${r.ref} · ${r.title}` : r.title,
+      // NO REFERENCE PREFIX — see the same note on the list row above.
+      title: r.title,
       accent: r.department ?? "",
       detail: [PRIORITY_LABEL[r.priority], r.assigneeName].filter(Boolean).join(" · "),
     }))
@@ -339,31 +357,49 @@ export function TasksScreen({
         // of record, which is the kit's own test for the shape ("if the tab
         // shows the same kind of record with a filter on it, it is a folder
         // tab"). They draw flush against the card, so the tabs read as attached
-        // to the list they scope rather than floating above it.
-        folderTabs={
-          <TabsView
-            config={{
-              ...defaultTabsConfig,
-              variant: "folder",
-              tabs: TASK_TABS.map((tab) => ({
-                value: tab.value,
-                label: t(tab.label),
-                icon: tab.icon,
-                badge: badges[tab.value],
-                badgeVariant: "" as const,
-              })),
-            }}
-            value={view}
-            onValueChange={(v) => onViewChange(v as TaskView)}
-          />
-        }
+        // to the list they scope rather than floating above it. TABS ALONE
+        // now (client ruling, 2026-08-31, correcting the earlier fix that
+        // shared this row with "New task") — see the button below instead.
+        folderTabs={{
+          config: {
+            ...defaultTabsConfig,
+            variant: "folder",
+            tabs: TASK_TABS.map((tab) => ({
+              value: tab.value,
+              label: t(tab.label),
+              icon: tab.icon,
+              badge: badges[tab.value],
+              badgeVariant: "" as const,
+            })),
+          },
+          value: view,
+          onValueChange: (v) => onViewChange(v as TaskView),
+        }}
+        // KIT PANEL ON EVERY TAB EXCEPT CALENDAR. `RecordCalendar` never touches
+        // `CollectionFrame` (it is a month grid, not a collection body), so it has
+        // no toolbar and no create-button context to draw into — turning the kit
+        // panel on for that tab would strip its `CollectionCard` box and leave it
+        // with neither box nor create button. The other five tabs are all
+        // `RecordTable`, which now forwards this flag straight to the same
+        // `CollectionFrame` every other flipped collection draws through.
+        useKitPanel={view !== "calendar"}
       >
         {view === "calendar" ? (
-          <RecordCalendar
-            entries={calendarEntries}
-            onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
-            emptyText={t("Nothing due this month.")}
-          />
+          <div className="flex flex-col gap-4">
+            {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. The calendar
+                has no search/sort of its own (`RecordCalendar` never touches
+                `CollectionFrame`), but the button still lives below the tabs
+                rather than beside them (client ruling, 2026-08-31) — a bare
+                `<ToolbarRow>` is this view's own toolbar. The other five tabs
+                get theirs from the kit panel's own toolbar (`useKitPanel`
+                above). */}
+            {canCreate && <ToolbarRow actions={<AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />} />}
+            <RecordCalendar
+              entries={calendarEntries}
+              onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+              emptyText={t("Nothing due this month.")}
+            />
+          </div>
         ) : (
           <RecordTable
             columns={tableColumns}
@@ -371,6 +407,7 @@ export function TasksScreen({
             config={tableRecipe.collection as CollectionConfig}
             actions={visibleActions(tableRecipe, rights, onAction)}
             onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
+            useKitPanel
           />
         )}
       </SectionWithCreate>

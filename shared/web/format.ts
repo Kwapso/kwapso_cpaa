@@ -1,13 +1,34 @@
 // Shared display formatters — ONE source so dates look identical everywhere
 // (members list, activity feed, overview tabs). No duplication of date logic.
+//
+// LOCALE IS EXPLICIT, NEVER AMBIENT. Every formatter below takes a required
+// `lang: Language` and hands it straight to `Intl` as the locale. Passing
+// `undefined` instead — the shape this file used to be — asks `Intl` to
+// resolve the RUNTIME's ambient default locale, which is Node's default
+// during server rendering and the browser's during client hydration. Those
+// two are not guaranteed to agree ("Mar 12, 2024" vs "12 Mar 2024" for the
+// same instant), and when they disagree React's hydration throws — on a plain
+// date, with no network involved and nothing else wrong. Ruling 07 in the kit
+// (`shared/ui/`) already says this for every date-shaped component there:
+// "Dates follow the app language, not the browser" — formatting is the
+// CALLER's job, done with the app's own current language. `Language` codes
+// ("en", "de", "es", "ca") are themselves valid BCP-47 tags, so they pass to
+// `Intl` directly with no mapping table.
+//
+// Required rather than optional, for the same reason `formatRelative`'s `t`
+// is required (see its own comment, below): an optional `lang` defaulting to
+// `undefined` is the ambient-default failure this file exists to close,
+// spelled as an API. Required, TypeScript names every call site that forgot.
+
+import type { Language } from "../i18n"
 
 /** "13 Jun 2026" — for dates where the time of day doesn't matter. */
-export function formatDate(iso?: string | null): string {
+export function formatDate(iso: string | null | undefined, lang: Language): string {
   if (!iso) return ""
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+    : d.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" })
 }
 
 /** "13 Jun" — a date with the year left off, for an AXIS.
@@ -19,12 +40,22 @@ export function formatDate(iso?: string | null): string {
  * still the reader's own locale, still one place. Use it ONLY where the
  * surrounding copy already says which period is on screen ("the last eight
  * weeks"); anywhere a date stands alone, `formatDate` is the one. */
-export function formatDayMonth(iso?: string | null): string {
+export function formatDayMonth(iso: string | null | undefined, lang: Language): string {
   if (!iso) return ""
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : d.toLocaleDateString(lang, { month: "short", day: "numeric" })
+}
+
+/** "Jun 2026" — a calendar month, for an AXIS whose columns are months rather
+ * than days: the waves timeline's periods (`components/gantt`'s own `periods`
+ * prop, which the component cannot format itself — ruling 07, the caller's own
+ * locale). Takes the first of the month it names; the day is never read. */
+export function formatMonth(iso: string | null | undefined, lang: Language): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(lang, { year: "numeric", month: "short" })
 }
 
 /** "14:05" — the clock time alone, for a row whose DAY is already said.
@@ -33,10 +64,10 @@ export function formatDayMonth(iso?: string | null): string {
  * its rows under the day, so every row repeating "13 Jun 2026" is a fact nobody
  * is reading four times down one screen — but the TIME is the whole reason a
  * person opens the day at all. Still the reader's own locale, still one place. */
-export function formatTime(iso?: string | null): string {
+export function formatTime(iso: string | null | undefined, lang: Language): string {
   if (!iso) return ""
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { timeStyle: "short" })
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString(lang, { timeStyle: "short" })
 }
 
 /** "2026-06-13" — a date for a COLUMN SOMEBODY SORTS.
@@ -69,12 +100,12 @@ export function formatDateSortable(iso?: string | null): string {
 }
 
 /** "13 Jun 2026, 14:05" — for activity rows where the moment matters. */
-export function formatDateTime(iso?: string | null): string {
+export function formatDateTime(iso: string | null | undefined, lang: Language): string {
   if (!iso) return ""
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    : d.toLocaleString(lang, { dateStyle: "medium", timeStyle: "short" })
 }
 
 /** "2026-06-30 21:50" — the timestamp for activity-feed rows. The library
@@ -121,8 +152,12 @@ export type Translate = (english: string, vars?: Record<string, string | number>
  * AND IT STAYS TERSE. Seven of the nine call sites are tight — table cells with
  * `tabular-nums`, attachment meta lines, message-bubble timestamps — so the
  * words stay as short as each language can make them. This is the app's ONE
- * relative-time vocabulary; nothing else may grow a second. */
-export function formatRelative(iso: string | null | undefined, t: Translate): string {
+ * relative-time vocabulary; nothing else may grow a second.
+ *
+ * `lang` RIDES ALONGSIDE `t` FOR THE SAME REASON. The fallback branch below
+ * calls `formatDate`, whose own locale argument is required, so this function
+ * needs one to hand it — required, not defaulted, for the reasoning above. */
+export function formatRelative(iso: string | null | undefined, t: Translate, lang: Language): string {
   if (!iso) return ""
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ""
@@ -134,9 +169,11 @@ export function formatRelative(iso: string | null | undefined, t: Translate): st
   if (hrs < 24) return t("{count}h ago", { count: hrs })
   const days = Math.round(hrs / 24)
   if (days < 7) return t("{count}d ago", { count: days })
-  // Past a week it is an absolute date, in the reader's own locale. That half is
-  // `formatDate`'s and is deliberately untouched: a date is not a sentence.
-  return formatDate(iso)
+  // Past a week it is an absolute date, in the reader's own app language. That
+  // half is `formatDate`'s and is deliberately untouched: a date is not a
+  // sentence. `lang` rides alongside `t` for the same reason `t` is required
+  // above — an ambient default here is exactly the bug this file just had.
+  return formatDate(iso, lang)
 }
 
 // ── the datetime-local pair ───────────────────────────────────────────────────
@@ -170,6 +207,34 @@ export function toMoment(local: string): string {
   if (!local) return ""
   const ms = Date.parse(local)
   return Number.isFinite(ms) ? new Date(ms).toISOString() : ""
+}
+
+// ── the date-only pair ────────────────────────────────────────────────────────
+// `<input type="date">`'s replacement, the kit's `DatePicker` in `mode="date"`,
+// speaks a `Date` at midnight in the READER'S OWN clock; the doors store
+// `YYYY-MM-DD`. Built from local parts in both directions, never through
+// `toISOString()`: a local midnight read back out through UTC lands on the day
+// before it everywhere east of Greenwich, and a stored day parsed with
+// `new Date("2026-06-13")` (which reads a date-only string as UTC, not local)
+// lands on the day before THAT everywhere west of it. Same shape of bug as the
+// datetime-local pair above, one field narrower.
+
+/** A stored day (`YYYY-MM-DD`) → a `Date` at local midnight, for `DatePicker`'s
+ * `value`. `null` when nothing is stored, which `DatePicker` reads as unset. */
+export function dateFromYMD(ymd: string | null | undefined): Date | null {
+  if (!ymd) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd)
+  if (!m) return null
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/** …and back. `DatePicker` hands back local midnight; the local calendar date IS
+ * the day meant, so it is read off local parts and never off `toISOString()`. */
+export function ymdFromDate(date: Date | null): string {
+  if (!date) return ""
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`
 }
 
 /** THE POSTAL ADDRESS AS ONE LINE, from the four fields it is stored in.

@@ -1,0 +1,14 @@
+-- WHICH SPINE THIS PERSON WANTS THE SIDEBAR PAINTED IN — ink, paper or mango.
+--
+-- The twin of 0026_user_scale.sql. NULL is a real answer ("never chosen") and
+-- reads as `mango` (shared/spine.ts DEFAULT_SPINE). This column shipped reading
+-- as `paper` instead, on the argument that this app's rail had always been
+-- paper and nobody who had never opened Settings should see it change under
+-- them; the client OVERRULED that on 2026-09-02 ("default spine to mango, but
+-- everyone can change it during the onboarding or anytime at settings"), so the
+-- fallback is mango and it now agrees with the kit's own ScreenShell default.
+-- shared/spine.ts keeps the overturned argument in full. No CHECK constraint,
+-- for the same reason `scale` carries none: the allow-list is SPINE_VALUES in
+-- shared/spine.ts, the door validates against it, and an unrecognised value
+-- falls back rather than throws.
+ALTER TABLE users ADD COLUMN spine TEXT;

@@ -7,6 +7,7 @@
 // properties) and then rendered from the raw English anyway — translated, and
 // never asked for.
 import { formatRelative, type Translate } from "@shared/web/format"
+import type { Language } from "@shared/i18n"
 
 export type AuditMeta = {
   createdByName?: string | null
@@ -27,12 +28,12 @@ export type AuditMeta = {
  * The VALUES are not translated and must not be: four of them are a person's
  * name or a timestamp, and the fifth is a status word the caller has already put
  * through its own vocabulary. */
-export function auditItems(a: AuditMeta, t: Translate): { label: string; value: string }[] {
+export function auditItems(a: AuditMeta, t: Translate, lang: Language): { label: string; value: string }[] {
   return [
     { label: t("Created by"), value: a.createdByName || "—" },
-    { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt, t) : "—" },
+    { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt, t, lang) : "—" },
     { label: t("Last edited by"), value: a.editedByName || "—" },
-    { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt, t) : "—" },
+    { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt, t, lang) : "—" },
     { label: t("Status"), value: a.status },
   ]
 }

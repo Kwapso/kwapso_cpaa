@@ -75,6 +75,15 @@ export const auth = {
       body: JSON.stringify({ scale }),
     }),
 
+  /** Which colour the sidebar paints in — ink, paper or mango. Its own door
+   * beside `setScale`, and for the same reason: this must not be refused
+   * because a name is missing, and must not post a name back. */
+  setSpine: (spine: string) =>
+    api<{ user: SessionUser }>("/api/auth/spine", {
+      method: "POST",
+      body: JSON.stringify({ spine }),
+    }),
+
   /** Change email, step 1: send a 6-digit code to the NEW address (inbox only —
    * same law as login, the code never rides the response). */
   startEmailChange: (email: string) =>

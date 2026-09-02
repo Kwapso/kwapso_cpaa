@@ -34,6 +34,7 @@ import { Input } from "@shared/ui/components/input/input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { Headline } from "@shared/ui/components/typography/typography"
 
 import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -131,7 +133,18 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   }
 
   if (ratesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the internal rates.")}</p>
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the internal rates.") }}
+        action={
+          <Button variant="secondary" onClick={() => ratesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const rates = ratesQ.data
 
@@ -139,7 +152,10 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium">{t("Internal rates")}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
+              is the kit's own named "Page title" step (56/500), see
+              collection-heading.tsx's own note for the full ruling. */}
+          <Headline as="h1" size="display-m">{t("Internal rates")}</Headline>
           {/* The sentence that says who may read this, on the screen rather than
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
@@ -159,7 +175,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -356,7 +372,19 @@ function RoleRateCard({ teamId }: { teamId: string }) {
     }
   }
 
-  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role rates.")}</p>
+  if (ratesQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the role rates.") }}
+        action={
+          <Button variant="secondary" onClick={() => ratesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const rates = ratesQ.data
   // Whole units in, whole cents out — the same conversion every price on this
@@ -378,7 +406,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}

@@ -2,12 +2,19 @@
 //
 // Three invariants, all earned by things this repo actually shipped:
 //
-//   1. EVERY SIDEBAR DESTINATION DECLARES WHICH HALF OF THE RAIL IT IS IN, and
-//      the shell partitions the rail from that field rather than naming pages.
-//      The owner's ruling is two groups with a divider — daily on top,
-//      occasional below — and he rejected both alternatives put to him. A rule
-//      like that survives exactly as long as the next person adding a section
-//      remembers it, unless the registry makes it un-forgettable.
+//   1. EVERY SIDEBAR DESTINATION DECLARES WHICH SECTION OF THE RAIL IT IS IN,
+//      and the shell partitions the rail from that field rather than naming
+//      pages. Client feedback 31 Aug 2026 replaced the owner's original
+//      two-group daily/occasional split with three NAMED sections (My work,
+//      Build, Accounts) plus two destinations that declared `"none"` and sat
+//      outside all three (Home, Kwapso) — then, the same day, asked for a
+//      fourth NAMED section (Kwapso, last), and then, later the same day,
+//      asked for that section to be removed from the rail entirely ("move
+//      with your profile and settings"). So Home is the rail's only
+//      remaining `"none"` entry, Kwapso is `inRail: false` (off the rail
+//      altogether, like Settings), and there are three named sections again
+//      — a rule like that survives exactly as long as the next person adding
+//      a section remembers it, unless the registry makes it un-forgettable.
 //
 //   2. EVERY SIDEBAR DESTINATION ACTUALLY RESOLVES. A section in the registry is
 //      a link in the rail, and a link needs four things to work: a permission
@@ -37,7 +44,7 @@ import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
 
-import { NAV, TEAM_SECTIONS } from "../lib/pages"
+import { NAV, NAV_GROUP_ORDER, TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, MODULE_PERMISSION } from "../lib/screens"
 import { TOP_LEVEL_MODULES } from "../components/deep-link/route"
 
@@ -47,9 +54,11 @@ const ROOT = join(WEB, "..")
 const read = (p: string) => readFileSync(p, "utf8")
 
 /** Every destination in the left rail — the universal anchors plus the team's
- * own sidebar pages. Derived from the two registries, never listed here. */
+ * own sidebar pages. Derived from the two registries, never listed here.
+ * `inRail !== false` drops Settings (client, 31 Aug 2026): its page is real
+ * and unchanged, it just isn't a rail destination any more. */
 const RAIL = [
-  ...NAV.filter((n) => !n.need).map((n) => ({ what: `NAV "${n.slug}"`, group: n.group })),
+  ...NAV.filter((n) => !n.need && n.inRail !== false).map((n) => ({ what: `NAV "${n.slug}"`, group: n.group })),
   ...TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => ({
     what: `section "${s.key}"`,
     group: s.group,
@@ -57,21 +66,34 @@ const RAIL = [
 ]
 
 describe("the screens are reachable", () => {
-  // 1 — THE RAIL IS TWO GROUPS, and the registry is what says which.
-  it("nav-groups: every rail destination declares its half, and the shell derives them", () => {
+  // 1 — THE RAIL IS THREE NAMED SECTIONS PLUS "NONE", and the registry is what
+  // says which — never a fourth value nobody decided about.
+  it("nav-groups: every rail destination declares its section (or is deliberately standalone), and the shell derives them", () => {
     expect(RAIL.length, "the rail derivation found nothing — it has gone blind").toBeGreaterThan(5)
-    const ungrouped = RAIL.filter((d) => d.group !== "daily" && d.group !== "occasional")
+    const VALID = new Set<string>([...NAV_GROUP_ORDER, "none"])
+    const undeclared = RAIL.filter((d) => !VALID.has(d.group as string))
     expect(
-      ungrouped.map((d) => d.what),
-      `a rail destination with no group lands in the occasional half by accident rather than by decision — give it \`group: "daily"\` or \`group: "occasional"\` in lib/pages.ts: ${ungrouped.map((d) => d.what).join(", ")}`
+      undeclared.map((d) => d.what),
+      `a rail destination with an unrecognised group lands somewhere by accident rather than by decision — give it a real NavGroup or "none" in lib/pages.ts: ${undeclared.map((d) => d.what).join(", ")}`
     ).toEqual([])
 
-    // BOTH halves have to be occupied, or the divider the owner asked for never
-    // draws and the ruling is silently undone by a registry edit.
-    for (const half of ["daily", "occasional"] as const)
+    // "none" is NAV's own word for "no heading" — Home is the one entry left
+    // using it since Kwapso got its own section. A TEAM_SECTIONS sidebar page
+    // declaring it would sit in the rail with no section at all, which nobody
+    // has asked for and `StandaloneNavItem` was never built to scale past a
+    // handful of hand-placed entries.
+    const sidebarStandalone = RAIL.filter((d) => d.what.startsWith("section ") && d.group === "none")
+    expect(
+      sidebarStandalone.map((d) => d.what),
+      `"none" is reserved for NAV's own anchors — these team sections need a real NavGroup instead: ${sidebarStandalone.map((d) => d.what).join(", ")}`
+    ).toEqual([])
+
+    // EVERY NAMED SECTION HAS TO BE OCCUPIED, or its heading never draws and
+    // the client's own grouping is silently undone by a registry edit.
+    for (const g of NAV_GROUP_ORDER)
       expect(
-        RAIL.filter((d) => d.group === half).length,
-        `the ${half} half of the rail is empty — the divider only exists between two groups`
+        RAIL.filter((d) => d.group === g).length,
+        `the "${g}" section is empty — a section's heading only draws over real destinations`
       ).toBeGreaterThan(0)
 
     // …and the SHELL must partition by that field rather than naming pages. A
@@ -232,7 +254,12 @@ describe("the screens are reachable", () => {
         .join("\n") +
       // The host's own write layer — a named action dispatched from a screen's
       // button is still that button pressing the door.
-      read(join(WEB, "lib", "use-screen-actions.ts"))
+      read(join(WEB, "lib", "use-screen-actions.ts")) +
+      // Same shape, one hook over: the record footer's add-a-note field calls
+      // `activity.addNote`, which is this file's own `tenancy.addNote(` call —
+      // a control passed by REFERENCE (`onAddNote={... ? activity.addNote :
+      // undefined}`) presses the door exactly as a named dispatch does.
+      read(join(WEB, "lib", "use-record-activity.ts"))
     expect(screens.length, "the screen scan read nothing — it has gone blind").toBeGreaterThan(10000)
 
     const unpressed: string[] = []

@@ -26,11 +26,17 @@ import * as React from "react"
 
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
+
+/** LIST, or the Gantt-drawn TIMELINE (waves-screen.tsx's `waveTimelineWindow`).
+ * List is the first-run default — D7-5's "table-first" rule, spelled for a
+ * collection whose default body is a plain list rather than a table. */
+export type WaveView = "list" | "timeline"
 
 /** What a wave can be ordered by. The words are the SCREEN's, not the column's. */
 export type WaveOrder = "name" | "runs" | "sprints" | "client" | "newest"
@@ -112,12 +118,41 @@ export function WaveFinder({
   /** Omit the client filter where the list is already one client's. */
   showClientFilter = true,
   resultCount,
+  view,
+  onViewChange,
+  period,
+  actions,
 }: {
   query: WaveQuery
   onChange: (next: WaveQuery) => void
   clients: Account[]
   showClientFilter?: boolean
   resultCount?: number
+  /** LIST/TIMELINE — CH19's third toolbar zone ("search, then filters, then
+   * view switcher, then actions pinned right", CH27.13), the kit's own
+   * `ViewSwitch`. Waves offers exactly two and no more, so it is always drawn
+   * here rather than made conditional — `ViewSwitch` itself renders nothing
+   * for fewer than two (view-switch.tsx's own state 7). */
+  view?: WaveView
+  onViewChange?: (view: WaveView) => void
+  /** CH27.26's `‹ 6 months ›` — override 28 puts the stepper "between the
+   * search field and the view switch". `GanttPeriodStepper` renders nothing
+   * with no handlers and no label (its own state 7/10), so an idle List view
+   * or a Timeline whose data fits inside six months passes nothing here and
+   * this slot draws empty air rather than a control with nowhere to go. */
+  period?: React.ReactNode
+  /** THE ROW'S OWN ACTION BUTTONS ("Sell a wave"…), last in THIS toolbar's
+   * first line — the same slot `<PagedFind>`'s own `actions` draws, so a
+   * bare collection's toolbar and a paged one's read as the same control in
+   * two places. No longer pushed to the far edge with `ml-auto` (client,
+   * 2 Sep 2026: her reference artifact packs it as the last chip in the
+   * same left-clustered row, not stretched open to the far side). Waves is
+   * the one bounded, single-view collection whose search/sort/filter is a
+   * component of its own rather than the frame's, so the button lives HERE,
+   * beside search and sort, instead of in a row of its own above this one
+   * (client ruling, 2026-08-31: an action button never gets a separate row
+   * from the toolbar it belongs to). */
+  actions?: React.ReactNode
 }) {
   const t = useT()
 
@@ -128,9 +163,14 @@ export function WaveFinder({
             field: "accountId",
             label: t("Client"),
             control: "select" as const,
-            // No `searchable` flag any more: the kit's facet carries its own
-            // search field, which an agency with 131 clients on staging needs
-            // and a two-word one does not mind having.
+            // No `searchable` flag: a facet declares its OPTIONS and nothing
+            // about how they are picked over (`FilterFacet`, config.ts).
+            // Whether the panel offers a search field is one decision in one
+            // place — and since 2 Sep 2026 the answer is no: a facet is a
+            // compact `Select` (client ruling, filter-bar.tsx's own header),
+            // which scrolls and takes type-ahead. This is the list that pays
+            // for that — an agency with 131 clients on staging — and the
+            // toolbar's own search box beside it is untouched.
             options: clients.map((a) => ({ value: a.id, label: a.name })),
           },
         ]
@@ -146,14 +186,31 @@ export function WaveFinder({
     },
   ]
 
-  // THE BAR IS ITS OWN ROW, at every width. The kit's filter row is a full-width
-  // strip of chips above whatever they are narrowing — that is the shape her
-  // component is drawn in and the reason it reads on a phone (a one-line
-  // scroller) without a second layout. Squeezing it back into the control row
-  // would be the first step of theming it into the row it replaced.
+  // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+  // approved that night, which supersedes this file's own earlier reasoning
+  // below). The filter bar used to be drawn as this row's own sibling BELOW
+  // it — the same shape her Apps screenshot caught: search+sort(+actions) on
+  // one line, the filter chips stranded on a second, disconnected one. The
+  // kit's chip row is still exactly what it always was (a full-width strip on
+  // its own, which is why it is wrapped in a non-growing flex box below
+  // rather than dropped in bare — a bare `w-full` child would still claim the
+  // rest of the line and push `actions` onto a line of its own, the same
+  // fault one level down), it is simply a FLEX ITEM of this one row now
+  // instead of a sibling block underneath it, the same technique the kit's
+  // OWN toolbar uses for its `filters` slot (`shared/ui/components/
+  // collection-frame/collection-frame.tsx`).
   return (
-    <div className="flex w-full flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="relative flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+          like in your atifact": the reference artifact's search element is
+          `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+          chips/sort/period after it to the track's far edge instead of
+          sitting immediately after a narrow box. `relative` on this track —
+          `filter-bar.tsx`'s own open panel anchors to it via `position:
+          absolute`/`top-full`, so its own tall height never feeds this
+          pill's `rounded-pill` (2 Sep 2026, second pass: it did, once, and
+          drew a giant oval). */}
+      <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
         <SearchInput
           value={query.q}
           onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
@@ -162,23 +219,16 @@ export function WaveFinder({
           // kit's bar says "Clear filters" and now means only that.
           onClear={() => onChange({ ...query, q: "" })}
           placeholder={t("Search waves…")}
-          className="w-full sm:w-56"
-        />
-        <SortControl
-          options={[
-            { value: "newest", label: t("Newest first") },
-            { value: "name", label: t("Name") },
-            { value: "client", label: t("Client") },
-            { value: "runs", label: t("When it runs") },
-            { value: "sprints", label: t("Sprints inside it") },
-          ]}
-          value={query.sortBy}
-          onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-          direction={query.dir}
-          onDirectionChange={(dir) => onChange({ ...query, dir })}
-          label={t("Sort by")}
+          className="w-full"
         />
       </div>
+      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its chip cluster renders
+          inline as a normal flex child (wrapping itself in a non-growing box
+          internally), and its own OPEN panel renders out of flow entirely,
+          `position: absolute` against this track's own `relative` above, so
+          the panel is never part of THIS flexbox's layout math and cannot
+          feed the pill's height. See `filter-bar.tsx`'s own header for the
+          full account, including the second pass that got here. */}
       <FilterBar
         facets={facets}
         values={{ accountId: query.accountId, status: query.status }}
@@ -192,6 +242,34 @@ export function WaveFinder({
         }
         resultCount={resultCount}
       />
+      <SortControl
+        options={[
+          { value: "newest", label: t("Newest first") },
+          { value: "name", label: t("Name") },
+          { value: "client", label: t("Client") },
+          { value: "runs", label: t("When it runs") },
+          { value: "sprints", label: t("Sprints inside it") },
+        ]}
+        value={query.sortBy}
+        onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+        direction={query.dir}
+        onDirectionChange={(dir) => onChange({ ...query, dir })}
+        label={t("Sort by")}
+        hideLabel
+      />
+      {period}
+      {view && onViewChange ? (
+        <ViewSwitch
+          views={[
+            { value: "list", label: t("List") },
+            { value: "timeline", label: t("Timeline") },
+          ]}
+          value={view}
+          onValueChange={(v) => onViewChange(v as WaveView)}
+          label={t("View")}
+        />
+      ) : null}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

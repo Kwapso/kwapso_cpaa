@@ -96,7 +96,7 @@ export function AskTheAssistant({
 
   if (!mayAsk)
     return (
-      <div className="bg-card flex flex-col gap-2 rounded-[var(--radius)] border p-4">
+      <div className="bg-surface-panel flex flex-col gap-2 rounded-[var(--radius)] p-4">
         <p className="text-sm font-medium">{t("Asking a question needs the assistant")}</p>
         <p className="text-muted-foreground text-sm">
           {t(
@@ -107,7 +107,7 @@ export function AskTheAssistant({
     )
 
   return (
-    <div className="bg-card flex flex-col gap-4 rounded-[var(--radius)] border p-4">
+    <div className="bg-surface-panel flex flex-col gap-4 rounded-[var(--radius)] p-4">
       <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={question}

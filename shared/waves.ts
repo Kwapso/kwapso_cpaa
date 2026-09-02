@@ -33,6 +33,11 @@
 /** ONE WAVE, as the tenancy worker lists it. */
 export type Wave = {
   id: string
+  /** THE NUMBER A PERSON READS OFF THE HEADER'S BLACK CHIP — "W1", team-wide,
+   * minted the moment the wave is sold (shared/workers/refs.ts). New as of the
+   * 2026-08-31 ruling: a wave never carried one before. Null on every wave
+   * sold before that migration landed. */
+  ref: string | null
   /** The client who bought it. A wave always belongs to one. */
   accountId: string
   accountName: string | null

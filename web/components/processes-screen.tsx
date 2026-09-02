@@ -15,8 +15,10 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import {
   ScreenRenderer,
   type ScreenActionContext,
@@ -138,7 +140,18 @@ export function ProcessesScreen({
   }
 
   if (processesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the processes.")}</p>
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the processes.") }}
+        action={
+          <Button variant="secondary" onClick={() => processesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (processesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = processesQ.data
@@ -194,6 +207,7 @@ export function ProcessesScreen({
                 icon="plus"
                 secondary={{ show: canCreate, label: t("Record an app"), onClick: () => setAppOpen(true) }}
                 onCreate={() => setAddOpen(true)}
+                useKitPanel
               >
                 <ScreenRenderer
                   recipe={listRecipe}
@@ -201,6 +215,7 @@ export function ProcessesScreen({
                   rights={rights}
                   onAction={onAction}
                   onIntent={onIntent}
+                  useKitPanel
                 />
               </SectionWithCreate>
 

@@ -84,6 +84,7 @@
 //   POST /api/tenancy/internal-rates/active-> retire / restore an internal rate
 //   GET  /api/tenancy/margin               -> revenue - our time - tool costs (internal)
 //   GET  /api/tenancy/activity             -> activity feed (?scope=team|user|role&id=)
+//   POST /api/tenancy/activity/note        -> add a note to one record's history ({table, id, note})
 //   GET  /api/tenancy/query                -> ask a module a question (?module=&where=&groupBy=&countOnly=&cursor=)
 //   GET  /api/tenancy/query/describe       -> what a module has: its fields, types and allowed values
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
@@ -139,6 +140,7 @@ import {
   getActivityFeed,
   getTeamMetaFeed,
   myTeams,
+  postActivityNote,
   postUpdateTeam,
   switchActiveTeam,
 } from "./routes/team"
@@ -304,6 +306,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
     kind: "housekeeping",
   },
   "GET /api/tenancy/activity": { handler: getActivityFeed, kind: "read" },
+  // The write half of the record scope above — add a note to one record's
+  // history (ch27.8's add-a-note field). Gated per-table via ACTIVITY_GATE_MAP,
+  // same as the read; always refused for a portal caller (postActivityNote's
+  // own doc says why).
+  "POST /api/tenancy/activity/note": { handler: postActivityNote, kind: "mutation" },
   // THE TWO QUERY DOORS — the generic read that stands in for fifty list tools
   // (shared/workers/query-grammar.ts says why). They sit HERE, beside the
   // activity feed, because that is this worker's other module-spanning read: one

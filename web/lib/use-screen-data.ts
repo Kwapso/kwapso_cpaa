@@ -12,11 +12,12 @@
 // tickets / accounts / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
-import type { HelpScope, TaskView } from "@/lib/live-resources"
+import type { TaskView } from "@/lib/live-resources"
 import {
   accountsKey,
   appsKey,
   brandAssetsKey,
+  companiesKey,
   cursorKey,
   helpKey,
   knowledgeKey,
@@ -51,8 +52,6 @@ export type ScreenDataInput = {
    * for exactly the same reason the current module does: something on screen
    * says its name. */
   ancestorModules?: string[]
-  /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
-  helpScope?: HelpScope
   /** which pile of our own admin the Tasks screen is showing — a SERVER view,
    * for the same reason (R14/R16). */
   taskView?: TaskView
@@ -77,7 +76,6 @@ export function useScreenData({
   enabled,
   module,
   recordId,
-  helpScope = "all",
   taskView = "open",
   ancestorModules = [],
 }: ScreenDataInput) {
@@ -114,17 +112,17 @@ export function useScreenData({
   const helpQ = useCached(enabled && module === "tickets" ? helpKey(teamId as string, "all") : null, () =>
     listFetch.help(teamId as string)
   )
-  const helpArchivedQ = useCached(
-    enabled && module === "tickets" && helpScope === "archived"
-      ? helpKey(teamId as string, "archived")
-      : null,
-    () => listFetch.helpArchived(teamId as string)
-  )
   // Accounts back their list, the breadcrumb label and the record screen. R14:
   // the list is a PAGE — page one lands here, its next cursor in the sidecar
   // <LoadMore> reads. Row-level live: a change patches the one account in place.
+  //
+  // CONTACTS READS THE SAME CACHE. A contact is a row of this SAME table
+  // (`accountType: "individual"`), so its own sidebar page (module "contacts")
+  // narrows this exact list rather than asking a second door — see
+  // `contactsListRecipe` in lib/screens.ts and the "contacts" branch in
+  // collection-content.tsx.
   const accountsQ = useCached(
-    enabled && onScreen("accounts") ? accountsKey(teamId as string) : null,
+    enabled && (onScreen("accounts") || onScreen("contacts")) ? accountsKey(teamId as string) : null,
     () => listFetch.accounts(teamId as string)
   )
   // The knowledge base backs its list, the breadcrumb label and one source's
@@ -133,6 +131,17 @@ export function useScreenData({
   const knowledgeQ = useCached(
     enabled && onScreen("knowledge") ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
+  )
+  // EVERY COMPANY, as a safety net for the list's "filed under" names —
+  // 2026-08-31: `accountsQ` above is gated to the accounts/contacts screens, so
+  // it was `undefined` while browsing Knowledge and every source's account
+  // name fell to "A client" whether or not it was in page one. `companiesKey`
+  // (waves-screen.tsx's own fix for the same paged-list problem) asks the
+  // door the narrow question directly rather than depending on another
+  // screen's cache having warmed it first.
+  const companiesQ = useCached(
+    enabled && onScreen("knowledge") ? companiesKey(teamId as string) : null,
+    () => tenancy.accounts({ type: "entity" }).then((r) => r.accounts)
   )
   // ── THE WORK ENGINE'S FOUR ───────────────────────────────────────────────
   // Each loaded only on its own section (cache-first + row-level live), so
@@ -219,7 +228,6 @@ export function useScreenData({
     invites: useCachedValue<number>(enabled ? totalKey("invites", teamId as string) : null),
     selectable: useCachedValue<number>(enabled ? totalKey("selectable", teamId as string) : null),
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
-    helpArchived: useCachedValue<number>(enabled ? totalKey("help-archived", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
     // The Companies / Contacts / All strip's other two badges — exact, from the
     // same read as the rows, and both zero-safe: without the contacts right the
@@ -339,6 +347,7 @@ export function useScreenData({
     overridesQ,
     accountsQ,
     knowledgeQ,
+    companiesQ,
     storiesQ,
     sprintsQ,
     appsQ,
@@ -351,7 +360,6 @@ export function useScreenData({
     invitesQ,
     metaQ,
     helpQ,
-    helpArchivedQ,
     totals,
     formSelectableQ,
     selectableValues,

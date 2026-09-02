@@ -67,7 +67,7 @@ function TimeGivenBack() {
   // A card that is a link — one of the three things motion.css §13 allows to
   // gain elevation on hover, and `motion-hover-lift` is how it is spelt.
   return (
-    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-[var(--radius)] border p-6">
+    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-[var(--radius)] bg-surface-panel p-6">
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
       <p className="text-3xl font-medium">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
@@ -144,7 +144,9 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
             <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
           </div>
         ) : newest.length === 0 ? (
-          <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
+          // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
+          // impact-screen.tsx's own note on this box for the full reasoning.
+          <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
             <p>{t("You haven't asked us for anything yet.")}</p>
             <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
           </div>

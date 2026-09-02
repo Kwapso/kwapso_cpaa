@@ -21,7 +21,6 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/ui/components/list/list"
 
 import type { AccountDetail } from "@shared/types"
-import { RecordMark } from "@shared/web/record-mark"
 import { postalAddress } from "@shared/web/format"
 import { useCached } from "@shared/web/store"
 import { portal } from "@/lib/api"
@@ -62,21 +61,21 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
 
   return (
     <div className="flex flex-col gap-12">
-      <div className="flex items-start gap-4">
-        {/* THEIR OWN MARK, on their own page. The column is on the row the fence
-            already hands this screen, and the portal drew no picture anywhere at
-            all — one brand logo on the sign-in door and nothing after it. A
-            client opening the record we keep on them should see themselves at
-            the top of it. Shown WHOLE rather than cropped, because a company
-            mark is usually a wordmark (shared/web/record-mark.tsx), and it falls
-            back to the company's initial rather than an empty square. */}
-        <RecordMark picture={account.logoUrl} name={account.name} size="band" />
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-3xl font-medium">{account.name}</h1>
-          <p className="text-muted-foreground">
-            {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
-          </p>
-        </div>
+      {/* NO MARK ON THE TITLE — client ruling, 2026-09-01, verbatim: "for now
+          there are no - under no case - images on title. remove it
+          everywhere." This page used to lead with the account's own
+          `RecordMark` beside the `<h1>` (see git history for the prior
+          reasoning); that is exactly the shape the ruling reaches — a
+          picture beside a title — regardless of front door, so it is gone
+          here too, the same as every detail screen's own header
+          (record-chrome.tsx) and the main-screen heading (collection-
+          heading.tsx). `RecordMark` itself is untouched — it still draws in
+          an ordinary list row, just never beside a title. */}
+      <div className="flex min-w-0 flex-col gap-2">
+        <h1 className="text-3xl font-medium">{account.name}</h1>
+        <p className="text-muted-foreground">
+          {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
+        </p>
       </div>
 
       {details.length > 0 ? (

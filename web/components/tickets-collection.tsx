@@ -1,55 +1,114 @@
 "use client"
 
-// THE TICKETS SCREEN — two tab strips, one collection, and a triage queue.
+// THE TICKETS SCREEN — one tab strip, one collection, and a triage queue.
 //
 // It lived inside the deep-link host's collection switch, which was fine while it
-// was one strip. CHECKLIST 5.1 adds a second ("sub-tabs by TYPE beneath the
-// existing All / My / Archived strip") and 5.11 adds a queue that is not a filter
-// of the list at all, and both need state of their own — so this is a component
-// rather than a branch. The host renders it and hands over the four things only
-// the host knows: the recipe, the rights, and the two action callbacks.
+// was one strip. CHECKLIST 5.1 added a second ("sub-tabs by TYPE beneath the
+// existing All / My / Archived strip") and 5.11 added a queue that is not a
+// filter of the list at all, and both needed state of their own — so this is a
+// component rather than a branch. The host renders it and hands over the things
+// only the host knows: the recipe, the rights, and the two action callbacks.
 //
-// THE TWO STRIPS COMPOSE, and that is the whole shape:
+// ── THE REDESIGN, 2026-08-31 ─────────────────────────────────────────────────
 //
-//   the OUTER strip is WHOSE and WHERE — All / My / Archived. Two of the three
-//   are a raiser filter and one is a view, and the door has answered all three as
-//   server scopes since tickets started paging;
+// This screen used to stack TWO folder tab strips (CHECKLIST 5.1's own
+// description above is the fossil of that: "sub-tabs … beneath the existing …
+// strip"). The owner had ruled, 2026-08-28, to keep both rather than move one
+// into the toolbar ("there's no way out .. lets' keep 2 tabs but both as the
+// folder tabs" — `web/test/rules.test.ts`'s `TWO_FOLDERS_OK` carried that
+// ruling). The CLIENT overruled it the next business day, verbatim: "there can
+// never be 2 rows of tabs, no folder tabs, no line tabs. just never." Not a
+// narrower version of the 28 Aug ruling — the opposite of it — so this is a
+// genuine redesign, not a spacing fix.
 //
-//   the INNER strip is WHAT KIND and HOW FAR ALONG — Ready, then one tab per live
-//   `Ticket type` value, then Closed, then All. DERIVED from the team's own
-//   vocabulary rather than hard-coded: deactivating "Bug" on the Dropdown values
-//   screen takes its tab away, and adding a word adds one.
+// WHAT THE TWO STRIPS WERE ASKING were always two different questions:
 //
-// Every narrowing is the DOOR's (R14 + R16). Filtering the loaded page would
-// answer "the questions among the newest fifty" while the badge above counted all
-// of them, which is the failure R16 exists for and the one a manager reported as
-// "filter by type, the count doesn't change".
+//   the OLD OUTER strip was WHOSE and WHERE — All tickets / Archived, a raiser-
+//   scope-turned-VIEW the door has answered as a server scope since tickets
+//   started paging;
 //
-// AND ONE TAB IS NOT A FILTER. "Triage" swaps the collection for the queue of
-// requests nobody has read — and the DOOR decides whether this caller is given
-// that queue at all (CHECKLIST 5.11: only the person on duty sees it). A screen
-// that hid a list it had already been handed would be a curtain, not a rule.
+//   the strip that REMAINS is WHAT KIND and HOW FAR ALONG — Ready, then one tab
+//   per live `Ticket type` value, then Closed, then All. DERIVED from the
+//   team's own vocabulary rather than hard-coded: deactivating "Bug" on the
+//   Dropdown values screen takes its tab away, and adding a word adds one.
+//
+// THREE SHAPES WERE ON THE TABLE. (a) fold Archived in as one more value on the
+// remaining strip — rejected, because Archived is orthogonal to kind/stage (an
+// archived ticket can be any type, at any stage) and folding it in as a sibling
+// of Ready/Issue/Closed would have made "archived Ready tickets" unreachable,
+// a real capability the two stacked strips already gave away. (b) move it to
+// the toolbar as a plain control — too vague to be a decision. What shipped is
+// closer to (c): Archived becomes a real FILTER (`COLLECTION_FILTERS.help`,
+// field `view`), the exact shape Accounts' own "Archived" toggle already uses
+// beside its Companies/All tab (`web/lib/collection-filters.ts`) — so scope and
+// kind/stage stay two REAL, independently-askable questions, just never drawn
+// as two tab strips. A tab and a filter compose for free through
+// `<PagedFind>`'s own `query` object (paged-find.tsx), so "archived Ready
+// tickets" is still one search away, through the toolbar's Filter control
+// rather than a second folder strip.
+//
+// THE TOOLBAR MOVES INSIDE THE CARD, the other half of the same client note
+// (verbatim on a screenshot of THIS screen: the search/sort sat on the base
+// background, above the peachy panel holding the rows). Accounts hit the
+// identical defect the same day and fixed it the identical way
+// (`collection-content.tsx`, `accountTabs`): `<PagedFind>`'s `wrap` boxes the
+// toolbar AND the rows in one `CollectionCard`, and the tab strip sits directly
+// above it with zero gap so the folder tab's own pulled-down feet
+// (`--folder-tab-overlap`) melt into the card rather than showing themselves
+// on the base background — see `web/test/rules.test.ts`'s "tab-shape: only the
+// inner filter strips and the record strip override it", which names this
+// exact join for Accounts. Tickets now draws the same join.
+//
+// THE TOOLBAR GAINS A FILTER AND A CREATE BUTTON, the two pieces the old
+// search-and-sort-only bar was missing next to Accounts' fixed one: the
+// Archived filter above, and a "Raise ticket" button beside the tab row where
+// Accounts' New/Import/Export row sits. There is no Export/Import button here
+// because there is no export or import door for tickets (SCOPE ch.07 — a
+// ticket is a conversation, not an importable record; `internal-money.ts`'s
+// neighbour AGENTIC-IMPORT.md says the same about what earns a target). A
+// "view selector" beyond the tab strip and the Archived filter is not drawn
+// either. The kit's own `ViewSwitch` (`shared/ui/components/collection-frame/
+// view-switch.tsx`) is genuinely reached elsewhere now (Apps' Tiles/List,
+// Waves' List/Timeline, 1 Sep 2026) — the reason it stays off THIS screen is
+// that a ticket has no second real way to look at the same rows, not that
+// the control is unproven. A Board grouped by `status` was analysed and
+// flagged as real future work (per-status paged reads, an R16 arbitration
+// question), not a "no view exists yet" gap.
+//
+// Every narrowing is still the DOOR's (R14 + R16). Filtering the loaded page
+// would answer "the questions among the newest fifty" while the badge above
+// counted all of them, which is the failure R16 exists for and the one a
+// manager reported as "filter by type, the count doesn't change".
+//
+// AND ONE TAB IS STILL NOT A FILTER. "Triage" swaps the collection for the
+// queue of requests nobody has read — and the DOOR decides whether this caller
+// is given that queue at all (CHECKLIST 5.11: only the person on duty sees
+// it). A screen that hid a list it had already been handed would be a
+// curtain, not a rule.
 
 import * as React from "react"
 
-import { Button } from "@shared/ui/components/button/button"
 import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
+import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Send } from "@shared/ui/foundations/icons"
+import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Plus, Send } from "@shared/ui/foundations/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { EmptyLine, SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { translatedFacets } from "@/lib/collection-filters"
+import { AddButton, CollectionCard, EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
-import { TicketStagesCard } from "@/components/pulse"
+import { TicketStagesCard, TicketsByAccountCard } from "@/components/pulse"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api/tenancy"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
@@ -60,6 +119,8 @@ import type { TriageGap } from "@shared/triage-readiness"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { TriageReplyDialog } from "@/components/triage-reply-dialog"
 import {
+  accountsKey,
+  appModulesKey,
   helpFacetFilter,
   helpFacetKey,
   helpKey,
@@ -67,15 +128,14 @@ import {
   totalKey,
   triageKey,
   type HelpFacet,
-  type HelpScope,
 } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatRelative } from "@shared/web/format"
 import { primeCache, invalidate,
   mergePage, useCached, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
-import type { HelpTicket, SelectableValue } from "@shared/types"
+import { useLanguage, useT } from "@shared/web/language"
+import type { Account, AppModule, HelpTicket, SelectableValue } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two facets that are STAGES rather than kinds, and the tab each one is.
@@ -86,13 +146,17 @@ const READY: HelpFacet = "status:ready"
 const CLOSED: HelpFacet = "status:resolved"
 const TRIAGE: HelpFacet = "triage"
 const ALL: HelpFacet = "all"
+/** THE ONE OTHER NON-NARROWING TAB, following Triage's own precedent (the
+ * file header, "THE REDESIGN, 2026-08-31"): a different screen wearing the
+ * same strip, not a filter of the list. `helpFacetFilter` already returns `{}`
+ * for any value it doesn't recognise, so this needs no change there — only
+ * the render switch below and the `narrowed` check needed to know about it. */
+const DASHBOARD: HelpFacet = "dashboard"
 
 export function TicketsCollection({
   teamId,
   recipe,
   rights,
-  helpScope,
-  setHelpScope,
   helpTypeOptions,
   totals,
   can,
@@ -103,11 +167,9 @@ export function TicketsCollection({
   teamId: string
   recipe: ScreenRecipe
   rights: ScreenRights
-  helpScope: HelpScope
-  setHelpScope: (v: HelpScope) => void
-  /** the team's live `Ticket type` values — the inner strip is built from these */
+  /** the team's live `Ticket type` values — the tab strip is built from these */
   helpTypeOptions: string[]
-  totals: { help?: number; helpArchived?: number }
+  totals: { help?: number }
   can: (module: string, right: "read" | "create" | "edit" | "delete") => boolean
   onCreate: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
@@ -118,8 +180,6 @@ export function TicketsCollection({
   // screen — the sub-tab is as much "where she was" as the search box under it.
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
 
-  // THE TWO SCOPE CACHES: each is a server scope with its own page. There were
-  // three until "My tickets" went (live-resources.ts says why).
   // The team's own glyphs, scanned once for the whole strip rather than once
   // per tab. The vocabulary is a cache this screen's siblings already hold and
   // the live registry keeps current, so an emoji edited on the Dropdown values
@@ -128,75 +188,75 @@ export function TicketsCollection({
     tenancy.selectable().then((r) => r.values)
   )
   const ticketMarks = markMap(selectableQ.data, MARK_GROUP.ticket)
+  // THE TWO NEW TOOLBAR FACETS (Client, Module) — read unconditionally, like
+  // Processes' own `appId` facet reads `appsKey` (processes-screen.tsx), because
+  // narrowing by either is a READ act available to anyone who can see this
+  // screen at all, not something gated behind creating a ticket. Modules are a
+  // BOUNDED, whole-team read (help-form-dialog.tsx reads the identical
+  // `appModulesKey` the same way, for the same reason: "a team's systems, not a
+  // feed"). Accounts is the one with a real caveat: `tenancy.accounts()` is
+  // page ONE of a GROWING_COLLECTIONS list (R14) — exactly the defect
+  // help-form-dialog.tsx's own account picker was rewritten off of ("offered
+  // the newest fifty companies and had no opinion about the rest"). This facet
+  // inherits that same limitation rather than fixing it: a live, searched
+  // facet option list is a capability no facet control in this app has today
+  // (shared/web/screen-engine/filter-bar.tsx's own header says the async
+  // option-provider was removed as dead code, and — since 2 Sep 2026 — that a
+  // facet is a compact `Select`, which scrolls and type-aheads but does not
+  // search; re-adding a searched one is outside this fix's remit). Filed as a
+  // known gap rather than silently shipped as if it were complete.
+  const accountsQ = useCached<Account[]>(accountsKey(teamId), () =>
+    tenancy.accounts().then((r) => r.accounts)
+  )
+  const modulesQ = useCached<AppModule[]>(appModulesKey(teamId), () =>
+    tenancy.appModules().then((r) => r.modules)
+  )
+  // THE RESTING CACHE — always the LIVE list now that Archived has moved off a
+  // tab and onto the toolbar's Filter (see the header comment). It never holds
+  // archived rows: those are an ACTIVE question, asked through `<PagedFind>`'s
+  // own `facets` below exactly the way a search or a sort already is, so they
+  // land in that find's own cache key rather than a resting one here.
   const allQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
-  const archivedQ = useCached<HelpTicket[]>(
-    helpScope === "archived" ? helpKey(teamId, "archived") : null,
-    () => listFetch.helpArchived(teamId)
-  )
-  // …and ONE more for whichever sub-tab is open, keyed by BOTH strips because the
-  // two compose: "my questions" and "all questions" are different pages.
-  const narrowed = facet !== ALL && facet !== TRIAGE
+  // …and ONE more for whichever sub-tab is open. DASHBOARD is excluded for the
+  // same reason TRIAGE is: neither narrows the list, both swap in a different
+  // screen, so neither should open a facet read of its own.
+  const narrowed = facet !== ALL && facet !== TRIAGE && facet !== DASHBOARD
   const facetQ = useCached<HelpTicket[]>(
-    narrowed ? helpFacetKey(teamId, helpScope, facet) : null,
-    () => listFetch.helpFacet(teamId, helpScope, facet)
+    narrowed ? helpFacetKey(teamId, "all", facet) : null,
+    () => listFetch.helpFacet(teamId, "all", facet)
   )
-  // R16: every badge on the inner strip is the door's own grouped COUNT(*),
-  // primed by whichever ticket read ran last and counted over the list IGNORING
-  // the kind and stage facets — so opening "Questions" does not make every other
-  // badge read zero.
+  // R16: every badge on the strip is the door's own grouped COUNT(*), primed by
+  // whichever ticket read ran last and counted over the list IGNORING the kind
+  // and stage facets — so opening "Questions" does not make every other badge
+  // read zero.
   const byType = useCachedValue<Record<string, number>>(`help-by-type:${teamId}`)
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
-  const scopedQ = narrowed ? facetQ : helpScope === "archived" ? archivedQ : allQ
+  const scopedQ = narrowed ? facetQ : allQ
   // The list key is written out at BOTH call sites below rather than held in a
   // variable: the paging and search checks read the JSX and look for the key the
   // door's own page lands in (`helpKey(`), which is the honest thing to look for
   // — a variable could be anything by the time it reaches the prop.
   const facetTotal = useCachedValue<number>(
-    totalKey(`help-facet:${helpScope}:${facet}`, teamId)
+    totalKey(`help-facet:all:${facet}`, teamId)
   )
-  const scopeTotal =
-    helpScope === "archived" ? totals.helpArchived : totals.help
+  const scopeTotal = totals.help
   const shownTotal = narrowed ? facetTotal : scopeTotal
 
-  const outerTabs = {
+  // THE ONE STRIP LEFT (2026-08-31's redesign — see the file header). Ready,
+  // then a tab per live ticket type, then Closed, then All — and Triage on the
+  // end, which is a different screen rather than a narrower list. Archived
+  // used to be a second strip above this one; it is a toolbar Filter now
+  // (`COLLECTION_FILTERS.help`, below), because it narrows a different, ORTHOGONAL
+  // question — a ticket's stage in the archive, not its kind or lifecycle stage.
+  const tabsConfig = {
     ...defaultTabsConfig,
-    // THE FOLDER, by saying nothing. Client ruling E: "folder tabs are for main
-    // screens, line tabs for detail screens", and ch27.13: "folder tabs belong to
-    // collections and main screens only". Tickets is a collection on a main
-    // screen, and this strip cuts it into subsets — All and Archived — which is
-    // the folder's own job. It said `line` here and was the reason the owner saw
-    // folders on every section except this one. `defaultTabsConfig` is already
-    // the folder, so the fix is to stop overriding it rather than to flip it.
-    tabs: [
-      { value: "all", label: t("All tickets"), icon: "inbox", badge: formatCount(totals.help), badgeVariant: "" as const },
-      // THE PUT-AWAY PILE. Archive shipped as a door with no button; giving it a
-      // button without giving the pile a screen would have moved the dead end one
-      // step along instead of ending it.
-      { value: "archived", label: t("Archived"), icon: "archive", badge: formatCount(totals.helpArchived), badgeVariant: "" as const },
-    ],
-  }
-
-  // THE INNER STRIP, built from the team's own words. Ready, then a tab per live
-  // ticket type, then Closed, then All — and Triage on the end, which is a
-  // different screen rather than a narrower list.
-  const innerTabs = {
-    ...defaultTabsConfig,
-    // THE FOLDER TOO, by the owner's ruling of 2026-08-28: "there's no way out ..
-    // lets' keep 2 tabs but both as the folder tabs." He was shown the alternative
-    // — ch27.13 puts a sub-picker in the toolbar — and chose two folder strips
-    // over moving the control, which is his screen to decide.
-    //
-    // What this overrides, written down because the reasoning was sound and lost
-    // anyway: a folder tab is drawn to sit attached to a card, and this strip has
-    // no second card beneath it. It reads as a folder resting on the one above.
-    // That is a cosmetic cost he has accepted; a control moving between regions
-    // was the one he would not. (`pill` used to be spelled here; the kit has no
-    // pill tab and drew it as a line anyway.)
-    //
-    // Inherited rather than spelled: `defaultTabsConfig` is already the folder,
-    // and saying `variant` here again is how sixteen screens once hard-coded
-    // `line` on top of a default that had moved.
+    // THE FOLDER. Client ruling E: "folder tabs are for main screens, line tabs
+    // for detail screens", and ch27.13: "folder tabs belong to collections and
+    // main screens only". Tickets is a collection on a main screen, and this is
+    // now its ONLY strip — the shape a single folder tab strip on a main
+    // screen has always had (Tasks, Sprints, Apps, Accounts). Inherited rather
+    // than spelled: `defaultTabsConfig` is already the folder.
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
@@ -216,6 +276,13 @@ export function TicketsCollection({
       })),
       { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
+      // THE OTHER NON-NARROWING TAB (2026-09-01, beside Triage below): the
+      // Opus-analysis dashboard — which client is generating the most work,
+      // and where the tickets are sitting. No badge, for the same reason
+      // Triage carries none — it is not a count of a narrower slice of THIS
+      // list, so a number here would be R16's exact violation (a collection's
+      // count shown more than once).
+      { value: DASHBOARD, label: t("Dashboard"), icon: CONCEPT_ICON.dashboard, badge: "", badgeVariant: "" as const },
       // The one tab on this strip whose idea has a concept icon of its own. The
       // four KIND tabs beside it carry the team's own type MARKS on every other
       // surface (a ticket's header band, its detail) and cannot carry one here:
@@ -228,127 +295,182 @@ export function TicketsCollection({
     ],
   }
 
+  const canCreateTicket = can("help", "create")
+
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
-        {/* BOTH STRIPS STAY `line`, and that is a decision rather than an
-            oversight. The kit's folder tab is drawn to be ATTACHED: it pulls
-            itself down under the panel below so the panel's edge covers its cut
-            feet, which is the whole of why the active one reads as a folder in
-            a drawer. On this screen a search box and the create row sit between
-            these strips and the list's card, so there is nothing for them to
-            attach to — a folder tab hanging in mid-air with its feet showing is
-            worse than the line tab it replaced. Tasks, Sprints, Apps and
-            Accounts introduce their card directly and take the shape; this one
-            takes it the day its search moves above the strips. */}
-        {/* THE GAP CANCELS THE KIT'S OWN OVERLAP, and that is why it is a calc
-            and not a number somebody liked the look of.
- 
-            A folder tab is drawn PULLED DOWN by `--folder-tab-overlap` (1.06375rem
-            ≈ 17px) so the active one looks physically attached to the panel under
-            it — tabs.tsx says so, and collection-frame rides its panel up by
-            exactly that much to meet it. With two strips stacked there is no panel
-            between them, so the outer strip's feet reach 17px into a `gap-2` of
-            8px and stand on the inner strip's tabs. The owner reported it as "the
-            tabs cut into each other", which is precisely what it is.
- 
-            So the gap is the overlap plus the ordinary spacing: the first part
-            gets the feet back to the line, the second is the space a reader sees.
-            Written against the token, so a kit that redraws the silhouette moves
-            this with it rather than leaving a number here that used to be right.
- 
-            This exists because two folder strips are stacked at all, which the
-            kit does not do and our own law forbade until the owner ruled for it
-            on 2026-08-28 (see TWO_FOLDERS_OK in web/test/rules.test.ts). The
-            spacing is therefore ours to decide: there is no kit rule for a shape
-            the kit declines to draw. */}
-        <div className="flex flex-col gap-[calc(var(--folder-tab-overlap)+0.5rem)]">
-          <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
-          <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
-        </div>
+        {/* ONE STRIP, GENUINELY ATTACHED — the client's 2026-08-31 rulings, both
+            on this exact screen: "there can never be 2 rows of tabs … just
+            never", "toolbar must be inside of card background", and — once
+            "Raise ticket" had moved to share the tab row — "never align the
+            button with the tabs … that button belongs in the right of the
+            toolbar, part of the toolbar". So the strip carries nothing but
+            the tabs, and whatever follows attaches to it with ZERO gap, so
+            the folder tab's own pulled-down feet (`--folder-tab-overlap`,
+            tabs-view.tsx) melt into that panel instead of showing on the base
+            background. This column carries no `gap-*` for exactly that
+            reason — the same join `SectionWithCreate`'s `folderTabs` slot
+            draws for apps-screen.tsx/sprints-screen.tsx/tasks-screen.tsx, and
+            `PagedFind`'s `wrap` now draws for Accounts. */}
+        <div className="flex flex-col">
+          <TabsView config={tabsConfig} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
 
-        {facet === TRIAGE ? (
-          <TriageQueue
-            teamId={teamId}
-            canTriage={can("help", "edit")}
-            canEdit={can("help", "edit")}
-            helpTypeOptions={helpTypeOptions}
-            // The engine's open intent carries a URL SEGMENT, not a permission
-            // module — its only consumer builds an address out of it
-            // (deep-link-screen.tsx). Everywhere else in the app the two words
-            // are the same string, so passing `help` here looked right and
-            // produced `/help/<id>`, which is not a route: triage's Open button
-            // answered 404 for as long as the tab has existed. `tickets` is the
-            // segment; MODULE_PERMISSION is where it becomes `help` again.
-            onOpen={(id) => onIntent({ kind: "open", module: "tickets", id })}
-          />
-        ) : scopedQ.error ? (
-          <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
-        ) : scopedQ.data === undefined ? (
-          <Skeleton variant="list" lines={4} />
-        ) : (
-          <PagedFind<HelpTicket>
-            listKey={narrowed ? helpFacetKey(teamId, helpScope, facet) : helpKey(teamId, helpScope)}
-            placeholder={t("Search tickets…")}
-            matches={{
-              none: t("No tickets match"),
-              one: t("1 ticket matches"),
-              many: t("{count} tickets match"),
-            }}
-            sorts={translatedSorts("help", t)}
-            defaultSort={COLLECTION_SORTS.help.defaultSort}
-            // NO `facets` HERE, deliberately. The recipe used to declare a
-            // Status select, which the frame answered over the loaded fifty; the
-            // inner strip above already narrows the same field AT THE DOOR, and
-            // two controls on one field is the clutter the accounts screen
-            // removed ("the Accounts tab is a bit confusing"). One control, and
-            // it is the one that can see past the cursor.
-            //
-            // The strip's own narrowing is NOT `fixed` either, and the difference
-            // matters: `fixed` makes a find ACTIVE, and these two strips are
-            // already in `listKey` above. Passing them there would move the
-            // resting screen into a `find:` cache key the live registry does not
-            // patch (R15) — a ticket list that stops updating itself, in exchange
-            // for nothing.
-            fetchPage={(query, cursor) =>
-              contentApi
-                .help({
-                  // What the strips chose, then the person's own question spread
-                  // whole over it: `listQuery` forwards every key, so a narrowing
-                  // cannot be lost between these controls and the door.
-                  scope: helpScope === "archived" ? "all" : helpScope,
-                  view: helpScope === "archived" ? "archived" : "live",
-                  ...helpFacetFilter(facet),
-                  ...query,
-                  cursor,
-                })
-                .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
-            }
-          >
-            {(found) => {
-              const rows = found.active ? found.rows : scopedQ.data
-              if (rows === null || rows === undefined) return <Skeleton variant="list" lines={4} />
-              const data = shapeHelpList(rows, ticketMarks)
-              const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
-              return (
-                <>
-                  <SectionWithCreate
-                    show={can("help", "create")}
-                    label={t("Raise ticket")}
-                    icon="plus"
-                    onCreate={onCreate}
-                    useKitPanel
+          {facet === TRIAGE ? (
+            <CollectionCard attached>
+              {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. Triage is a
+                  queue, not a `<PagedFind>` toolbar, so there is no search/sort
+                  row to share — but "Raise ticket" still lives below the tabs
+                  rather than beside them (client ruling, 2026-08-31), so this
+                  bare `<ToolbarRow>` is Triage's own toolbar. */}
+              {canCreateTicket && (
+                <ToolbarRow className="mb-4" actions={<AddButton label={t("Raise ticket")} onClick={onCreate} />} />
+              )}
+              <TriageQueue
+                teamId={teamId}
+                canTriage={can("help", "edit")}
+                canEdit={can("help", "edit")}
+                helpTypeOptions={helpTypeOptions}
+                // The engine's open intent carries a URL SEGMENT, not a permission
+                // module — its only consumer builds an address out of it
+                // (deep-link-screen.tsx). Everywhere else in the app the two words
+                // are the same string, so passing `help` here looked right and
+                // produced `/help/<id>`, which is not a route: triage's Open button
+                // answered 404 for as long as the tab has existed. `tickets` is the
+                // segment; MODULE_PERMISSION is where it becomes `help` again.
+                onOpen={(id) => onIntent({ kind: "open", module: "tickets", id })}
+              />
+            </CollectionCard>
+          ) : facet === DASHBOARD ? (
+            /* THE DASHBOARD (2026-09-01) — two charts and no numbers (R16: a
+               tab strip badge and a stat tile would both be counting the same
+               collection twice). Tickets by client is the door's own
+               `byAccount` facet, never drawn before tonight; Where the
+               tickets are sitting is `TicketStagesCard`, MOVED here from
+               below the list (see the note there) rather than duplicated. */
+            <CollectionCard attached>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TicketsByAccountCard teamId={teamId} />
+                <TicketStagesCard teamId={teamId} />
+              </div>
+            </CollectionCard>
+          ) : scopedQ.error ? (
+            <CollectionCard attached>
+              <ShapeStateBody
+                shape="collectionScreen"
+                state="error"
+                copy={{ errorTitle: t("Couldn't load the tickets.") }}
+                action={
+                  <Button variant="secondary" onClick={() => scopedQ.refresh()}>
+                    {t("Try again")}
+                  </Button>
+                }
+              />
+            </CollectionCard>
+          ) : scopedQ.data === undefined ? (
+            <CollectionCard attached>
+              <Skeleton variant="list" lines={4} />
+            </CollectionCard>
+          ) : (
+            <PagedFind<HelpTicket>
+              listKey={narrowed ? helpFacetKey(teamId, "all", facet) : helpKey(teamId, "all")}
+              placeholder={t("Search tickets…")}
+              matches={{
+                none: t("No tickets match"),
+                one: t("1 ticket matches"),
+                many: t("{count} tickets match"),
+              }}
+              sorts={translatedSorts("help", t)}
+              defaultSort={COLLECTION_SORTS.help.defaultSort}
+              // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
+              // overnight (2026-09-01) names Client and Module as the ticket
+              // screen's own worked example of "real filter facet chips"; the
+              // Status select the old frame drew is still gone (the tab strip
+              // above still narrows kind/stage AT THE DOOR — spread into
+              // `fetchPage` below, NOT through `facets`, so there are never two
+              // controls asking the same field — "the Accounts tab is a bit
+              // confusing"). All three are rows/options `COLLECTION_FILTERS.help`
+              // now declares; Client and Module are filled in from the accounts
+              // and modules this screen reads above, Archived is the closed
+              // `view` vocabulary it always was.
+              facets={translatedFacets("help", t, {
+                accountId: (accountsQ.data ?? [])
+                  .filter((a) => a.active)
+                  .map((a) => ({ value: a.id, label: a.name })),
+                moduleId: (modulesQ.data ?? [])
+                  .filter((m) => m.active)
+                  .map((m) => ({ value: m.id, label: `${m.appName} · ${m.name}` })),
+              })}
+              // "RAISE TICKET", AT THE RIGHT OF THE TOOLBAR — PagedFind's own
+              // `actions` slot (client ruling, 2026-08-31). No Export/Import
+              // beside it: unlike Accounts, tickets has no export or import
+              // door (a ticket is a raised conversation, not an importable
+              // record — AGENTIC-IMPORT.md), so there is nothing else to draw.
+              actions={() => (canCreateTicket ? <AddButton label={t("Raise ticket")} onClick={onCreate} /> : null)}
+              // The tab strip's own kind/stage narrowing is NOT `fixed`, and the
+              // difference matters: `fixed` makes a find ACTIVE unconditionally,
+              // and this strip is already in `listKey` above — passing it here
+              // too would move the RESTING screen into a `find:` cache key the
+              // live registry does not patch (R15), for no gain. The Archived
+              // filter above has no such cost: untouched, a facet contributes
+              // nothing to `query`, so the resting cache stays exactly as live
+              // as it was before this toolbar could ask it anything.
+              fetchPage={(query, cursor) =>
+                contentApi
+                  .help({
+                    // The strip's own choice, then whatever the toolbar is
+                    // asking (search, sort, the Archived filter) spread whole
+                    // over it: `listQuery` forwards every key, so a narrowing
+                    // cannot be lost between these controls and the door.
+                    scope: "all",
+                    view: "live",
+                    ...helpFacetFilter(facet),
+                    ...query,
+                    cursor,
+                  })
+                  .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
+              }
+              // THE ONE CARD — toolbar, then rows — the same join Accounts draws
+              // (`collection-content.tsx`'s own `wrap`): zero gap to the tab row
+              // above, which is this component's own flex column rather than a
+              // second `gap-*` here.
+              wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+            >
+              {(found) => {
+                const rows = found.active ? found.rows : scopedQ.data
+                if (rows === null || rows === undefined) return <Skeleton variant="list" lines={4} />
+                const data = shapeHelpList(rows, ticketMarks)
+                const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+                return (
+                  // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
+                  // `SectionWithCreate` does this identically) — the create
+                  // button now lives in the toolbar above; the engine's
+                  // zero-state still needs to name the next act.
+                  <CollectionCreateActionProvider
+                    action={
+                      canCreateTicket
+                        ? { label: t("Raise ticket"), icon: <Plus className="size-4" />, onCreate }
+                        : null
+                    }
                   >
+                    {/* No `useKitPanel`: `CollectionCard` above (drawn by `wrap`)
+                        is the ONE box now — Accounts dropped it for the same
+                        reason the same day ("the broken combination",
+                        screen-bits.tsx's own doc on `CollectionCard`). */}
                     <ScreenRenderer
                       recipe={listRecipe}
                       data={data}
                       rights={rights}
                       onAction={onAction}
                       onIntent={onIntent}
-                      useKitPanel
                       band={
-                        helpScope === "archived" ? (
+                        // ARCHIVED IS A QUESTION NOW, not a screen this
+                        // component sits on — so this band reads the ACTIVE
+                        // question (the same `queryString` the Accounts export
+                        // href narrows by) rather than a second copy of the
+                        // toolbar's own state.
+                        found.queryString.includes("view=archived") ? (
                           <Text as="p" size="sm" tone="secondary">
                             {t(
                               "Archived tickets keep their history and stay searchable. They don't count toward the figures above."
@@ -357,45 +479,41 @@ export function TicketsCollection({
                         ) : undefined
                       }
                     />
-                  </SectionWithCreate>
-                  <LoadMore
-                    listKey={
-                      found.listKey ??
-                      (narrowed ? helpFacetKey(teamId, helpScope, facet) : helpKey(teamId, helpScope))
-                    }
-                    label={t("Load more tickets")}
-                    fetchPage={found.fetchPage}
-                  />
-                </>
-              )
-            }}
-          </PagedFind>
-        )}
+                    <LoadMore
+                      listKey={
+                        found.listKey ??
+                        (narrowed ? helpFacetKey(teamId, "all", facet) : helpKey(teamId, "all"))
+                      }
+                      label={t("Load more tickets")}
+                      fetchPage={found.fetchPage}
+                    />
+                  </CollectionCreateActionProvider>
+                )
+              }}
+            </PagedFind>
+          )}
+        </div>
 
-        {/* THE TWO PANELS THAT ARE NOT THE LIST, and they are UNDER it now.
-            WHOSE WEEK IT IS was written above the list because "it is the
-            sentence a person needs before they look, and a page they have to go
-            and open is a page nobody opens" (BUILD-1 §6) — the first half of
-            which is still true and the second half is what put it here rather
-            than on a screen of its own. WHERE THE WORK IS SITTING went above for
-            the same reason: the strip badges Ready, each kind and Closed and
-            says nothing about the four stages in between.
+        {/* THE ONE PANEL THAT IS NOT THE LIST, and it is UNDER it now. WHOSE
+            WEEK IT IS was written above the list because "it is the sentence a
+            person needs before they look, and a page they have to go and open
+            is a page nobody opens" (BUILD-1 §6). The person came for the list,
+            so the list comes first and this is a scroll away, which the owner
+            explicitly asked people to be happy to do. Nothing is hidden,
+            nothing is conditional on who is reading.
 
-            What neither argument answered is N2. Between the heading and the
-            first ticket a reader was crossing SIX blocks — a duty band about ONE
-            person, a stage chart about the whole pipeline, two tab strips, a
-            search bar and an action row — before reaching the thing the page is
-            named after. That is the "too much in one glance" complaint arriving
-            as a stack. The person came for the list, so the list comes first and
-            these two are a scroll away, which the owner explicitly asked people
-            to be happy to do. Nothing is hidden, nothing is conditional on who is
-            reading, and the Triage QUEUE is still its own tab because that is a
-            screen's worth. */}
-        {facet !== TRIAGE && (
-          <>
-            <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
-            <TicketStagesCard teamId={teamId} />
-          </>
+            WHERE THE WORK IS SITTING used to render here too (N2's original
+            complaint: a reader crossed FIVE blocks — a duty band, a stage
+            chart, the tab strip, the search bar and an action row — before
+            reaching the list itself). It moved to the Dashboard tab
+            (2026-09-01, alongside the new Tickets-by-client chart): a chart
+            about the whole pipeline is a screen's worth of its own, the same
+            argument that already gave Triage's queue a tab rather than a
+            panel here, so it is absent on Dashboard's own tab (a screen does
+            not repeat its own reason for being one) and on Triage's, same as
+            before. */}
+        {facet !== TRIAGE && facet !== DASHBOARD && (
+          <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
         )}
       </div>
     </CountedAbove>
@@ -425,7 +543,7 @@ function TriageQueue({
   helpTypeOptions: string[]
   onOpen: (id: string) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState<string | null>(null)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
@@ -451,6 +569,7 @@ function TriageQueue({
       mergePage(helpKey(teamId, "all"), "id", r.tickets as unknown as Record<string, unknown>[])
       if (r.byType) primeCache(`help-by-type:${teamId}`, r.byType)
       if (r.byStatus) primeCache(`help-by-status:${teamId}`, r.byStatus)
+      if (r.byAccount) primeCache(`help-by-account:${teamId}`, r.byAccount)
       toast.success(t("Marked as read."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
@@ -472,7 +591,7 @@ function TriageQueue({
     raisedByContactId?: string
   }) {
     if (!editing) return
-    const { tickets, byType, byStatus } = await contentApi.updateHelp({ id: editing.id, ...input })
+    const { tickets, byType, byStatus, byAccount } = await contentApi.updateHelp({ id: editing.id, ...input })
     invalidate(triageKey(teamId))
     // The door's response IS the fresh first page — this used to be thrown
     // away and the same ~1s five-read rebuild fetched again one frame later.
@@ -483,6 +602,7 @@ function TriageQueue({
     // (round-two realtime review).
     if (byType) primeCache(`help-by-type:${teamId}`, byType)
     if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
+    if (byAccount) primeCache(`help-by-account:${teamId}`, byAccount)
     toast.success(t("Ticket updated."))
   }
 
@@ -532,17 +652,18 @@ function TriageQueue({
             )}
           </div>
           <span className="text-muted-foreground text-xs tabular-nums">
-            {t("{days} days · {when}", { days: w.days, when: formatRelative(w.createdAt, t) })}
+            {t("{days} days · {when}", { days: w.days, when: formatRelative(w.createdAt, t, lang) })}
           </span>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
             <Button
               variant="secondary"
-              size="sm"
+              size="icon"
               onClick={() => setEditing(w)}
-              className="shrink-0 gap-1"
+              className="shrink-0"
+              aria-label={t("Edit")}
             >
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           <Button

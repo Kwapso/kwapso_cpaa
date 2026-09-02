@@ -165,7 +165,13 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-3xl font-medium">{t("What this has been worth")}</h1>
-        <p className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
+        {/* REGRESSION FIX, 2026-09-01: was `border border-dashed` — a literal
+         * stroke round a page-level placeholder, the exact "outlined
+         * container" BUILD-A-SCREEN.md §6.1 forbids (separation is a fill or
+         * an inset shadow, never a stroke). `bg-surface-panel` is the same
+         * fill every plain card in the app already draws on this page's
+         * `--background`. */}
+        <p className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
           {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
         </p>
       </div>
@@ -209,7 +215,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
             </p>
           )}
           {data.prices.rates.length > 0 && (
-            <div className="rounded-[var(--radius)] border">
+            <div className="rounded-[var(--radius)] bg-surface-panel">
               {data.prices.rates.map((r) => (
                 <div
                   key={r.label}
@@ -249,7 +255,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
           <AppSavingsChart rows={appChart} label={t("Hours a month")} />
         )}
 
-        <Accordion type="multiple" className="rounded-[var(--radius)] border px-4">
+        <Accordion type="multiple" className="rounded-[var(--radius)] bg-surface-panel px-4">
           {data.apps.map((app) => (
             <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
               <AccordionTrigger>

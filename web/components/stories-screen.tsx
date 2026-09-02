@@ -17,7 +17,9 @@
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   ScreenRenderer,
@@ -41,7 +43,8 @@ import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
 import { assignableMembers } from "@/lib/members"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { RecordMark } from "@shared/web/record-mark"
@@ -54,7 +57,7 @@ import { richTextPlain } from "@shared/web/rich-text"
  * lookup the tickets collection makes, `web/lib/type-marks.ts`). Tickets got
  * this and stories did not, which is why one collection led with a mark and the
  * one beside it led with nothing. */
-function shapeStories(stories: Story[], marks?: Map<string, string>) {
+function shapeStories(stories: Story[], lang: Language, marks?: Map<string, string>) {
   return {
     rows: stories.map((s) => ({
       id: s.id,
@@ -71,7 +74,7 @@ function shapeStories(stories: Story[], marks?: Map<string, string>) {
         [
           STORY_STATUS_LABEL[s.status],
           s.assigneeName ?? "unassigned",
-          s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
+          s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
         ]
           .filter(Boolean)
           .join(" · ") || "—",
@@ -209,7 +212,7 @@ export function StoriesScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // Page one of the backlog, its next cursor parked in the sidecar <LoadMore>
   // reads (R14). The same fetcher primes the exact `total:` sidecar (R16).
   const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
@@ -221,7 +224,19 @@ export function StoriesScreen({
   const storyMarks = markMap(options.selectableValues, MARK_GROUP.story)
   const [storyOpen, setStoryOpen] = React.useState(false)
 
-  if (storiesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
+  if (storiesQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the work.") }}
+        action={
+          <Button variant="secondary" onClick={() => storiesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (storiesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = storiesQ.data
@@ -280,7 +295,7 @@ export function StoriesScreen({
         {(found) => {
           const rows = found.active ? found.rows : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeStories(rows, storyMarks)
+          const data = shapeStories(rows, lang, storyMarks)
           const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
           return (
             <>
@@ -289,6 +304,7 @@ export function StoriesScreen({
                 label={t("New story")}
                 icon="plus"
                 onCreate={() => setStoryOpen(true)}
+                useKitPanel
               >
                 <ScreenRenderer
                   recipe={listRecipe}
@@ -296,6 +312,7 @@ export function StoriesScreen({
                   rights={rights}
                   onAction={onAction}
                   onIntent={onIntent}
+                  useKitPanel
                 />
               </SectionWithCreate>
 

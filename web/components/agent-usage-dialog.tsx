@@ -25,6 +25,7 @@ import {
 } from "@shared/ui/components/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
+import { nameInitials } from "@/lib/identity"
 import { formatActivityWhen } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
@@ -69,7 +70,8 @@ export function AgentUsageDialog({
     id: row.id,
     description: rowDescription(row),
     actor: row.actorName ?? undefined,
-    timestamp: formatActivityWhen(row.createdAt),
+    initials: nameInitials(row.actorName),
+    time: formatActivityWhen(row.createdAt),
   }))
 
   return (

@@ -25,16 +25,21 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
+import type { FilterFacet } from "@shared/web/screen-engine/config"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
@@ -46,7 +51,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { BandCard, SprintBurndownChart } from "@/components/pulse"
 import { CountedAbove } from "@/components/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
-import { EmptyLine, SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { EmptyLine, SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import {
   SprintFormDialog,
   sprintTypeName,
@@ -66,6 +71,7 @@ import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useLanguage } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
 
 /* --------------------------- where a sprint is up to ---------------------- */
 
@@ -192,6 +198,60 @@ function progressTrailing(s: Sprint, t: Translate): React.ReactNode {
   )
 }
 
+/* ------------------ search + filter (narrowing within the groups) --------- */
+//
+// Overview and Calendar are bespoke bodies (a grouped list, a month grid) that
+// never touch `ScreenRenderer`/`CollectionFrame` — so, unlike the "All sprints"
+// tab, neither ever got a search box or a filter. Bounded, client-side,
+// deliberately (R14's other half — see wave-finder.tsx's own header for the
+// argument): a sprint is a contract, the collection is read whole already, and
+// everything that can match is already in front of us.
+//
+// ONE QUESTION, SHARED BY BOTH TABS — narrowing the same array the state/kind
+// groups and the calendar squares are both drawn from, so a search typed on one
+// tab is still narrowing when you flip to the other.
+
+type SprintQuery = { q: string; state: SprintState | ""; kind: string }
+
+const EMPTY_SPRINT_QUERY: SprintQuery = { q: "", state: "", kind: "" }
+
+function sprintQueryIsActive(query: SprintQuery): boolean {
+  return query.q.trim() !== "" || query.state !== "" || query.kind !== ""
+}
+
+/** SEARCH (name/app), then the two facets the view already groups by — state
+ * and kind — over the whole bounded collection. */
+function selectSprints(sprints: Sprint[], query: SprintQuery, today: string): Sprint[] {
+  const needle = query.q.trim().toLowerCase()
+  return sprints.filter((s) => {
+    if (query.state && sprintState(s, today) !== query.state) return false
+    if (query.kind && (s.sprintType ?? "") !== query.kind) return false
+    if (!needle) return true
+    return [s.name, s.appName ?? "", s.ref ?? ""].some((v) => v.toLowerCase().includes(needle))
+  })
+}
+
+/** THE KIND FILTER'S OWN VOCABULARY — every kind actually IN the collection,
+ * worded exactly as `groupByKind` words its own headings, so the filter offers
+ * nothing the grouping itself would not show. Off the WHOLE collection, not the
+ * narrowed one, so picking a kind can never make the option that picked it
+ * disappear. */
+function sprintKindOptions(
+  sprints: Sprint[],
+  kinds: Map<string, SprintTypeOption>,
+  lang: string,
+  noKind: string
+): { value: string; label: string }[] {
+  const words = new Map<string, string>()
+  for (const s of sprints) {
+    const key = s.sprintType ?? ""
+    if (words.has(key)) continue
+    const option = kinds.get(key)
+    words.set(key, option ? sprintTypeName(option, lang) : key || noKind)
+  }
+  return [...words.entries()].map(([value, label]) => ({ value, label }))
+}
+
 /* --------------------------------- the rows -------------------------------- */
 
 /** One sprint, as a row. Everything a person would say about one out loud.
@@ -199,14 +259,14 @@ function progressTrailing(s: Sprint, t: Translate): React.ReactNode {
  * `marks` is the SPRINT TYPE's glyph, keyed by the word the row stores. The
  * Overview view has drawn it since v0.11.0 and this list did not, so the same
  * sprint led with a picture under one tab and with text under the next. */
-function shapeSprints(sprints: Sprint[], today: string, marks?: Map<string, string>) {
+function shapeSprints(sprints: Sprint[], today: string, lang: Language, marks?: Map<string, string>) {
   return {
     rows: sprints.map((s) => ({
       id: s.id,
       // THE GLYPH THE ROW IS KNOWN BY (recipe `leading`). A NODE, not a string.
       mark: <RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? "?"} />,
       name: s.ref ? `${s.ref} · ${s.name}` : s.name,
-      detail: sprintLine(s),
+      detail: sprintLine(s, lang),
       // Facet columns (read by the filter engine, not the renderer). The status
       // facet says the SAME three words the Overview groups under, so narrowing
       // this list and reading that one are one question asked twice rather than
@@ -276,9 +336,42 @@ export function SprintsScreen({
   )
   // Remembered with the screen — see web/lib/nav-memory.ts.
   const [view, setView] = useRemembered("view", "overview")
+  // ONE search+filter question, shared by Overview and Calendar (see the note
+  // above `selectSprints`) — `find`, the same slot name `<PagedFind>`/
+  // `WaveFinder` remember their own question under, so this reads as the same
+  // kind of state everywhere it appears.
+  const [sprintQuery, setSprintQuery] = useRemembered<SprintQuery>("find", EMPTY_SPRINT_QUERY, (found) => {
+    if (!found || typeof found !== "object") return undefined
+    const was = found as Record<string, unknown>
+    return {
+      q: typeof was.q === "string" ? was.q : "",
+      state: (SPRINT_STATES as string[]).includes(was.state as string)
+        ? (was.state as SprintState)
+        : "",
+      // Not validated against today's kinds (unlike `state`, a closed
+      // three-word vocabulary): the team's sprint-type list is a cached read
+      // that may not have arrived yet at this hook's first render, and a kind
+      // retired since simply matches nothing — a degraded answer, never a
+      // wrong one, the same tradeoff `waves-screen.tsx` makes for its own
+      // account filter.
+      kind: typeof was.kind === "string" ? was.kind : "",
+    }
+  })
   const [addOpen, setAddOpen] = React.useState(false)
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
+  if (sprintsQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the sprints.") }}
+        action={
+          <Button variant="secondary" onClick={() => sprintsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const sprints = sprintsQ.data
@@ -289,8 +382,75 @@ export function SprintsScreen({
   // The glyph for the STATE a sprint is in, keyed by the heading word itself —
   // which is why the vocabulary holds exactly the three `STATE_HEADING` words.
   const stateMarks = markMap(selectableQ.data, MARK_GROUP.sprintStatus)
-  const data = shapeSprints(sprints, today, kindMarks)
+  const data = shapeSprints(sprints, today, lang, kindMarks)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
+
+  // OVERVIEW AND CALENDAR BOTH DRAW FROM THIS, narrowed but never re-fetched —
+  // see the header note above `selectSprints`.
+  const narrowedSprints = selectSprints(sprints, sprintQuery, today)
+  const askingSprints = sprintQueryIsActive(sprintQuery)
+  const sprintFacets: FilterFacet[] = [
+    {
+      field: "state",
+      // SAME WORD the "All sprints" tab's own filter uses for this column
+      // (screens.ts's `sprintsListRecipe`) — one vocabulary for one idea (R34).
+      label: t("Status"),
+      control: "select",
+      options: SPRINT_STATES.map((st) => ({ value: st, label: t(STATE_HEADING[st]) })),
+    },
+    {
+      field: "kind",
+      // SAME WORD the sprint form's own field uses for this column
+      // (sprint-form-dialog.tsx's `typeField`).
+      label: t("Type"),
+      control: "select",
+      options: sprintKindOptions(sprints, byKind, lang, t("No type said")),
+    },
+  ]
+  // THE TOOLBAR ITSELF, shared by both bespoke tabs. Only where there is
+  // something to search — a box over an empty collection cannot do anything,
+  // so an empty sprints list falls back to the bare button-only toolbar it
+  // always had (the same gate `waves-screen.tsx` puts on its own finder).
+  //
+  // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+  // approved that night). `filters` used to be a `<FilterBar>` rendered as
+  // this row's own sibling below it — the same shape her Apps screenshot
+  // caught (search+actions on one row, a stranded filter chip under it) —
+  // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx),
+  // never a second row this call site draws for itself.
+  const sprintToolbar =
+    sprints.length > 0 ? (
+      <ToolbarRow
+        search={
+          <SearchInput
+            value={sprintQuery.q}
+            onChange={(e) => setSprintQuery((q) => ({ ...q, q: e.currentTarget.value }))}
+            onClear={() => setSprintQuery((q) => ({ ...q, q: "" }))}
+            // SAME PLACEHOLDER the "All sprints" tab's own search box uses
+            // (screens.ts's `sprintsListRecipe`) — one search box in one
+            // collection's words, wherever it appears.
+            placeholder={t("Search sprints…")}
+            className="w-full"
+          />
+        }
+        filters={
+          <FilterBar
+            facets={sprintFacets}
+            values={{ state: sprintQuery.state, kind: sprintQuery.kind }}
+            // Empty on purpose: both facets carry their own options above,
+            // derived off the WHOLE collection rather than the narrowed one —
+            // see `sprintKindOptions`'s own note on why.
+            data={[]}
+            onChange={(field, value) => setSprintQuery((q) => ({ ...q, [field]: value }))}
+            onClearFacets={() => setSprintQuery((q) => ({ ...q, state: "", kind: "" }))}
+            resultCount={narrowedSprints.length}
+          />
+        }
+        actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
+      />
+    ) : (
+      canCreate && <ToolbarRow actions={<AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />} />
+    )
 
   // R16: ONE number, on all three tabs, and it is the door's exact COUNT(*) —
   // see the note at the top of this file for why three views of one bounded
@@ -323,14 +483,19 @@ export function SprintsScreen({
   //
   // AND EVERY ONE OF THEM OPENS, by the same `open` intent the overview list
   // below already fires: a calendar is a way IN to sprints, not a picture of them.
-  const calendarEntries: CalendarEntry[] = sprints
+  //
+  // NARROWED, the same question the toolbar above draws (`selectSprints`) — a
+  // search or a state/kind filter typed on this tab or the Overview one narrows
+  // which sprints the calendar draws squares for, not just which ones the
+  // grouped list shows.
+  const calendarEntries: CalendarEntry[] = narrowedSprints
     .filter((s) => s.startsOn)
     .map((s) => ({
       id: s.id,
       day: (s.startsOn as string).slice(0, 10),
       title: s.ref ? `${s.ref} · ${s.name}` : s.name,
       accent: s.sprintType ?? "",
-      detail: sprintLine(s),
+      detail: sprintLine(s, lang),
     }))
 
   // THE OVERVIEW — state first, kind second. Two levels because the two
@@ -348,7 +513,11 @@ export function SprintsScreen({
   // ONLY THE RUNNING ONES, and only where there is work to show. A chart of
   // wrapped sprints is history nobody is deciding anything from, and a row of
   // empty columns is a picture of nothing.
-  const burndown = sprints
+  //
+  // NARROWED, same reason as the calendar above: it is a picture OF the rows
+  // in the grouped list, so a search that narrows those rows narrows the chart
+  // under them too.
+  const burndown = narrowedSprints
     .filter((s) => sprintState(s, today) === "running" && s.storyCount > 0)
     .map((s) => ({
       label: s.ref ?? s.name,
@@ -359,8 +528,17 @@ export function SprintsScreen({
   const overview = (
     <div className="flex flex-col gap-12">
       {sprints.length === 0 && <EmptyLine concept="sprints">{t("No sprints yet.")}</EmptyLine>}
+      {/* NOTHING MATCHED is a different, and truer, sentence than "no sprints
+          yet" once a search or a filter is on — see the identical split
+          `<PagedFind>`'s own `emptyText` makes for a paged collection. Every
+          state section below is already keyed off `narrowedSprints`, so an
+          active question with no matches leaves every one of them null and
+          this is the only line left to say why the screen is blank. */}
+      {sprints.length > 0 && askingSprints && narrowedSprints.length === 0 && (
+        <EmptyLine concept="sprints">{t("Nothing matched.")}</EmptyLine>
+      )}
       {SPRINT_STATES.map((state) => {
-        const inState = sprints.filter((s) => sprintState(s, today) === state)
+        const inState = narrowedSprints.filter((s) => sprintState(s, today) === state)
         if (inState.length === 0) return null
         return (
           <section key={state} className="flex flex-col gap-4">
@@ -392,7 +570,7 @@ export function SprintsScreen({
                     // The kind is the heading above; how much is done is the
                     // number on the right. What is left is the three facts a
                     // status line may carry (D5): whose, which app, and when.
-                    subtitle: sprintLineInKindGroup(s),
+                    subtitle: sprintLineInKindGroup(s, lang),
                     trailing: progressTrailing(s, t),
                   }))}
                   onItemClick={(item) => onIntent({ kind: "open", module: "sprints", id: item.id })}
@@ -431,17 +609,44 @@ export function SprintsScreen({
           icon="plus"
           onCreate={() => setAddOpen(true)}
           // The view strip scopes what the collection card shows, so it sits
-          // above the card rather than inside it.
-          folderTabs={<TabsView config={tabsConfig} value={view} onValueChange={setView} />}
+          // above the card rather than inside it. TABS ALONE now (client
+          // ruling, 2026-08-31, correcting the earlier fix that shared this
+          // row with "Start a sprint") — see the button below instead.
+          folderTabs={{ config: tabsConfig, value: view, onValueChange: setView }}
+          // KIT PANEL ONLY ON THE "ALL SPRINTS" TAB. Overview and Calendar are
+          // bespoke bodies (a grouped list, a month grid) that never touch
+          // `CollectionFrame` at all — there is no toolbar and no create-button
+          // context for the kit panel to draw there, so turning this on for
+          // every tab would strip their `CollectionCard` box on two of three
+          // views and leave them with no box and no create button at all. Only
+          // the "all" tab renders through `ScreenRenderer`, so only that tab
+          // gets the kit panel, matched below.
+          useKitPanel={view === "all"}
         >
           {view === "overview" ? (
-            overview
+            <div className="flex flex-col gap-4">
+              {/* THE TOOLBAR, carrying real search + filter now (by name/app,
+                  by state, by kind) rather than only the button — Overview and
+                  Calendar are bespoke bodies that never touch `CollectionFrame`,
+                  so this is their own toolbar rather than the kit panel's (see
+                  `sprintToolbar`'s own note). The button still lives below the
+                  tabs rather than beside them (client ruling, 2026-08-31). */}
+              {sprintToolbar}
+              {overview}
+            </div>
           ) : view === "calendar" ? (
-            <RecordCalendar
-              entries={calendarEntries}
-              onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
-              emptyText={t("No sprints start this month.")}
-            />
+            <div className="flex flex-col gap-4">
+              {sprintToolbar}
+              <RecordCalendar
+                entries={calendarEntries}
+                onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
+                emptyText={
+                  askingSprints && narrowedSprints.length === 0
+                    ? t("Nothing matched.")
+                    : t("No sprints start this month.")
+                }
+              />
+            </div>
           ) : (
             // ALL SPRINTS — the engine's own flat list, with the search and the
             // Client / App / Status filters the recipe declares. Its rows carry
@@ -456,6 +661,7 @@ export function SprintsScreen({
               rights={rights}
               onAction={onAction}
               onIntent={onIntent}
+              useKitPanel
             />
           )}
         </SectionWithCreate>

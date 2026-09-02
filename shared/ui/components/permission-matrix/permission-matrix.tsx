@@ -25,9 +25,16 @@
         delete. f.e. someone might have all, and someone only can see — all
         variations are possible."
 
+   THE RIGHT THE CLIENT CALLED "add" IS SHIPPED AS `create` — the id and the
+   label both, corrected 2026-09-02. The application that enforces these
+   switches has one name for it (`gating.ts`: `"read" | "create" | "edit" |
+   "delete"`), and an id is a key two systems match on rather than a
+   transcript of a sentence. The reasoning is at `RIGHTS` below, `see` and its
+   own divergence included.
+
    So a cell is not one word off a three-rung ladder. It is FOUR INDEPENDENT
    BOOLEANS and all sixteen subsets are legal, including ones nobody would
-   plan. "Full" and "Read" cannot describe *add but not see*, so no single
+   plan. "Full" and "Read" cannot describe *create but not see*, so no single
    word can stay in the cell, and 27.12's own defence of the ladder —
    "There is no 'edit but not delete' tier: it would double the table to save
    one case" — is the sentence the ruling overturns. OVERRIDE 24 is amended in
@@ -42,7 +49,7 @@
    APPROACH A — THE RUN. Drawn, measured and chosen at `verify/permissions.html`
    §A, and built here without improvisation:
 
-     · FOUR FIXED SLOTS PER CELL, in the client's own order — see · add ·
+     · FOUR FIXED SLOTS PER CELL, in the client's own order — see · create ·
        edit · delete. They never move and never reorder, at any width.
      · THE SLOT WEARS `Checkbox`'S SKIN. 1.375rem, `--radius-select`, `--card`
        behind a hairline when the capability is not held, `--surface-inverse`
@@ -255,12 +262,15 @@
 
    CAPABILITIES ARE A PROP, SO A FIFTH IS A DATA ENTRY
    `capabilities` defaults to `PERMISSION_CAPABILITIES` — the client's four
-   words and nothing else is invented. The header, the cells, the run's width
-   and the legend all count from the array, so a fifth capability costs one
-   entry and never an edit to this file. `RIGHTS` and `WRITE_RIGHTS` are now
+   actions and nothing else is invented. The header, the cells, the run's
+   width and the legend all count from the array, so a fifth capability costs
+   one entry and never an edit to this file. `RIGHTS` and `WRITE_RIGHTS` are
    the capability ids and the three of them that CHANGE a record; the older
-   `view / create / edit / delete` vocabulary is gone, because keeping a
-   second set of words for the same four things is how two lists drift.
+   `view / create / edit / delete` LADDER vocabulary is gone, because keeping
+   a second set of words for the same four things is how two lists drift.
+   (`create` returned on 2026-09-02 as an id, above — same word, and that is
+   the point: there is one name for that switch and this file now uses it.
+   Nothing else of the ladder's vocabulary came back with it.)
 
    The TABLE is `table.tsx`, transcribed from f3.css `.kw-matrix`; the slot's
    skin is `checkbox.tsx`'s; the hover name on a slot is `tooltip.tsx`.
@@ -322,15 +332,32 @@ import { ScreenRegister } from "../screen-renderer/screen-renderer";
  *
  * They are not a ladder and none of them contains another: a role holds any
  * subset of the four, and all sixteen subsets are legal.
+ *
+ * `create`, NOT `add` — CORRECTED 2026-09-02. The client SAID "add" on
+ * 2026-08-24 and these ids were transcribed from that sentence, but the right
+ * has one name in the system that enforces it and that name is `create`:
+ * `shared/workers/gating.ts` types it `"read" | "create" | "edit" | "delete"`,
+ * the permission sheet stores `can_create`, and the glossary's own definition
+ * of an access right reads "read, create, edit, or delete". An id is a key
+ * two systems match on, not a transcript. The LABEL follows it rather than
+ * keeping a second word for the same switch — "keeping a second set of words
+ * for the same four things is how two lists drift" was already this file's own
+ * rule, and it had been broken by this id since the day it was written.
+ *
+ * `see` IS DELIBERATELY LEFT ALONE and it is the same divergence unfixed: the
+ * enforcing name for that one is `read`. It is not corrected here because it
+ * was not asked for and it is one word in front of a reader, where `Create`
+ * versus `Add` is not; the mapping the app keeps for it therefore stays. It
+ * is logged rather than tidied silently.
  */
-const RIGHTS = ["see", "add", "edit", "delete"] as const;
+const RIGHTS = ["see", "create", "edit", "delete"] as const;
 
 /**
  * The three that CHANGE a record, as against `see`, which only opens one.
  * Kept because it is the one true relation between the four — and it is a
  * FACT about them, never a tier a cell can be set to.
  */
-const WRITE_RIGHTS = ["add", "edit", "delete"] as const;
+const WRITE_RIGHTS = ["create", "edit", "delete"] as const;
 
 export type PermissionRight = (typeof RIGHTS)[number];
 
@@ -344,8 +371,8 @@ export interface PermissionCapability {
   /** Stable key. This is the value handed to `onChange`. */
   id: string;
   /**
-   * The capability's word, in the reader's language. The client's four are
-   * See, Add, Edit and Delete; nothing else is shipped.
+   * The capability's word, in the reader's language. The four are See,
+   * Create, Edit and Delete; nothing else is shipped.
    */
   label: string;
   /**
@@ -357,10 +384,11 @@ export interface PermissionCapability {
   initial?: string;
 }
 
-/** The client's own words for their own four actions. */
+/** The four actions in words. Each one's initial is the slot's letter, and
+    all four differ: S · C · E · D. */
 const CAPABILITY_LABELS: Record<PermissionRight, string> = {
   see: "See",
-  add: "Add",
+  create: "Create",
   edit: "Edit",
   delete: "Delete",
 };

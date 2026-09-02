@@ -140,16 +140,27 @@ export type LogQuery = {
   targetTable?: string
   targetId?: string
   userId?: string
+  /** the Time screen's search box, answered by the door (R14) */
+  q?: string
+  /** a rolling window on `startedAt` — "7d", "30d" or "90d"; leave off for all time */
+  period?: string
+  /** a name out of the door's own WORK_LOG_SORTS, with `dir` flipping it */
+  sort?: string
+  dir?: string
 }
 
 function logQuery(filter: LogQuery | undefined, cursor: string | null | undefined): string {
-  const q = new URLSearchParams()
-  if (filter?.scope) q.set("scope", filter.scope)
-  if (filter?.targetTable) q.set("targetTable", filter.targetTable)
-  if (filter?.targetId) q.set("targetId", filter.targetId)
-  if (filter?.userId) q.set("userId", filter.userId)
-  if (cursor) q.set("cursor", cursor)
-  const s = q.toString()
+  const params = new URLSearchParams()
+  if (filter?.scope) params.set("scope", filter.scope)
+  if (filter?.targetTable) params.set("targetTable", filter.targetTable)
+  if (filter?.targetId) params.set("targetId", filter.targetId)
+  if (filter?.userId) params.set("userId", filter.userId)
+  if (filter?.q) params.set("q", filter.q)
+  if (filter?.period) params.set("period", filter.period)
+  if (filter?.sort) params.set("sort", filter.sort)
+  if (filter?.dir) params.set("dir", filter.dir)
+  if (cursor) params.set("cursor", cursor)
+  const s = params.toString()
   return s ? `?${s}` : ""
 }
 
@@ -169,6 +180,13 @@ export type TriageWaiting = {
   moduleId: string | null
   raisedByContactId: string | null
 }
+
+/** ONE CLIENT'S TALLY — the shape `countTicketFacets`' `byAccount`
+ * (workers/content/src/lib/help.ts) hands back: already grouped by account,
+ * already ordered with the most open tickets first, already capped. `total`
+ * sits beside `open` because a client with everything resolved is a real
+ * answer to "how much have we done for them", not a row worth hiding. */
+export type HelpAccountFacet = { accountId: string; accountName: string | null; open: number; total: number }
 
 export const content = {
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
@@ -214,6 +232,12 @@ export const content = {
         mineTotal: number
         byType: Record<string, number>
         byStatus: Record<string, number>
+        /** THE THIRD FACET (workers/content/src/lib/help.ts's own
+         * `countTicketFacets`) — which CLIENT is generating the most work,
+         * counted by the database and ordered with the most open first. The
+         * door has shipped this on every ticket read since 2026-08-28; nothing
+         * on any screen read it until the Tickets Dashboard tab. */
+        byAccount: HelpAccountFacet[]
       }>
     >(`/api/content/help${listQuery({ scope: "all", view: "live", ...opts })}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
@@ -257,14 +281,30 @@ export const content = {
     appId?: string
     moduleId?: string
     raisedByContactId?: string
-  }) => api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/update", post(input)),
+  }) =>
+    api<{
+      tickets: HelpTicket[]
+      byType?: Record<string, number>
+      byStatus?: Record<string, number>
+      byAccount?: HelpAccountFacet[]
+    }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
-    api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/status", post({ id, status })),
+    api<{
+      tickets: HelpTicket[]
+      byType?: Record<string, number>
+      byStatus?: Record<string, number>
+      byAccount?: HelpAccountFacet[]
+    }>("/api/content/help/status", post({ id, status })),
   /** SOMEBODY HAS READ IT — the one judgement in the ticket lifecycle nothing can
    * infer, and the only act the triage screen performs (5.11). Everything after
    * it happens by itself. */
   triageRead: (id: string) =>
-    api<{ tickets: HelpTicket[]; byType?: Record<string, number>; byStatus?: Record<string, number> }>("/api/content/help/triage-read", post({ id })),
+    api<{
+      tickets: HelpTicket[]
+      byType?: Record<string, number>
+      byStatus?: Record<string, number>
+      byAccount?: HelpAccountFacet[]
+    }>("/api/content/help/triage-read", post({ id })),
   /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
    * by phone; a client presses it in their own portal. */
   validateHelp: (id: string) =>
@@ -455,7 +495,17 @@ export const content = {
    * be carrying the file a client sent. `total` counts the view that was asked
    * for; the other two numbers ride along so a tab badge is never derived from
    * the rows in front of it (R16). */
-  todos: (opts: { accountId?: string; view?: TodoViewName; cursor?: string } = {}) =>
+  todos: (
+    opts: {
+      accountId?: string
+      view?: TodoViewName
+      /** the nested panel's own search box, answered by the DOOR — the done
+       * pile pages and grows forever, so a browser could only ever search the
+       * page it had loaded. `total` counts this same question. */
+      q?: string
+      cursor?: string
+    } = {}
+  ) =>
     api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
       `/api/content/todos${listQuery({ ...opts })}`
     ),

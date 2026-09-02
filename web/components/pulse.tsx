@@ -42,18 +42,20 @@ import * as React from "react"
 
 import dynamic from "next/dynamic"
 
+import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
+import type { HelpAccountFacet } from "@/lib/api/content"
 import { insightsKey } from "@/lib/live-resources"
 import type { TeamPulse } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
-import { useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useCached, useCachedValue } from "@shared/web/store"
+import { useLanguage, useT } from "@shared/web/language"
 
 /** How tall a chart on a BAND is. Deliberately short: two of these plus the
  * numbers above them is about a third of a laptop screen, which leaves the
@@ -113,6 +115,12 @@ export const RecordWeeksChart = dynamic(() => chartModule().then((m) => m.WeeksC
   ssr: false,
   loading: chartLoading,
 })
+/** The Tickets Dashboard tab's own picture — which client is generating the
+ * most work, by open ticket count. Same lazy boundary as the others. */
+export const TicketsByAccountChart = dynamic(() => chartModule().then((m) => m.TicketsByAccountChart), {
+  ssr: false,
+  loading: chartLoading,
+})
 /** The margin panel's own picture — sold, our time by role, tools, margin.
  * Same lazy boundary as the four above, so the Rates tab only pays for
  * Recharts on the account that opens it. */
@@ -135,7 +143,7 @@ export function hoursSpoken(seconds: number): string {
  * that says what would make a picture appear. */
 export function BandCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-[var(--radius)] border p-4">
+    <section className="min-w-0 rounded-[var(--radius)] bg-surface-panel p-4">
       <h3 className="text-muted-foreground mb-2 text-sm font-medium">{title}</h3>
       {children}
     </section>
@@ -147,17 +155,30 @@ export function BandCard({ title, children }: { title: string; children: React.R
  * reads as a broken screen rather than an empty one — and the glyph is there for
  * the same reason, so the box looks like a place something goes rather than like
  * a chart that failed to draw. `aria-hidden`, because the sentences beside it
- * carry the whole meaning (UI-CONVENTIONS §5). */
+ * carry the whole meaning (UI-CONVENTIONS §5).
+ *
+ * REGRESSION FIX, 2026-09-01: this drew `border border-dashed` — a stroke round
+ * a box nested inside `BandCard`'s own `bg-surface-panel` fill, i.e. a card
+ * inside a card with a visible outline on the inner one, at every call site
+ * (impact-panel.tsx, app-money-panel.tsx, work-logs-panel.tsx x3,
+ * margin-panel.tsx). BUILD-A-SCREEN.md §6.1 is absolute ("no CSS border,
+ * ever"; separation is a fill or an inset shadow) and the ONE place the kit
+ * itself draws a real `border` is `file-upload.tsx`'s drag-and-drop dropzone
+ * edge — documented there as deliberately NOT a pattern to extend. This is
+ * exactly Card's own "well" — chapter 13: "a well holds secondary detail
+ * inside a card… same radius, no edge, no shadow" — so it now IS one
+ * (`variant="well"`, `bg-accent`) instead of a hand-rolled dashed box. */
 export function NothingYet({ what, how }: { what: string; how: string }) {
   return (
-    <div
-      className="text-muted-foreground flex flex-col items-start justify-center gap-1 rounded-[var(--radius)] border border-dashed p-4 text-sm"
+    <Card
+      variant="well"
+      className="text-muted-foreground flex flex-col items-start justify-center gap-1 p-4 text-sm"
       style={{ minHeight: BAND_HEIGHT }}
     >
       <ChartNoAxesColumn aria-hidden className="mb-1 size-5 opacity-60" />
       <p>{what}</p>
       <p className="text-xs">{how}</p>
-    </div>
+    </Card>
   )
 }
 
@@ -198,16 +219,59 @@ export function TicketStagesCard({ teamId }: { teamId: string }) {
   )
 }
 
+/** WHICH CLIENT IS GENERATING THE MOST WORK — the Tickets Dashboard tab's own
+ * picture (2026-09-01). One bar per account, open tickets, biggest first —
+ * the same shape as HoursByChart, because it answers the same kind of
+ * question about a different collection.
+ *
+ * Reads a DIFFERENT cache key than the two visuals above: `byAccount` rides
+ * the TICKET LIST door (`workers/content/src/lib/help.ts`), not the `insights`
+ * aggregate `usePulse` reads, so this primes straight off `help-by-account`
+ * (the same key every ticket read primes in `web/lib/live-resources.ts`)
+ * rather than sharing `usePulse`'s one request.
+ *
+ * The agency's OWN tickets carry no account (`AND h.account_id IS NOT NULL`
+ * in the door's SQL — DATA-MODEL.md § help + help_threads says why), so these
+ * bars can never sum to the ticket total. Said on the card itself, in the
+ * open, because a dashboard is the one place a wrong-looking number goes
+ * unchecked — nobody scans a chart the way they scan a list. */
+export function TicketsByAccountCard({ teamId }: { teamId: string }) {
+  const t = useT()
+  const byAccount = useCachedValue<HelpAccountFacet[]>(`help-by-account:${teamId}`)
+  if (!byAccount) return null
+
+  const rows = byAccount.map((a) => ({ label: a.accountName ?? t("Unnamed client"), count: a.open }))
+  return (
+    <BandCard title={t("Tickets by client")}>
+      {rows.length === 0 ? (
+        <NothingYet
+          what={t("No tickets are tied to a client yet.")}
+          how={t("Raise a ticket against a client and it shows up here.")}
+        />
+      ) : (
+        <>
+          <TicketsByAccountChart rows={rows} label={t("Open tickets")} />
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t(
+              "The agency's own tickets aren't tied to a client, so they're left out here — these bars won't add up to the total above."
+            )}
+          </p>
+        </>
+      )}
+    </BandCard>
+  )
+}
+
 /** HOURS LOGGED, WEEK BY WEEK. The eight buckets the door summed, oldest first,
  * labelled by the Monday that opens each one. */
 export function HoursByWeekCard({ teamId }: { teamId: string }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { data } = usePulse(teamId)
   const work = data?.work
   if (!work) return null
 
   const rows = work.weeks.map((w) => ({
-    label: formatDayMonth(w.weekStart),
+    label: formatDayMonth(w.weekStart, lang),
     hours: Math.round((w.seconds / 3600) * 10) / 10,
   }))
   return (

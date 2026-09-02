@@ -51,7 +51,16 @@ const HAND_ROLLED =
  * 2026-08-27: the header is the kit's `RecordChrome` now and the hand-rolled
  * collapse went with it, so the pin described nothing and this check said so
  * before anybody read the diff. The list can only shrink. */
-const HAND_ROLLED_OK: Record<string, string> = {}
+const HAND_ROLLED_OK: Record<string, string> = {
+  "web/components/agent-markdown.tsx":
+    "the assistant's rendered links transition `text-decoration-color` (rest " +
+    "`decoration-hair-strong`, hover `decoration-current`) — the one ink-swap " +
+    "case `motion-hover` does not cover (motion.css §13 lists background-color/" +
+    "border-color/color/fill, not text-decoration-color), so swapping the class " +
+    "would drop the transition rather than reuse it. Same duration/easing tokens " +
+    "(`--duration-colour`, `ease-kwapso`) as `motion-hover` itself, copied " +
+    "verbatim rather than re-derived per this file's own header note.",
+}
 
 describe("motion is the kit's, everywhere", () => {
   /** Both front doors and the host seams they share. `shared/ui/` is NOT walked:

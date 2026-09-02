@@ -68,8 +68,14 @@ describe("a record's own name is clamped to two lines", () => {
     ]) {
       const src = read(file)
       expect(src, `${file} imports the clamp`).toMatch(/clampRecordHeading/)
+      // Not pinned to a `title={...}` PROP shape — record-chrome.tsx composes
+      // the kit's `<RecordChrome>` by hand (R45) and feeds the clamped node in
+      // as JSX children of its own `titleBlock`, while screen-renderer.tsx
+      // passes it straight through as a prop. Both are genuine call sites; what
+      // matters is that the file's own `title` reaches the clamp before either
+      // heading step ever sees it.
       expect(src, `${file} feeds its title THROUGH the clamp`).toMatch(
-        /title=\{clampRecordHeading\(/
+        /clampRecordHeading\(title\)/
       )
     }
   })

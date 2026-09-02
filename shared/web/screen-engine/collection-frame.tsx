@@ -20,7 +20,7 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown } from "@shared/ui/foundations/icons"
+import { ArrowUpDown, Plus } from "@shared/ui/foundations/icons"
 
 import { facetOptions, selectRows } from "./collection"
 import { useRemembered } from "@shared/web/remembered"
@@ -43,6 +43,7 @@ import {
   PopoverTrigger,
 } from "@shared/ui/components/popover/popover"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useIsVisible } from "./visibility"
@@ -72,9 +73,45 @@ export type CollectionCreateAction = {
   /** The host's glyph, so the two buttons for one act cannot disagree. */
   icon?: React.ReactNode
   onCreate: () => void
+  /**
+   * THE COLLECTION'S OWN IMPORT ACT, published beside its create act — never
+   * invented here. A caller passes this only where a real CSV import target
+   * exists for this record type (`workers/data-ops/src/lib/targets.ts`) AND
+   * the reader holds the right to run it; most nested collections have
+   * neither and this stays `undefined`, which is the only way "Import a
+   * list" does not appear on a screen with nothing to import (composition
+   * 27.21's own doors-differ clause — the portal has no second action, and
+   * an agency collection with no import target is the same absence for a
+   * different reason). `SectionWithCreate`'s own `secondary` prop is this
+   * same act, already gated by `secondary.show` there — this is that act,
+   * carried one layer further down to where the empty body actually draws.
+   */
+  secondary?: { label: string; onClick: () => void }
 }
 
 const CreateActionContext = React.createContext<CollectionCreateAction | null>(null)
+
+/** THE PUBLISHED CREATE ACTION, DRAWN — a glyph and nothing else (UI-RULEBOOK
+ * B3 / CHECKLIST 11.7, client ruling 2026-08-31: "+ actions never have a
+ * word, they are only the + icon"). `label` becomes the button's accessible
+ * name and its tooltip, the same seam `screen-bits.tsx`'s own `AddButton`
+ * draws from — one function, so the toolbar button and the filtered-empty
+ * state's CTA cannot drift into two different shapes for one act. The
+ * GENUINELY-empty body no longer calls this — see `CollectionEmptyState`
+ * below, which carries composition 27.21's one carved-out exception: "the
+ * only place a labelled create button is allowed". */
+function createActionButton(action: CollectionCreateAction, className?: string) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="icon" onClick={action.onCreate} aria-label={action.label} className={className}>
+          {action.icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{action.label}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export function CollectionCreateActionProvider({
   action,
@@ -84,6 +121,83 @@ export function CollectionCreateActionProvider({
   children: React.ReactNode
 }) {
   return <CreateActionContext.Provider value={action}>{children}</CreateActionContext.Provider>
+}
+
+/** THE KIT'S OWN "NOTHING IN THIS COLLECTION YET" REGISTER, drawn to the exact
+ * composition (`shared/ui/compositions/states/empty-collection.tsx`, 27.21)
+ * this engine's own `useKitPanel` branch already approximated — this is that
+ * approximation, finished, and pulled out so a hand-rolled nested panel
+ * (work-panels.tsx and its dozen siblings) can draw the identical register
+ * instead of a fourth version of "a bare grey line".
+ *
+ * WHY IT WAS WRONG BEFORE (the client's own screenshot, 2026-09-01): a
+ * genuinely-empty collection drew ONE icon-only mango, no sentence, no way to
+ * import — the plainest reading of `createActionButton` above reused for a
+ * screen 27.21 explicitly carves an exception for. "The one mango" rule (B3)
+ * governs every OTHER button in the app; this is composition 27.21's own
+ * named exception to it: "Add the first takes the one mango — the only place
+ * a labelled create button is allowed, because there is no toolbar + to lean
+ * on and the screen exists to be filled."
+ *
+ * TWO BUTTONS, NEITHER INVENTED. `onCreate` absent (a reader with no create
+ * right) draws no button at all — TEN STATES #10 in the composition's own
+ * doc: "the control is then absent, never dimmed". `onImport` absent (no CSV
+ * target for this record, or the reader lacks the right) likewise draws
+ * nothing — never a button that would 404 or refuse. */
+export function CollectionEmptyState({
+  title,
+  description,
+  onCreate,
+  onImport,
+  className,
+}: {
+  /** The collection's own word for what's missing — `config.emptyText`,
+   * translated at the call site. */
+  title: string
+  /** 27.21: "One sentence naming the two routes". Defaults to the
+   * composition's own words, verbatim, for a caller with nothing more
+   * specific to say. */
+  description?: string
+  /** The one mango on this register — composition 27.21's own exception to
+   * B3. Absent draws no button (a reader with no create right). */
+  onCreate?: () => void
+  /** The paper action beside it — absent unless a real import target exists
+   * for this record AND the reader may run it. */
+  onImport?: () => void
+  className?: string
+}) {
+  const t = useT()
+  return (
+    <div
+      data-slot="collection-empty-body"
+      className={cn("flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]", className)}
+    >
+      <Headline as="h3" size="h3">
+        {title}
+      </Headline>
+      <Text as="p" size="sm" tone="secondary" measure>
+        {description ??
+          t(
+            "Records land here when someone adds one, or when a client raises a request from the portal. The first one takes a minute."
+          )}
+      </Text>
+      {(onCreate || onImport) && (
+        <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+          {onCreate && (
+            <Button onClick={onCreate} className="gap-1">
+              <Plus className="size-4" />
+              {t("Add the first")}
+            </Button>
+          )}
+          {onImport && (
+            <Button variant="secondary" onClick={onImport}>
+              {t("Import a list")}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function CollectionFrame<T>({
@@ -297,6 +411,18 @@ function CollectionFrame<T>({
   // itself, which is the thing this is a predicate about.)
   const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
 
+  // GENUINELY EMPTY, READ EARLY — client, 2 Sep 2026, verbatim: "NEVER
+  // TOOLBAR ON EMPTY COLLECTION." Nothing to search, filter or sort when
+  // there is nothing in the collection AND nothing is narrowing it — the
+  // toolbar used to stay drawn above `CollectionEmptyState` regardless (only
+  // the create button was ever suppressed here, see below), which is a
+  // search box and a sort control offered over zero rows. Computed once,
+  // ahead of `searchBox`/`filterBar`/`sortControl`, so both render paths
+  // this file draws (the kit-panel branch below, and the app-drawn-header
+  // branch further down) suppress the same three controls from the same
+  // one answer instead of two copies of the same condition.
+  const isEmptyState = state === "ready" && filtered.length === 0 && !narrowed
+
   const showFilterBar = config.userFilter && config.filterFacets.length > 0
   const showSort = config.sortable && config.sortOptions.length > 0
   const showHeader =
@@ -386,7 +512,12 @@ function CollectionFrame<T>({
     const searchPlaceholder = config.showCount
       ? config.searchPlaceholder.replace(/^Search\b/i, (m) => `${m} ${filtered.length}`)
       : config.searchPlaceholder
-    const searchBox = config.searchable ? (
+    // `!isEmptyState` on all three (client, 2 Sep 2026, verbatim: "NEVER
+    // TOOLBAR ON EMPTY COLLECTION") — nothing to search, filter or sort
+    // over zero rows with nothing narrowing them. `showFilterBar`/`showSort`
+    // still gate on the recipe's own config first; this is a second,
+    // independent reason to draw nothing, not a replacement for it.
+    const searchBox = config.searchable && !isEmptyState ? (
       <SearchInput
         defaultValue={query}
         onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
@@ -394,22 +525,43 @@ function CollectionFrame<T>({
         placeholder={searchPlaceholder}
       />
     ) : null
-    const filterBar = showFilterBar ? (
-      <FilterBar
-        facets={config.filterFacets}
-        values={facetValues}
-        data={data}
-        onChange={setFacet}
-        onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
-        resultCount={filtered.length}
-        modal={modal}
-      />
+    // `modal` no longer passed through: `FilterBar` dropped its Popover
+    // entirely (client ruling, 2026-09-02 — see filter-bar.tsx's own header),
+    // so there is no floating surface left here for a Dialog's scroll lock to
+    // fight with. `modal` still gates the mobile Sort popover below, which is
+    // unrelated and unchanged.
+    // WRAPPED IN A `relative` BOX, and that box is the whole point of the
+    // wrapper — `FilterBar`'s open panel is `position: absolute` with
+    // `top-full`/`inset-x-0` (filter-bar.tsx, 2 Sep 2026: a flex-sibling
+    // panel fed its own height into the toolbar's `rounded-pill` and drew a
+    // giant oval), so it anchors to the nearest POSITIONED ancestor. The kit's
+    // own frame wraps whatever it is handed here in `<div className="flex
+    // min-w-0 flex-wrap items-center gap-2">` with no `position` of its own
+    // (`shared/ui/components/collection-frame/collection-frame.tsx`, R39 — a
+    // hand-edit there turns the build red), and nothing above it is positioned
+    // either, so without this the panel would measure against the initial
+    // containing block and land at the wrong width in the wrong place. This
+    // anchor is narrower than the toolbar — it is only the filters slot — so
+    // the panel carries its own `min-w-*` to keep a usable measure; marking
+    // the kit's own wrapper `relative` is the upstream fix, logged for the
+    // design-kit pipeline.
+    const filterBar = showFilterBar && !isEmptyState ? (
+      <div className="relative flex min-w-0 items-center">
+        <FilterBar
+          facets={config.filterFacets}
+          values={facetValues}
+          data={data}
+          onChange={setFacet}
+          onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
+          resultCount={filtered.length}
+        />
+      </div>
     ) : null
     // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
     // between the actual view switcher and "the sub-tab picker are controls"
     // — this frame has no view switcher, so `SortControl` takes the slot
     // rather than inventing a sixth one the component does not offer.
-    const sortControl = showSort ? (
+    const sortControl = showSort && !isEmptyState ? (
       <SortControl
         options={config.sortOptions}
         value={sortBy}
@@ -418,12 +570,19 @@ function CollectionFrame<T>({
         onDirectionChange={setSortDir}
       />
     ) : null
-    const createButton = createAction ? (
-      <Button onClick={createAction.onCreate} className="gap-1">
-        {createAction.icon}
-        {createAction.label}
-      </Button>
-    ) : null
+    // GENUINELY EMPTY SUPPRESSES THE TOOLBAR'S OWN + BUTTON (`isEmptyState`,
+    // computed once above alongside `narrowed` — now also what gates
+    // `searchBox`/`filterBar`/`sortControl` themselves, see there). Below,
+    // the GENUINELY-EMPTY branch draws `CollectionEmptyState`'s own "Add the
+    // first" — a labelled button carrying the identical `createAction`. The
+    // toolbar's icon-only + button pinned to the panel's `actions` slot
+    // (composition 27.1's toolbar contract: "search, then filters, then view
+    // switcher, then actions pinned right") would then sit right above it,
+    // two controls for the one act the client's B3 rule ("the one mango")
+    // exists to prevent. It stays for every OTHER state — loading, error,
+    // no-results (`narrowed`), and a populated collection — where the empty
+    // body is not the one being drawn.
+    const createButton = createAction && !isEmptyState ? createActionButton(createAction) : null
 
     return (
       <KitCollectionFrame
@@ -478,34 +637,19 @@ function CollectionFrame<T>({
             }
           />
         ) : filtered.length === 0 ? (
-          // GENUINELY EMPTY — assembled from the kit's own primitives
-          // (Headline + Text + Button) to match `EmptyCollectionScreen`'s
-          // `emptyBody` register (states/empty-collection.tsx), the one
-          // piece of that composition this engine can adopt without also
-          // needing a figure strip or zero-badged tabs (concepts
-          // `CollectionConfig` doesn't have — see COMPOSITION-MISMATCHES.md).
-          // "Left-aligned, type only... no dashed placeholder rectangle" is
-          // the composition's own law, kept here rather than the dashed box
-          // this used to be.
-          <div
-            data-slot="collection-empty-body"
-            className="flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]"
-          >
-            <Headline as="h3" size="h3">
-              {copy?.emptyTitle ?? t(config.emptyText)}
-            </Headline>
-            {copy?.emptyDescription ? (
-              <Text as="p" size="sm" tone="secondary" measure>
-                {copy.emptyDescription}
-              </Text>
-            ) : null}
-            {createAction ? (
-              <Button onClick={createAction.onCreate} className="mt-2 gap-1">
-                {createAction.icon}
-                {createAction.label}
-              </Button>
-            ) : null}
-          </div>
+          // GENUINELY EMPTY — the finished register, `CollectionEmptyState`
+          // above, matching `EmptyCollectionScreen`'s `emptyBody`
+          // (states/empty-collection.tsx, 27.21) verbatim: a bold title, one
+          // explanatory sentence, and up to two buttons. The figure strip and
+          // zero-badged tabs are still not adopted — `CollectionConfig` has
+          // no "figures" concept, and inventing one is separate, unscoped
+          // work (COMPOSITION-MISMATCHES.md).
+          <CollectionEmptyState
+            title={copy?.emptyTitle ?? t(config.emptyText)}
+            description={copy?.emptyDescription}
+            onCreate={createAction?.onCreate}
+            onImport={createAction?.secondary?.onClick}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {renderItems(visible)}
@@ -547,6 +691,8 @@ function CollectionFrame<T>({
               className="w-44"
             />
           ) : null
+          // `modal` no longer passed: `FilterBar` has no Popover left to gate
+          // (see the `useKitPanel` branch's own note above).
           const filterBar = showFilterBar ? (
             <FilterBar
               facets={config.filterFacets}
@@ -555,7 +701,6 @@ function CollectionFrame<T>({
               onChange={setFacet}
               onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
               resultCount={filtered.length}
-              modal={modal}
             />
           ) : null
           const sortControl = showSort ? (
@@ -591,63 +736,117 @@ function CollectionFrame<T>({
           // the app telling somebody a filter was on without telling them which.
           return (
             <>
-              {/* Mobile (< sm): ONE compact row — a stretching search field + a
-                  sort funnel. Left-to-right, never wrapping into stacked rows.
-                  The filter bar is its own row below, at every width. */}
-              <div className="flex items-center gap-2 sm:hidden">
-                {config.searchable ? (
-                  <SearchInput
-                    defaultValue={query}
-                    onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
-                    onClear={() => debouncedSetQuery("")}
-                    placeholder={mobilePlaceholder}
-                    className="min-w-0 flex-1"
-                  />
-                ) : (
-                  <div className="min-w-0 flex-1">{titleBlock}</div>
-                )}
-                {showSort && (
-                  <Popover modal={modal}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        aria-label={t("Sort")}
-                        className="size-8 shrink-0"
+              {/* Mobile (< sm): a stretching search field + a sort funnel,
+                  left-to-right and never wrapping — the box and its trigger
+                  are one control and stay glued together. Filters ride
+                  directly below, in the SAME `sm:hidden` block (never a
+                  fully separate element the way the old full-width sibling
+                  was): the kit's own chip row is a horizontal SCROLLER at
+                  this width (`filter-bar.tsx`'s own header), which cannot
+                  share a line with the search box, so it is the one
+                  legitimate second line here — connected to the row above
+                  it rather than floating disconnected from "the toolbar",
+                  and never present when there is nothing to filter.
+                  `relative` — `filter-bar.tsx`'s OPEN panel is `position:
+                  absolute` with `top-full`/`inset-x-0` (2 Sep 2026: a
+                  flex-sibling panel fed its height into the toolbar pill and
+                  drew a giant oval), so it measures against the nearest
+                  positioned ancestor; this block is it, which puts the panel
+                  under the whole phone header at the header's own width. */}
+              <div className="relative flex flex-col gap-2 sm:hidden">
+                <div className="flex items-center gap-2">
+                  {config.searchable ? (
+                    <SearchInput
+                      defaultValue={query}
+                      onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
+                      onClear={() => debouncedSetQuery("")}
+                      placeholder={mobilePlaceholder}
+                      className="min-w-0 flex-1"
+                    />
+                  ) : (
+                    <div className="min-w-0 flex-1">{titleBlock}</div>
+                  )}
+                  {showSort && (
+                    <Popover modal={modal}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          aria-label={t("Sort")}
+                          className="size-8 shrink-0"
+                        >
+                          <ArrowUpDown />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
                       >
-                        <ArrowUpDown />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="end"
-                      className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3"
-                    >
-                      {/* The same control the desktop layout renders (built
-                          once above) — just moved into a popover, since the
-                          phone header is ONE row: search + this trigger. */}
-                      {sortControl}
-                    </PopoverContent>
-                  </Popover>
-                )}
+                        {/* The same control the desktop layout renders (built
+                            once above) — just moved into a popover, since the
+                            phone header is ONE row: search + this trigger. */}
+                        {sortControl}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+                {filterBar}
               </div>
 
-              {/* ≥ sm: "inline" = title + search + sort on one wrapping row;
-                  "stacked" (default) = a title+search row with the sort on the
-                  row below. Sort is IN the header either way, never a bolted-on
-                  strip. */}
-              <div className="hidden sm:block">
+              {/* ≥ sm: FILTERS NEVER ORPHAN INTO A ROW OF THEIR OWN ANY MORE
+                  (client ruling, 2026-09-01 — the toolbar spec Aurora
+                  approved that night): they ride in the SAME row as
+                  search, wrapping only when the viewport is genuinely too
+                  narrow, never a designed second tier. This file used to
+                  render `filterBar` once, after both branches below, as a
+                  full-width sibling row — exactly the shape the client's
+                  screenshot of the Apps screen caught: search+sort on one
+                  line, a stranded filter chip under it — and this file's own
+                  `headerLayout` doc claimed "inline" already put "title,
+                  search, and filters together on one wrapping row", which
+                  the code never actually did. `filterBar` is wrapped in its
+                  own non-growing flex box before it joins either row — the
+                  adapter's own outer `<div>` (`filter-bar.tsx`) is `w-full`
+                  by design (its chip row is meant to claim a whole line when
+                  it IS the line), and a bare `w-full` child inside this flex
+                  row would still claim the rest of it and push whatever
+                  comes after it (sort, in "inline") onto a line of its own —
+                  the same two-row shape one level down. The kit's OWN
+                  toolbar (`shared/ui/components/collection-frame/
+                  collection-frame.tsx`) wraps its own `filters` slot the
+                  identical way, for the identical reason.
+                  `headerLayout` still decides where SORT rides — "inline"
+                  keeps it beside search+filters on this one row; "stacked"
+                  (default) keeps it on its own row below, exactly as before
+                  this fix — that split is a title/sort decision this bug is
+                  not about, and it stays untouched.
+                  `relative` is the OTHER half of `filter-bar.tsx`'s open
+                  panel, which is `position: absolute` with
+                  `top-full`/`inset-x-0` so its own height can never feed a
+                  toolbar's box model (2 Sep 2026: it did, once, and drew a
+                  giant oval). It is marked on THIS block rather than on
+                  either layout's inner row so the panel measures against the
+                  whole desktop header in both — under "stacked" that means it
+                  opens below the sort row instead of over it. */}
+              <div className="relative hidden sm:block">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}
                     {searchBox}
+                    {filterBar && (
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">{filterBar}</div>
+                    )}
                     {sortControl}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       {titleBlock}
-                      {searchBox}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {searchBox}
+                        {filterBar}
+                      </div>
                     </div>
                     {sortControl && (
                       <div className="flex flex-wrap items-center gap-2">
@@ -657,9 +856,6 @@ function CollectionFrame<T>({
                   </div>
                 )}
               </div>
-
-              {/* THE FILTERS, AT EVERY WIDTH, on their own full-width row. */}
-              {filterBar}
             </>
           )
         })()}
@@ -717,29 +913,39 @@ function CollectionFrame<T>({
         // reading of ch27.21's "no empty-box drawing, no mascot … type and one
         // button carry it". Dropping the icon is that law, not a shim I could
         // not find; a recipe's `emptyIcon` is simply unread from here now.
-        <ShapeStateBody
-          shape="collectionScreen"
-          state="empty"
-          filtered={narrowed}
-          copy={{ emptyTitle: t(config.emptyText), ...copy }}
-          action={
-            narrowed
-              ? Object.keys(facetValues).length > 0 && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
-                  >
-                    {t("Clear filters")}
-                  </Button>
-                )
-              : createAction && (
-                  <Button onClick={createAction.onCreate} className="gap-1">
-                    {createAction.icon}
-                    {createAction.label}
-                  </Button>
-                )
-          }
-        />
+        //
+        // GENUINELY EMPTY draws through `CollectionEmptyState` now (same
+        // register `useKitPanel` draws, see its own doc) rather than
+        // `ShapeStateBody` — a bold title, the two-routes sentence, and up to
+        // two buttons, never the icon-only mango this used to stop at.
+        // NO-RESULTS is unchanged: `ShapeStateBody` + "Clear filters", because
+        // a filtered-out list is a different fact and 27.22 draws it
+        // differently (no mango in the body at all).
+        narrowed ? (
+          <ShapeStateBody
+            shape="collectionScreen"
+            state="empty"
+            filtered
+            copy={{ emptyTitle: t(config.emptyText), ...copy }}
+            action={
+              Object.keys(facetValues).length > 0 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
+                >
+                  {t("Clear filters")}
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <CollectionEmptyState
+            title={copy?.emptyTitle ?? t(config.emptyText)}
+            description={copy?.emptyDescription}
+            onCreate={createAction?.onCreate}
+            onImport={createAction?.secondary?.onClick}
+          />
+        )
       ) : (
         renderItems(visible)
       )}

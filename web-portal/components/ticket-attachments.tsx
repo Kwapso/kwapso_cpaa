@@ -60,7 +60,7 @@ import type { HelpAttachment } from "@shared/types"
 import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { formatRelative } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { reportError } from "@shared/web/log"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
@@ -98,7 +98,7 @@ function isFollowable(url: string): boolean {
 }
 
 export function TicketAttachments({ ticketId }: { ticketId: string }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const listQ = useCached<HelpAttachment[]>(cacheKeys.attachments(ticketId), () =>
     support.attachments(ticketId).then((r) => {
       primeCache(cacheKeys.attachmentsTotal(ticketId), r.total)
@@ -181,14 +181,14 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
         </p>
       ) : (
         // K5: one container, rows separated by a hairline — never a box each.
-        <ul className="divide-y rounded-[var(--radius)] border">
+        <ul className="divide-y rounded-[var(--radius)] bg-surface-panel">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2
             // The row is `items-start` rather than centred: its column now
             // carries a picture, and centring would hang the glyph and the
             // remove button halfway down the preview.
-            const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t), size]
+            const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t, lang), size]
               .filter(Boolean)
               .join(" · ")
             return (

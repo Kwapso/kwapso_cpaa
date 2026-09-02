@@ -276,9 +276,10 @@ export interface CollectionConfig extends BaseConfig {
    * `emptyText` would put a pictograph inside a sentence, which is the one shape
    * a host style guide is most likely to forbid. */
   emptyIcon?: string | null
-  /** Header arrangement. "stacked" (default) = a title+search row with the filter
-   * bar on its own line below; "inline" = title, search, and filters together on
-   * one wrapping row. */
+  /** Header arrangement. Filters never orphan into a row of their own (client
+   * ruling, 2026-09-01) — they always ride beside search. "stacked" (default) =
+   * a title+search+filters row with SORT on its own line below; "inline" =
+   * title, search, filters AND sort together on one wrapping row. */
   headerLayout: "stacked" | "inline"
 }
 

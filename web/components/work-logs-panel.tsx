@@ -29,15 +29,24 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { Pencil } from "@shared/ui/foundations/icons"
 
-import { AddButton, EmptyLine } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { LoadMore } from "@/components/load-more"
 import { BandCard, HoursByChart, NothingYet, RecordWeeksChart, hoursSpoken } from "@/components/pulse"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
@@ -48,7 +57,7 @@ import type { WorkLog, WorkLogSummary } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
 
 /** WHERE THE EXACT ENTRY COUNT IS PARKED, for the tab badge above the panel to
  * read (R16 — the door's own COUNT(*), never the loaded page's length).
@@ -165,11 +174,11 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
  * person (nothing to say about who), all of one kind (nothing to say about what),
  * and all of it before the window opened (nothing to say about when). */
 function Pictures({ summary }: { summary: WorkLogSummary }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   if (summary.total < ENOUGH_TO_CHART) return null
 
   const weeks = summary.weeks.map((w) => ({
-    label: formatDayMonth(w.weekStart),
+    label: formatDayMonth(w.weekStart, lang),
     hours: Math.round((w.seconds / 3600) * 10) / 10,
   }))
   const people = summary.people.map((p) => ({
@@ -262,10 +271,35 @@ export function WorkLogsPanel({
   const listKey = recordTimeKey(targetTable, targetId)
   const summaryKey = recordTimeSummaryKey(targetTable, targetId)
 
+  // WHO LOGGED IT — the one filter the door actually parses on this list
+  // (`userId`, LogFilter — see workers/content/src/routes/work-logs.ts). There
+  // is no free-text search here on purpose: the door has no `q` on this list,
+  // and a search box that only narrowed the loaded page would be exactly the
+  // lie `paged-find.tsx`'s own header describes — this collection GROWS
+  // (R14), so a box that looked like it searched everything while quietly
+  // answering about the newest fifty would be worse than no box at all.
+  const [personFilter, setPersonFilter] = React.useState("")
+  // Its own key, still inside the `time-of:<table>:<id>` family (R15's
+  // `slicePrefix`), so a work-log ping still drops it exactly as it drops the
+  // resting list — see `TIME_SLICE_PREFIX` in web/lib/live-resources.ts.
+  const filteredListKey = personFilter ? `${listKey}:by:${personFilter}` : listKey
+  const filteredFilter = React.useMemo(
+    () => (personFilter ? { ...filter, userId: personFilter } : filter),
+    [filter, personFilter]
+  )
+
   const logsQ = useCached<WorkLog[]>(listKey, () =>
     contentApi.workLogs({ filter }).then((r) => {
       primeCache(workLogsTotalKey(targetTable, targetId), r.total)
       primeCache(cursorKey(listKey), r.nextCursor)
+      return r.logs
+    })
+  )
+  // ONLY FETCHED WHILE A PERSON IS PICKED — the unfiltered read above already
+  // covers "nobody in particular", so this never doubles the resting read.
+  const filteredQ = useCached<WorkLog[]>(personFilter ? filteredListKey : null, () =>
+    contentApi.workLogs({ filter: filteredFilter }).then((r) => {
+      primeCache(cursorKey(filteredListKey), r.nextCursor)
       return r.logs
     })
   )
@@ -277,6 +311,7 @@ export function WorkLogsPanel({
   /** After any write here: both halves of this tab, and the record's own feed. */
   function refresh() {
     invalidate(listKey)
+    if (personFilter) invalidate(filteredListKey)
     invalidate(summaryKey)
     onActivityChanged?.()
   }
@@ -315,20 +350,59 @@ export function WorkLogsPanel({
     toast.success(t("Time logged."))
   }
 
-  if (logsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the time.")}</p>
+  if (logsQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the time.") }}
+        action={
+          <Button variant="secondary" onClick={() => refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (logsQ.data === undefined) return <Skeleton variant="list" lines={3} />
-  const rows = logsQ.data
+  // WHILE A PERSON IS PICKED, THE FILTERED READ IS THE LIST — its own cache
+  // key and its own cursor, exactly the shape a paged narrowing takes
+  // everywhere else in the app (findKeyFor in paged-find.tsx). The unfiltered
+  // `logsQ` stays warm underneath so clearing the filter costs nothing.
+  const rows = personFilter ? (filteredQ.data ?? null) : logsQ.data
+  const activeListKey = personFilter ? filteredListKey : listKey
+  const activeFetchPage = (c: string) =>
+    contentApi
+      .workLogs({ filter: personFilter ? filteredFilter : filter, cursor: c })
+      .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
 
   return (
     <div className="flex flex-col gap-6">
-      {canLog && (
-        <div className="flex flex-wrap justify-end gap-2">
-          {/* The same control every other collection tab in the app puts above
-              its list, so "add one of these" looks like one act wherever a person
-              meets it (UI-CONVENTIONS §4). */}
-          <AddButton label={t("Log time")} onClick={() => setAdding(true)} />
-        </div>
-      )}
+      {/* The same control every other collection tab in the app puts above
+          its list, so "add one of these" looks like one act wherever a person
+          meets it (UI-CONVENTIONS §4) — now through the canonical toolbar
+          row rather than a hand-written div. The "Logged by" filter joins it
+          once more than one person has time on this record — a filter over a
+          set of one is a control with nothing to control. */}
+      <ToolbarRow
+        search={
+          summaryQ.data && summaryQ.data.people.length > 1 && (
+            <Select value={personFilter || "all"} onValueChange={(v) => setPersonFilter(v === "all" ? "" : v)}>
+              <SelectTrigger className="h-9 w-full sm:w-48" aria-label={t("Filter by who logged it")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("Everyone")}</SelectItem>
+                {summaryQ.data.people.map((p) => (
+                  <SelectItem key={p.userId} value={p.userId}>
+                    {p.userName ?? t("Someone who has left")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )
+        }
+        actions={canLog && <AddButton label={t("Log time")} onClick={() => setAdding(true)} />}
+      />
 
       {/* The numbers wait for the second read rather than flashing a zero: an
           "0 hours" that becomes "14 hours" a moment later is a number somebody
@@ -340,10 +414,21 @@ export function WorkLogsPanel({
         </>
       )}
 
-      {rows.length === 0 ? (
-        <EmptyLine concept="time">{t("No time logged against this yet.")}</EmptyLine>
+      {rows === null ? (
+        <Skeleton variant="list" lines={3} />
+      ) : rows.length === 0 ? (
+        personFilter ? (
+          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        ) : (
+          // No `work_logs` import target — time against one record is logged
+          // live, never bulk-loaded.
+          <CollectionEmptyState
+            title={t("No time logged against this yet.")}
+            onCreate={canLog ? () => setAdding(true) : undefined}
+          />
+        )
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rows.map((l) => (
             <li
               key={l.id}
@@ -405,14 +490,9 @@ export function WorkLogsPanel({
       )}
 
       {/* R14: the badge above counts ALL of this record's time, so the list under
-          it has to be able to reach the rest of it. */}
-      <LoadMore
-        listKey={listKey}
-        label={t("Load more time")}
-        fetchPage={(c: string) =>
-          contentApi.workLogs({ filter, cursor: c }).then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
-        }
-      />
+          it has to be able to reach the rest of it — the filtered question's
+          own cursor while a person is picked, the record's own otherwise. */}
+      <LoadMore listKey={activeListKey} label={t("Load more time")} fetchPage={activeFetchPage} />
       <TimeFormDialog
         open={adding}
         onOpenChange={setAdding}

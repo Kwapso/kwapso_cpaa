@@ -23,6 +23,7 @@
 
 import * as React from "react"
 
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -37,6 +38,7 @@ import type { PickableRecord } from "@/lib/pickable"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
+import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
@@ -350,20 +352,22 @@ export function SprintFormDialog({
         />
       </Field>
       <Field config={startField} htmlFor="sprint-start" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="sprint-start"
-          type="date"
-          value={values.startsOn}
-          onChange={(e) => setValues((s) => ({ ...s, startsOn: e.target.value }))}
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(values.startsOn)}
+          onValueChange={(d) => setValues((s) => ({ ...s, startsOn: ymdFromDate(d) }))}
           disabled={busy}
         />
       </Field>
       <Field config={endField} htmlFor="sprint-end" className={fieldSpacing}>
-        <Input
+        <DatePicker
           id="sprint-end"
-          type="date"
-          value={values.endsOn}
-          onChange={(e) => setValues((s) => ({ ...s, endsOn: e.target.value }))}
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(values.endsOn)}
+          onValueChange={(d) => setValues((s) => ({ ...s, endsOn: ymdFromDate(d) }))}
           disabled={busy}
         />
       </Field>

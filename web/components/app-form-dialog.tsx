@@ -44,6 +44,7 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
+import { RecordMark } from "@shared/web/record-mark"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeSrc } from "@shared/web/rich-text"
 import { fileToDataUrl } from "@/lib/image"
@@ -361,25 +362,29 @@ export function AppFormDialog({
           disabled={busy}
         />
       </Field>
-      {/* THE MARK, IN THE SQUARE IT WILL APPEAR IN. Same seam and same shape as
-          the account logo: the picker downsizes in the browser, the fallback is
-          the stage mark the tile draws today, and the preview is the tile.
-          A `data:` preview cannot pass `safeSrc` — it is not a stored URL and
-          never leaves the browser — so it is named rather than checked, exactly
-          as the account form does. */}
+      {/* THE MARK, IN THE SQUARE IT WILL APPEAR IN — ONLY ONCE THERE IS ONE.
+          Client-reported on this exact dialog: "do not show the avatar on
+          left when empty (makes no sense)". On a brand-new app, `logoPreview`,
+          the stage mark AND the name are all still blank, so this used to draw
+          an empty grey circle with nothing in it — not a placeholder standing
+          for the record, a box standing for nothing. So the square is HIDDEN
+          until there is a real picture to show, and appears the moment one is
+          picked: "hide when empty, show when populated," never removed
+          outright — the preview is still how a chosen file is confirmed
+          before it uploads. A `data:` preview cannot pass `safeSrc` — it is
+          not a stored URL and never leaves the browser — so it is named
+          rather than checked, exactly as the account form does. */}
       <Field config={logoField} htmlFor="app-logo" className={fieldSpacing}>
         <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] text-2xl leading-none"
-          >
-            {logoPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
+          {logoPreview && (
+            <span
+              aria-hidden
+              className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] text-2xl leading-none"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoPreview} alt="" className="size-full object-contain" />
-            ) : (
-              appStageMark(values.stage) || values.name.slice(0, 1).toUpperCase()
-            )}
-          </span>
+            </span>
+          )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickLogo} />
         </div>
       </Field>
@@ -444,6 +449,22 @@ export function AppFormDialog({
                   }
                   disabled={busy}
                 />
+                {/* THEIR OWN FACE (R35) — a staff member is a person in their own
+                    right, the same round mark the lead and assignee pickers draw
+                    them with elsewhere on this exact form. Client-reported: "when
+                    creating an app on who's in it, there are no avatars."
+                    `size="choice"` — client-reported, 2026-08-31, TWICE on this
+                    exact checklist: first "avatars smaller in this cases, we have
+                    3 sizes of avatar, use the smaller one" (which `size="row"`,
+                    then the smallest of `record-mark.tsx`'s three sizes,
+                    answered), and then, on the same day, still "too big" — `row`
+                    was never actually the smallest box the component could draw,
+                    only the smallest of three sizes decided without reference to
+                    the kit's own person-mark scale. `choice` (24px,
+                    `record-mark.tsx`'s `BOX`) is a fourth, NAMED size, decided
+                    once in the shared component rather than hand-rolled here a
+                    second time. */}
+                <RecordMark picture={m.photo} name={m.name} shape="round" size="choice" />
                 {m.name}
               </Label>
             ))
@@ -495,6 +516,15 @@ export function AppFormDialog({
                     }
                     disabled={busy}
                   />
+                  {/* A CONTACT IS A PERSON (R35's "round" shape) — the same face
+                      the Main stakeholder picker below draws them with. No photo
+                      comes through `listAccountLinks` today, so this falls back
+                      to their initial like every unphotographed person.
+                      `size="choice"` — see the staff checklist's own `RecordMark`
+                      comment above: the client called `row` (36px) "too big" on
+                      this exact pair of checklists a second time, so both now
+                      draw the 24px checklist size instead. */}
+                  <RecordMark name={c.name} shape="round" size="choice" />
                   {c.name}
                 </Label>
               ))
@@ -510,9 +540,14 @@ export function AppFormDialog({
             onChange={(v) =>
               setValues((s) => ({ ...s, mainStakeholderContactId: v === NOBODY ? "" : v }))
             }
+            // A CONTACT IS A PERSON (R35's "round" shape), the same face
+            // `StakeholdersPanel` already draws them with on the app's own
+            // Stakeholders tab — no photo comes through `listAccountLinks`
+            // today, so this falls back to their initial the way every
+            // unphotographed person does, never to a client/company square.
             options={contacts
               .filter((c) => values.stakeholderContactIds.includes(c.id))
-              .map((c) => ({ value: c.id, label: c.name }))}
+              .map((c) => ({ value: c.id, label: c.name, shape: "round" as const }))}
             emptyOption={{ value: NOBODY, label: t("Not said") }}
             placeholder={t("Not said")}
             searchPlaceholder={t("Search contacts…")}

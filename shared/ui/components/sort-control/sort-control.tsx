@@ -48,12 +48,25 @@
    · Focus is the one global rule (tokens.css §8). The field moves its own
      HAIRLINE to ink on focus, which is a fill colour and not a ring.
    · Disabled is a fill and an ink — the field's hairline at 8%, a step down
-     from the resting 20% (override 42), and `--accent` withdrawn from the
-     direction button. Neither is an opacity and neither is mango. The FIELD
-     has no hover at all; the direction button, which is a button and not a
-     field, keeps its `--accent` wash.
+     from the resting 20% (override 42), and the hover withdrawn from both
+     halves. Neither is an opacity and neither is mango. AT REST, both halves
+     now answer to `--btn-secondary-hover` — client, 2026-09-02: the field
+     took `ViewSwitch`'s pill, hover included, so the chip no longer has a
+     field half with no hover standing next to a button half with `--accent`'s.
+     See `fieldVariants` and `directionVariants`'s own headers.
    · Every string is a prop with a default: "Sort by", "Ascending",
      "Descending", and the direction control's own name.
+
+   ORDER FLIP (client, 2026-09-02) — verbatim: "on the sort by, cange the
+   ordre: so on tge left of the fused we have the arrow and on the right the
+   value and dropdow." The chip's DOM order is now [direction, field]: the
+   arrow button first, the field (value + chevron) second. Rounding follows
+   the DOM, not the words "left"/"right" — `directionVariants` now owns
+   `rounded-s-pill rounded-e-none` (its outer corner is the chip's START) and
+   `fieldVariants`'s `fused` variant now owns `rounded-e-pill rounded-s-none`
+   (its outer corner is the chip's END). Reasoned in logical terms so this
+   still mirrors correctly under `dir="rtl"` — see the RTL paragraph on
+   `SortControl` itself, updated to match.
 
    RENDERING CONTEXT
    `"use client"`. It holds the uncontrolled key and direction, and attaches
@@ -99,12 +112,35 @@ const sortControlVariants = cva(["inline-flex min-w-0 items-center gap-2"], {
 });
 
 /* What this control changes about `SelectTrigger`, and nothing else: the
-   height (a toolbar control is 40 or 32, not the 44 form field) and the
-   read-only skin, which `Select` has no state for. Everything the two share —
-   the pill, the hairline, the open ink, the chevron — is `select.tsx`'s and
-   is not restated here. OVERRIDE 42 reaches this control through that file:
-   the resting edge is `--hair-strong`, disabled keeps 8%, and the hover
-   `select.tsx` used to draw is gone with nothing in its place. */
+   height (a toolbar control is 40 or 32, not the 44 form field), the
+   read-only skin, which `Select` has no state for, and — client, 2 Sep
+   2026 — the FIELD's outer shape, now that it shares one chip with the
+   direction control instead of standing beside it with a gap: this end
+   keeps the pill, the other end squares off where the two meet. Everything
+   else the two share — the open ink, the chevron — is `select.tsx`'s and is
+   not restated here.
+
+   THE RESTING FILL IS NO LONGER `select.tsx`'s CH09 FIELD SKIN — a second,
+   later ruling the same day. Client, verbatim: "all the components in
+   toolbar (the sort, the filter, the view) i want them in the same pill
+   aspect exactly. match filter and sort to the existing view selector
+   component (i am happy with how that is)". `ViewSwitch` draws through this
+   same `SelectTrigger` and overrides exactly this: `--btn-secondary-fill`,
+   `shadow-none` (no hairline), `--btn-secondary-hover` on hover, weight 500.
+   Until this ruling the field kept `select.tsx`'s own bordered-field skin —
+   `bg-background`, the `--hair-strong` hairline, weight 300, no hover — which
+   was CH09's own field law and correct for a lone select, but is a visibly
+   different pill from `ViewSwitch` standing next to it: a different
+   background token (`--background` against `--btn-secondary-fill`, the same
+   colour only by coincidence in light mode and NOT in dark, where `--card`
+   and `--background` split), a hairline `ViewSwitch` has none of, and no
+   hover where `ViewSwitch` has one. Overriding it here — rather than
+   defaulting `state: "default"` to the empty string `select.tsx` already
+   gives every other trigger — is what the client's "match ... exactly"
+   asks for. `select.tsx`'s OPEN/FOCUS ink hairline is untouched: it is
+   `enabled:focus:`- and `enabled:data-[state=open]:`-scoped, so `shadow-none`
+   here only drops the RESTING edge, exactly as `ViewSwitch`'s own header
+   documents for its own copy of this override. */
 const fieldVariants = cva(["w-auto"], {
   variants: {
     size: {
@@ -115,7 +151,9 @@ const fieldVariants = cva(["w-auto"], {
     },
     /** Mutually exclusive. Resolved once, in JS, below. */
     state: {
-      default: "",
+      /** `ViewSwitch`'s own pill, restated here — see the note above. */
+      default:
+        "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)] enabled:hover:bg-[var(--btn-secondary-hover)] font-[var(--font-weight-medium)]",
       /** A fill and an ink. `SelectTrigger`'s own `disabled:` rules do the rest. */
       disabled: "",
       /** Busy: the value has not arrived, so it may not be changed. The
@@ -123,18 +161,51 @@ const fieldVariants = cva(["w-auto"], {
           and the faint fill says the control is not yours right now. */
       readOnly: "cursor-default bg-hair-faint text-foreground shadow-none",
     },
+    /** `showDirection` reaching this half of the pair — see the file header.
+        A list with one natural order (`showDirection: false`) keeps the
+        field's own full pill, nothing squared off with nothing to meet it.
+        Since the ORDER FLIP (client, 2026-09-02) the field is the SECOND
+        (end) half of the chip, so it is the END corner that stays a pill. */
+    fused: {
+      true: "rounded-e-pill rounded-s-none",
+      false: "",
+    },
   },
-  defaultVariants: { size: "default", state: "default" },
+  defaultVariants: { size: "default", state: "default", fused: false },
 });
 
+/* FUSED WITH THE FIELD (client, 2 Sep 2026) — her reference artifact draws
+   one seamless chip, not a bordered field with a bare icon floating beside
+   it on a gap. Only the OUTER corner stays a pill — `rounded-s-pill
+   rounded-e-none` since the ORDER FLIP the same day (see the file header)
+   made this control the FIRST (start) half of the chip; the shared inner
+   edge squares off against the field's matching edge (`fused` on
+   `fieldVariants` above).
+
+   THE RESTING SKIN IS NOW THE FIELD'S NEW ONE, NOT `select.tsx`'s — same
+   ruling, same day, second half. This half used to mirror the CH09 field
+   hairline the field wore (`bg-background`, `--hair-strong`, `--accent`
+   hover): two 1px inset shadows on the exact same line, reading as one
+   continuous border. Now that the field itself has moved to `ViewSwitch`'s
+   borderless `--btn-secondary-fill` pill (see `fieldVariants`'s header), a
+   hairline mirrored from the field's OLD skin would put a border back on one
+   half of a chip that no longer has one on the other — the seam the fusion
+   was written to erase would reappear on this side alone. So this half now
+   mirrors the field's CURRENT skin instead: the same `--btn-secondary-fill`,
+   `shadow-none` at rest, and `--btn-secondary-hover` in place of the
+   `--accent` wash, so a hover anywhere on the chip answers in the one colour
+   the whole pill now stands on. The things that make this control a BUTTON
+   and not a field are untouched: the active-press nudge, and the
+   focus-visible ink shadow, which is this control's own fill-coloured
+   answer to the global ring (tokens.css §8), not a border it borrows from
+   the field. */
 const directionVariants = cva(
   [
     "grid shrink-0 cursor-pointer place-content-center",
-    "appearance-none rounded-pill border-0 bg-transparent",
-    "text-ink-secondary",
-    "enabled:hover:bg-accent enabled:hover:text-foreground",
+    "appearance-none rounded-s-pill rounded-e-none border-0",
     "enabled:active:translate-y-[0.0625rem]",
-    "transition-[background-color,color,translate]",
+    "enabled:focus-visible:shadow-[inset_0_0_0_0.0625rem_var(--foreground)]",
+    "transition-[background-color,box-shadow,color,translate]",
     "duration-[var(--duration-colour)] ease-kwapso",
   ],
   {
@@ -144,11 +215,15 @@ const directionVariants = cva(
         sm: "size-[var(--control-height-dense)]",
       },
       state: {
-        default: "",
-        /** A fill and an ink. Never an opacity. */
-        disabled:
-          "cursor-not-allowed bg-[var(--btn-disabled-fill)] text-[var(--btn-disabled-label)]",
-        readOnly: "cursor-default text-ink-tertiary",
+        /** `ViewSwitch`'s own pill, restated here — see the note above. */
+        default:
+          "shadow-none bg-[var(--btn-secondary-fill)] text-ink-secondary enabled:hover:bg-[var(--btn-secondary-hover)] enabled:hover:text-foreground",
+        /** Mirrors the field's own disabled edge (override 42: `--border`
+            is the weak 8% stroke, never the resting 20%). */
+        disabled: "cursor-not-allowed shadow-[inset_0_0_0_0.0625rem_var(--border)] bg-hair-faint text-ink-disabled",
+        /** Mirrors the field's own read-only skin exactly — the hairline
+            goes entirely and the faint fill carries the state alone. */
+        readOnly: "cursor-default shadow-none bg-hair-faint text-foreground",
       },
     },
     defaultVariants: { size: "default", state: "default" },
@@ -201,10 +276,12 @@ export interface SortControlProps
  * TEN STATES
  *  1. default        — the field with the current key, the chevron at the
  *                      inline end, the direction control beside it.
- *  2. hover          — does not apply to the FIELD half. CH09 draws no hover
- *                      on a field and the 20% the old one promoted to is now
- *                      the resting edge (override 42). `--accent` on the
- *                      direction control. Named tokens, not opacities.
+ *  2. hover          — `--btn-secondary-hover` on BOTH halves, client,
+ *                      2026-09-02: the field took `ViewSwitch`'s pill, hover
+ *                      included, so the fused chip answers in one colour
+ *                      wherever it is hovered rather than a field half with
+ *                      none and a button half with `--accent`'s. Named
+ *                      tokens, not opacities.
  *  3. focus-visible  — NOT here. tokens.css §8 rings the field and the
  *                      direction control at the pill radius. The field also
  *                      moves its own hairline to ink, which is a fill colour.
@@ -238,11 +315,18 @@ export interface SortControlProps
  *  toolbar scrolls — that is the composition's decision and `FilterBar` states
  *  the same answer for the same reason.
  *
- * RTL — safe, and this is the component where it matters most: the chevron
- * and the direction control both sit at the INLINE end (`justify-between`,
- * `end-*`, DOM order), so both move to the visual start in Arabic, Urdu and
- * Persian, and Radix mirrors the list's own alignment from `dir`. The up/down
- * arrows are vertical and mean the same thing in every script.
+ * RTL — safe, and this is the component where it matters most. Since the
+ * ORDER FLIP (client, 2026-09-02) the chip is [direction, field] in DOM
+ * order: the direction control sits at the chip's inline START
+ * (`rounded-s-pill`, first child, no literal side), and the field's own
+ * chevron stays at ITS inline end (`SelectTrigger`'s `justify-between`,
+ * unaffected by the outer reorder because it lives inside the field, not
+ * beside it). Reasoned in logical properties throughout, so in Arabic, Urdu
+ * and Persian the whole chip mirrors: logical start is the visual RIGHT, so
+ * the arrow renders on the right and the field (value + chevron) on the
+ * left — the same mirrored relationship LTR readers see reversed. Radix
+ * mirrors the list's own alignment from `dir`. The up/down arrows are
+ * vertical and mean the same thing in every script.
  */
 const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
   (
@@ -333,63 +417,71 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
           {label}
         </label>
 
-        <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
-          <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
-            <SelectTrigger
-              id={fieldId}
-              data-slot="sort-control-select"
-              aria-busy={loading || undefined}
-              aria-labelledby={labelId}
-              className={cn(fieldVariants({ size, state }))}
+        {/* THE PAIR, ONE CHIP — client, 2 Sep 2026. `sortControlVariants`'s
+            own `gap-2` still separates the LABEL from this group; inside it
+            the two halves sit with no gap at all, because they now draw one
+            continuous hairline between them rather than leaving room for a
+            border on each side of empty air (see `fieldVariants`'s `fused`
+            and `directionVariants`'s own header). */}
+        <span className="inline-flex min-w-0 items-center">
+          {showDirection ? (
+            <button
+              type="button"
+              data-slot="sort-control-direction"
+              disabled={inert}
+              onClick={flipDirection}
+              className={directionVariants({ size, state })}
             >
-              <SelectValue />
-            </SelectTrigger>
-            {/* The kit's own paper, in both modes. This is the whole of fix 4:
-                the list is `--popover` at the 24 radius under the overlay
-                shadow, not a surface the machine picked. */}
-            <SelectContent>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Busy: the spinner sits OVER the field at the inline end, in front
-              of the chevron, and takes no pointer events. Only drawn while
-              loading — the chevron is `SelectTrigger`'s and stays its own. */}
-          {loading ? (
-            <span
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute end-3 grid place-content-center",
-                "bg-hair-faint text-ink-tertiary",
-              )}
-            >
-              <Loader2 size={16} className="motion-spinner" />
-            </span>
+              <DirectionGlyph size={glyphSize} aria-hidden="true" />
+              {/* The control's accessible name is its content, so it says both
+                  what the control is and which way the list is running now. */}
+              <span className="sr-only">
+                {directionLabel}
+                {": "}
+                {currentDirection === "asc" ? ascendingLabel : descendingLabel}
+              </span>
+            </button>
           ) : null}
-        </span>
 
-        {showDirection ? (
-          <button
-            type="button"
-            data-slot="sort-control-direction"
-            disabled={inert}
-            onClick={flipDirection}
-            className={directionVariants({ size, state })}
-          >
-            <DirectionGlyph size={glyphSize} aria-hidden="true" />
-            {/* The control's accessible name is its content, so it says both
-                what the control is and which way the list is running now. */}
-            <span className="sr-only">
-              {directionLabel}
-              {": "}
-              {currentDirection === "asc" ? ascendingLabel : descendingLabel}
-            </span>
-          </button>
-        ) : null}
+          <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
+            <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
+              <SelectTrigger
+                id={fieldId}
+                data-slot="sort-control-select"
+                aria-busy={loading || undefined}
+                aria-labelledby={labelId}
+                className={cn(fieldVariants({ size, state, fused: showDirection }))}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              {/* The kit's own paper, in both modes. This is the whole of fix 4:
+                  the list is `--popover` at the 24 radius under the overlay
+                  shadow, not a surface the machine picked. */}
+              <SelectContent>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Busy: the spinner sits OVER the field at the inline end, in front
+                of the chevron, and takes no pointer events. Only drawn while
+                loading — the chevron is `SelectTrigger`'s and stays its own. */}
+            {loading ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute end-3 grid place-content-center",
+                  "bg-hair-faint text-ink-tertiary",
+                )}
+              >
+                <Loader2 size={16} className="motion-spinner" />
+              </span>
+            ) : null}
+          </span>
+        </span>
       </div>
     );
   },

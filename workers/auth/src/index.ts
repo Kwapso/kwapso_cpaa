@@ -42,9 +42,10 @@ import {
   verifyGoogleIdToken,
 } from "./lib/google"
 import { listAccountActivity } from "./lib/account-activity"
-import { setLanguage, setScale, updateProfile, type ProfileInput } from "./lib/profile"
+import { setLanguage, setScale, setSpine, updateProfile, type ProfileInput } from "./lib/profile"
 import { isLanguage } from "@shared/i18n"
 import { isScale } from "@shared/scale"
+import { isSpine } from "@shared/spine"
 import {
   findOrCreateUserByEmail,
   toSessionUser,
@@ -89,6 +90,8 @@ export default {
           return await language(request, env)
         case "POST /api/auth/scale":
           return await scale(request, env)
+        case "POST /api/auth/spine":
+          return await spine(request, env)
         case "POST /api/auth/logout":
           return await logout(request, env)
         case "GET /api/auth/health":
@@ -546,6 +549,27 @@ async function scale(request: Request, env: Env): Promise<Response> {
   if (!isScale(chosen)) return fail(400, "bad_scale", "That is not a size kwapso offers.")
 
   return json(await setScale(env, user, chosen))
+}
+
+/** WHICH SPINE THIS PERSON WANTS THE SIDEBAR PAINTED IN. `scale`'s twin, one
+ * field along: both are one word about one reader, both are read off
+ * `SessionUser` by `web/components/app-shell.tsx`, and both must survive a
+ * device change.
+ *
+ * R20, positionally: `body.spine` sits as `requireText`'s first argument and
+ * then as `isSpine`'s only argument, and `isSpine` is a real check against
+ * SPINE_VALUES rather than a truthiness guard. An unknown value is a clean 400
+ * here, never a value that lands on a user row. The body is read field by
+ * field and never destructured. */
+async function spine(request: Request, env: Env): Promise<Response> {
+  const user = await getSessionUser(env, request)
+  if (!user) return fail(401, "signed_out", "Not signed in.")
+
+  const body = (await request.json().catch(() => ({}))) as { spine?: unknown }
+  const chosen = requireText(body.spine, "Sidebar", 16)
+  if (!isSpine(chosen)) return fail(400, "bad_spine", "That is not a sidebar kwapso offers.")
+
+  return json(await setSpine(env, user, chosen))
 }
 
 async function logout(request: Request, env: Env): Promise<Response> {

@@ -14,11 +14,12 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/foundations/icons"
 
@@ -36,9 +37,10 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
@@ -217,8 +219,8 @@ export function SprintDetailScreen({
       label: t("Runs"),
       value:
         sprint.startsOn && sprint.endsOn
-          ? `${formatDate(sprint.startsOn)} → ${formatDate(sprint.endsOn)}`
-          : (formatDate(sprint.startsOn) || formatDate(sprint.endsOn) || "—"),
+          ? `${formatDate(sprint.startsOn, lang)} → ${formatDate(sprint.endsOn, lang)}`
+          : (formatDate(sprint.startsOn, lang) || formatDate(sprint.endsOn, lang) || "—"),
     },
     { label: t("Price sold"), value: priceSold(sprint.soldPriceCents, sprint.currency) },
     {
@@ -229,7 +231,7 @@ export function SprintDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -267,16 +269,45 @@ export function SprintDetailScreen({
   return (
     <RecordScreen
       mark={kindMark}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `sprint`), client ruling 2026-08-31.
+      eyebrow={t("Sprint")}
       recordNumber={sprint.ref || undefined}
       collectionLabel={kindWord}
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). A sprint has no stored
+      // status word — `completedAt` and `active` are the two facts this same
+      // three-way sentence already reads on the `status` line below — so the
+      // dot reuses that same reading rather than a new field: `shipped` once
+      // it is cut (closed, successfully, same tone as an app's "Completed"),
+      // `building` while it runs, `archived` once switched off unfinished
+      // (the "Cancelled" tier every other put-away record uses).
+      chips={
+        <>
+          <Badge
+            variant="status"
+            dot={sprint.completedAt ? "shipped" : sprint.active ? "building" : "archived"}
+          >
+            {sprint.completedAt ? t("Complete") : sprint.active ? t("Running") : t("Cancelled")}
+          </Badge>
+          {/* THE THIRD PILL, "the most relevant container parent" (client
+              ruling, 2026-08-31). The glossary's own words settle it: "sprint:
+              a block of delivery work sold to ONE ACCOUNT" — the account it
+              was sold to, not the app it happens to be building, is what a
+              sprint belongs to; the app link stays where it already was, the
+              cross-link line below. */}
+          {sprint.accountId && sprint.accountName ? (
+            <RecordChipLink href={`${host.base}/accounts/${sprint.accountId}`}>
+              {sprint.accountName}
+            </RecordChipLink>
+          ) : null}
+        </>
+      }
       title={sprint.name}
-      status={[
-        sprint.completedAt ? t("Complete") : sprint.active ? t("Running") : t("Cancelled"),
-        sprint.appName ?? undefined,
-        sprint.accountName ?? undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      // NO STATUS LINE — client feedback, 2026-08-31: the header carries only
+      // image/eyebrow/title/pills. All three facts here already say
+      // themselves elsewhere: the state as the first chip, the account as the
+      // third, and the app in the Overview tab's own "App" row.
       actions={
         canEdit ? (
           <>
@@ -294,34 +325,24 @@ export function SprintDetailScreen({
           </>
         ) : undefined
       }
-      headerExtra={
-        <>
-          {/* THE CROSS-LINKS UP THE TREE, the app it covers and the client who
-              bought it, both one tap away. */}
-          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {sprint.appId && sprint.appName && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
-                className="hover:text-foreground"
-              >
-                {t("On")} {sprint.appName}
-              </Button>
-            )}
-            {sprint.accountId && sprint.accountName && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
-                className="hover:text-foreground"
-              >
-                {t("For")} {sprint.accountName}
-              </Button>
-            )}
-          </p>
-        </>
-      }
+      // NO headerExtra — client ruling 2026-08-31, read a second time: "only
+      // components: image (sometimes), eyebrow, title, pills. remove the
+      // rest." The app cross-link this used to hold ("On {appName}") is not
+      // just a near-duplicate of the account chip above it, it is exactly the
+      // kind of extra line under the pills the ruling forbids outright — the
+      // app is still one tap away, in the Overview tab's own "App" row, so
+      // nothing here is lost, only moved to where the rest of a sprint's
+      // fields already live.
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column. A sprint keeps no editor snapshot, so the
+      // footer shows the half it knows rather than two rows of dashes.
+      audit={{
+        createdByName: sprint.createdByName,
+        createdAt: sprint.createdAt,
+      }}
+      activity={activity}
+      onAddNote={can("work", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       {/* WHAT COMPLETING IT WILL DO — a C8 warning band UNDER the header, which
           is where this book already says a warning band goes, rather than a
@@ -330,7 +351,7 @@ export function SprintDetailScreen({
           two questions on one band is N4's fault. The cross-links stay in the
           header, because they ARE who and what. */}
       {canEdit && !sprint.completedAt && (
-        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] border p-3 text-sm">
+        <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] p-3 text-sm">
           {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
         </p>
       )}
@@ -354,7 +375,13 @@ export function SprintDetailScreen({
               />
             )
           if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("work", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           return (
             <div className="flex flex-col gap-6">
               <OverviewList items={overviewItems} />
@@ -371,15 +398,6 @@ export function SprintDetailScreen({
               )}
             </div>
           )
-        }}
-      />
-
-      <RecordFooter
-        audit={{
-          createdByName: sprint.createdByName,
-          createdAt: sprint.createdAt,
-          // A sprint keeps no editor snapshot, so the footer shows the half it
-          // knows rather than two rows of dashes.
         }}
       />
 

@@ -132,10 +132,12 @@ beforeEach(() => {
   toasts.error.mockReset()
 })
 
-/** Open the Contacts tab, then the New contact form, and fill in a person. */
+/** Open the New contact form (the Contacts address book is a section on the
+ * default Overview tab now — client, 31 Aug 2026: "contacts as a real sidebar
+ * page, also remove the tab from inside accounts" — so there is no tab to
+ * switch to first any more), and fill in a person. */
 async function newContact(name = "Marta Bergman") {
   render(<AccountDetailScreen teamId="team-1" accountId="acct-bergman" basePath="/accounts" />)
-  fireEvent.mouseDown(await screen.findByRole("tab", { name: /contacts/i }))
   fireEvent.click(await screen.findByRole("button", { name: "New contact" }))
   fireEvent.change(await screen.findByLabelText(/name/i), { target: { value: name } })
   fireEvent.change(screen.getByLabelText(/relationship/i), { target: { value: "Operations" } })
@@ -145,7 +147,6 @@ async function newContact(name = "Marta Bergman") {
 describe("creating a contact under a company", () => {
   it("offers both ways in — a new person, and one we already hold", async () => {
     render(<AccountDetailScreen teamId="team-1" accountId="acct-bergman" basePath="/accounts" />)
-    fireEvent.mouseDown(await screen.findByRole("tab", { name: /contacts/i }))
     // Two buttons, because they are two different acts. Losing the second is how
     // somebody ends up typing a second Marta when the first one is right there.
     expect(await screen.findByRole("button", { name: "New contact" })).toBeTruthy()

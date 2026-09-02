@@ -53,9 +53,22 @@ import { looksLikeHtml, sanitizeRichHtml } from "@shared/web/rich-text"
  *
  * The values below are what these 14 screens have always drawn, deliberately:
  * this override changes nothing the owner is looking at, it only holds the line
- * while the kit decides. */
+ * while the kit decides.
+ *
+ * `family-name:` IS LOAD-BEARING, NOT DECORATION. `font-*` is Tailwind's
+ * prefix for THREE different properties (family, weight, style), so a bare
+ * arbitrary value — `font-[var(--font-sans)]` — is ambiguous and Tailwind
+ * resolves it as font-WEIGHT, emitting `font-weight: var(--font-sans)`: a
+ * string handed to a numeric property, which is invalid and dropped, so the
+ * class did nothing. The type hint tells it which property is meant, the
+ * same way `text-[length:var(--text-3xl)]` (typography.tsx's own comment)
+ * disambiguates size from colour. Verified by compiling this exact class
+ * through the app's own Tailwind (4.3.0) and reading the emitted rule:
+ * unhinted it is `font-weight: var(--font-sans)`; hinted it is
+ * `font-family: var(--font-sans)`. Caught auditing the client's "should be
+ * Sans" report — this override had never once applied. */
 const QUOTED_REPLY_UNTIL_THE_KIT_RULES = [
-  "[&_blockquote]:font-[var(--font-sans)] [&_blockquote]:tracking-normal",
+  "[&_blockquote]:font-[family-name:var(--font-sans)] [&_blockquote]:tracking-normal",
   "[&_blockquote]:text-sm [&_blockquote]:text-muted-foreground",
   "[&_blockquote]:my-[var(--space-3)] [&_blockquote]:border-l-2",
   "[&_blockquote]:border-border [&_blockquote]:ps-3",

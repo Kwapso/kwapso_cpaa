@@ -11,10 +11,15 @@ import { MAX_IMAGE_BYTES } from "./image"
 
 // Sane per-kind caps — generous for prose, tight for short labels.
 export const TEXT_LIMITS = {
-  // A TYPE MARK — one pictograph in the slot an icon would take (UI-RULEBOOK
-  // G2). Not one CHARACTER: an emoji with a variation selector or a skin-tone
-  // modifier is several code units, and a cap of one would refuse half of them.
-  // Eight is generous for a single glyph and nowhere near a word.
+  // A TYPE MARK — a short word, initial or two-letter code in the slot an icon
+  // would take (UI-CONVENTIONS §5). It used to invite a single pictograph
+  // (UI-RULEBOOK G2); the client's ruling on 2026-08-31 ("i said no emojis. why
+  // are there still emojis? kill them!") retired that, and `shared/app-stages.ts`
+  // shows the replacement shape — the same one-mark-per-type idea, spelled in
+  // letters instead ("MT", not a pictograph). Eight is still generous: room for
+  // "Voucher" and nowhere near a sentence. The length cap is only ever the
+  // length half of the rule — `optionalMark` below is what actually refuses the
+  // pictograph.
   tiny: 8,
   short: 200, // titles, names, categories, type/value labels
   link: 2_048, // URLs
@@ -96,6 +101,46 @@ export function optionalText(
   if (!clean) return undefined
   if (clean.length > max)
     throw new GuardError(400, "invalid_input", `${field} is too long (max ${max} characters).`)
+  return clean
+}
+
+/** R20, THE CLIENT'S RULING (2026-08-31, verbatim: "i said no emojis. why are
+ * there still emojis? kill them!"): a "mark" field — a dropdown value's type
+ * mark, an app section's icon, a client tool's icon — may never store a
+ * pictograph again, for any team, going forward. A live example reached
+ * staging (a warning sign, U+26A0, saved as the "Issue" ticket kind's mark)
+ * because nothing at the write door checked for one; `optionalText` alone
+ * type-checks and caps length, it was never asked to refuse a GLYPH.
+ *
+ * Matched on the Unicode PROPERTY rather than a fixed code-point table, so a
+ * future emoji release does not need a registry update here:
+ * `Extended_Pictographic` is the pictograph itself (the warning sign above is
+ * one), `Regional_Indicator` is a flag's own two-letter pair, and the
+ * variation selector / ZWJ / keycap combiner are what stitch a multi-code-point
+ * emoji (a skin tone, a flag, a joined sequence) into one glyph — the same
+ * multi-code-point shape `TEXT_LIMITS.tiny`'s own comment already accounts for
+ * on the length side. */
+// The pictograph properties above catch the glyph itself; these three
+// combiners (ZERO WIDTH JOINER U+200D, VARIATION SELECTOR-16 U+FE0F, COMBINING
+// ENCLOSING KEYCAP U+20E3) are what stitch a multi-code-point emoji — a joined
+// sequence, a text glyph forced to its emoji style, a keycap digit — into one.
+// Named by codepoint via `fromCharCode` rather than pasted as literal
+// invisible characters, the same way UI-RULEBOOK.md names a glyph by its
+// Unicode name so none appear in the source as an actual character.
+const EMOJI_COMBINERS = String.fromCharCode(0x200d, 0xfe0f, 0x20e3)
+const EMOJI_PATTERN = new RegExp(`\\p{Extended_Pictographic}|\\p{Regional_Indicator}|[${EMOJI_COMBINERS}]`, "u")
+
+/** An OPTIONAL "mark" field — `optionalText` plus the one refusal every mark
+ * needs now: no emoji. ONE seam, so a dropdown value, an app section and a
+ * client tool can never drift back to three different regexes, or to none. */
+export function optionalMark(
+  value: unknown,
+  field: string,
+  max: number = TEXT_LIMITS.tiny
+): string | undefined {
+  const clean = optionalText(value, field, max)
+  if (clean !== undefined && EMOJI_PATTERN.test(clean))
+    throw new GuardError(400, "invalid_input", `${field} should be a short word or initial, not an emoji.`)
   return clean
 }
 

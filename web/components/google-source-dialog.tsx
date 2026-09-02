@@ -268,8 +268,8 @@ export function GoogleSourceDialog({
                   setOptions(null)
                 }}
                 disabled={busy}
-                className={`flex flex-1 flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
-                  kind === k.value ? "border-primary bg-muted" : ""
+                className={`flex flex-1 flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
+                  kind === k.value ? "border border-primary bg-muted" : ""
                 }`}
               >
                 <span className="text-sm font-medium">{t(k.title)}</span>
@@ -302,7 +302,7 @@ export function GoogleSourceDialog({
       </Field>
 
       {options !== null && (
-        <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] border">
+        <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] bg-surface-panel">
           {options.length === 0 ? (
             <p className="text-muted-foreground p-3 text-sm">{t("Nothing found in your Google account.")}</p>
           ) : (
@@ -349,7 +349,7 @@ export function GoogleSourceDialog({
                       src={safeSrc(content.googleDriveThumbnailUrl(o.externalId))}
                       alt=""
                       loading="lazy"
-                      className="h-8 w-8 shrink-0 rounded border object-cover"
+                      className="h-8 w-8 shrink-0 rounded shadow-[var(--hairline)] object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = "none"
                       }}
@@ -419,8 +419,8 @@ export function GoogleSourceDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, shelf: s.value }))}
               disabled={busy}
-              className={`flex flex-col gap-1 rounded-[var(--radius)] border p-3 text-left ${
-                values.shelf === s.value ? "border-primary bg-muted" : ""
+              className={`flex flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
+                values.shelf === s.value ? "border border-primary bg-muted" : ""
               }`}
             >
               <span className="text-sm font-medium">{t(s.title)}</span>

@@ -45,7 +45,7 @@
       "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
       "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-      "/brand/*", "/purposes/*"
+      "/brand/*", "/purposes/*", "/contacts/*"
     ]
   },
   "services": [
@@ -65,8 +65,13 @@
     "staging": {
       "name": "kwapso-staging",
       "observability": { "enabled": true },
-      // Staging keeps its *.workers.dev name — the smoke and the seed use it, and
-      // there is nothing on staging worth fencing a second address away from.
+      // Staging keeps its *.workers.dev name for the smoke and the seed — but
+      // it ALSO answers at agency-staging.kwapso.app, a custom domain attached
+      // directly in the Cloudflare dashboard (confirmed live 2026-08-31; this
+      // file never wrote that DNS, per this repo's own rule that domains are
+      // attached from the dashboard). The comment that used to say no second
+      // address existed was wrong the moment someone added one there without
+      // updating this file — said out loud so it can't happen silently again.
       // Said out loud because envs do NOT inherit the top-level value.
       "workers_dev": true,
       "preview_urls": false,
@@ -81,7 +86,7 @@
           "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
           "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-          "/brand/*", "/purposes/*"
+          "/brand/*", "/purposes/*", "/contacts/*"
         ]
       },
       "services": [

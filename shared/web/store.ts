@@ -411,6 +411,44 @@ function loadShared<T>(key: string, fetcher: () => Promise<T>, force: boolean): 
   return p
 }
 
+// ── IS ANYTHING ON SCREEN STILL WAITING ON ITS FIRST ANSWER ─────────────────
+//
+// A tiny broadcast, orthogonal to the per-key cache above: which `useCached`
+// callers are currently in exactly the state a screen already reads to draw
+// its OWN skeleton (`data === undefined`, `state="loading"`) — never the
+// "quiet" half of cache-first + revalidate, where a warm key repaints from
+// cache and refetches in the background with `loading` staying false the
+// whole time (CACHING.md). A route/data top-loading-bar built on this fires
+// exactly when a person would otherwise be looking at a skeleton with nothing
+// moving above it, and never on a silent revalidation — one seam, read by
+// both front doors, no per-screen wiring: every screen already goes through
+// `useCached` for the data that gates its own loading state.
+const waitingInstances = new Set<symbol>()
+const waitingSubs = new Set<() => void>()
+
+function setInstanceWaiting(token: symbol, waiting: boolean): void {
+  const had = waitingInstances.has(token)
+  if (waiting === had) return
+  if (waiting) waitingInstances.add(token)
+  else waitingInstances.delete(token)
+  waitingSubs.forEach((fn) => fn())
+}
+
+/** Is any mounted `useCached` anywhere in the app waiting on its first answer
+ * right now? The one signal a top-of-page loading bar needs — see the note
+ * above. `getServerSnapshot` is `false`: the server never waits on a client
+ * cache, so there is nothing to agree on before hydration. */
+export function useIsAnyLoading(): boolean {
+  return React.useSyncExternalStore(
+    (onChange) => {
+      waitingSubs.add(onChange)
+      return () => waitingSubs.delete(onChange)
+    },
+    () => waitingInstances.size > 0,
+    () => false
+  )
+}
+
 export function useCached<T>(
   key: string | null,
   fetcher: () => Promise<T>
@@ -420,6 +458,15 @@ export function useCached<T>(
   )
   const [loading, setLoading] = React.useState<boolean>(key ? !fresh(key) : false)
   const [error, setError] = React.useState<unknown>(null)
+  // One token per hook instance, stable for its whole life — reported into the
+  // global waiting set below whenever `loading` changes, and always cleared on
+  // unmount so a screen navigated away from mid-fetch can never hold the bar up.
+  const waitingToken = React.useRef<symbol | null>(null)
+  if (waitingToken.current === null) waitingToken.current = Symbol("useCached")
+  React.useEffect(() => {
+    setInstanceWaiting(waitingToken.current as symbol, loading)
+    return () => setInstanceWaiting(waitingToken.current as symbol, false)
+  }, [loading])
 
   const fetcherRef = React.useRef(fetcher)
   fetcherRef.current = fetcher

@@ -102,7 +102,13 @@ export function AssistantLimitNotice({ failure }: { failure: ModelFailure }) {
   return (
     // `role="status"` rather than an alert role: this is a quiet report about
     // the app, not something interrupting what somebody is doing.
-    <Alert variant="warning" role="status" severityLabel={t("Notice")} className="mx-4 mb-2">
+    //
+    // No horizontal margin of its own any more (1 Sep 2026) — its one
+    // caller, agent-panel.tsx, now supplies the panel's own standard
+    // horizontal inset (`px-6 lg:px-[var(--space-7)]`, `CardContent`'s
+    // pattern) on `.agent-chat-host`, so this notice sits flush with
+    // everything else inside it rather than doubling the gutter.
+    <Alert variant="warning" role="status" severityLabel={t("Notice")} className="mb-2">
       <div className="flex min-w-0 flex-col gap-1">
         <AlertTitle>{title}</AlertTitle>
         <AlertDescription>{body}</AlertDescription>

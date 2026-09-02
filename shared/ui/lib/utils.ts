@@ -29,7 +29,54 @@ import { clsx, type ClassValue } from "clsx";
    reading it. Logged as GAPS-DOCS A-1.
    ========================================================================= */
 
+/* ----------------------------------------------------------------------------
+   tailwind-merge's own built-in `font-family`/`font-weight` groups have the
+   same opaque-`var()` ambiguity Tailwind itself has (see `family-name:` hints
+   at every `font-[var(--font-sans/serif)]` call site). Its default `isAny`
+   catch-all for `font-family` swallows an unlabelled arbitrary value too, so
+   an unhinted `font-[var(--font-weight-medium)]` and a hinted
+   `font-[family-name:var(--font-sans)]` both land in the SAME group and the
+   merge keeps only the last one — exactly the drop this file exists to
+   prevent. `extend` can't fix this: it appends to the built-in `isAny`
+   validator rather than replacing it, so the swallow-everything match still
+   wins. These groups must be replaced via `override` instead, routing by the
+   arbitrary value's label (`family-name:` → family, anything else → weight, matching
+   Tailwind's own default-to-weight inference for an unlabelled value).
+   ---------------------------------------------------------------------------- */
+const arbitraryFontValueRegex = /^\[(?:([a-z-]+):)?(.+)\]$/i;
+const isArbitraryFontFamily = (value: string) =>
+  arbitraryFontValueRegex.exec(value)?.[1] === "family-name";
+const isArbitraryFontWeight = (value: string) => {
+  const match = arbitraryFontValueRegex.exec(value);
+  if (!match) return false;
+  const label = match[1];
+  // No label at all defaults to weight too — matching Tailwind's own
+  // inference for an opaque `font-[var(...)]` with no type hint.
+  return label !== "family-name" && label !== "style";
+};
+
 const twMerge = extendTailwindMerge({
+  override: {
+    classGroups: {
+      "font-weight": [
+        {
+          font: [
+            "thin",
+            "extralight",
+            "light",
+            "normal",
+            "medium",
+            "semibold",
+            "bold",
+            "extrabold",
+            "black",
+            isArbitraryFontWeight,
+          ],
+        },
+      ],
+      "font-family": [{ font: [isArbitraryFontFamily] }],
+    },
+  },
   extend: {
     classGroups: {
       // The four kwapso radii. Ruling 03 admits no others.

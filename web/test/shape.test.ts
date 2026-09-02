@@ -145,7 +145,7 @@ describe("INVITE_STATUS", () => {
 })
 
 describe("shapeActivity", () => {
-  it("maps each item to { id, description, actor, timestamp }", () => {
+  it("maps each item to { id, description, actor, initials, timestamp }", () => {
     const [row] = shapeActivity(activity)
     expect(row.id).toBe("a1")
     expect(row.description).toBe("Alaap changed Bo's role to Editor")
@@ -157,11 +157,26 @@ describe("shapeActivity", () => {
     const [row] = shapeActivity([{ ...activity[0], actorName: null }])
     expect(row.actor).toBeUndefined()
   })
+
+  // The recipe engine's OWN activity feed (Team, Team member, Invite — the
+  // `{ kind: "activity" }` block in screen-renderer.tsx) draws through this
+  // shaper rather than `useRecordActivity`, so it needs the same avatar mark
+  // the bespoke `RecordScreen` path already carries — a row here with no
+  // `initials` is exactly the second, easy-to-miss avatar surface this app has.
+  it("carries the same nameInitials mark the bespoke activity path uses", () => {
+    const [row] = shapeActivity(activity)
+    expect(row.initials).toBe("A")
+  })
+
+  it("still marks the row with a fallback initial when actorName is null", () => {
+    const [row] = shapeActivity([{ ...activity[0], actorName: null }])
+    expect(row.initials).toBe("?")
+  })
 })
 
 describe("shapeMembersList", () => {
   it("maps userId→id, name via personName, and a 'role · joined …' detail", () => {
-    const { rows } = shapeMembersList([member])
+    const { rows } = shapeMembersList([member], "en")
     expect(rows?.[0].id).toBe("u1")
     expect(rows?.[0].name).toBe("Alaap Kanchwala")
     expect(String(rows?.[0].detail)).toContain("Admin")
@@ -240,7 +255,7 @@ describe("shapeHelpList", () => {
 
 describe("shapeMemberDetail", () => {
   it("shapes the record fields and a shaped activity set", () => {
-    const data = shapeMemberDetail(member, activity)
+    const data = shapeMemberDetail(member, activity, "en")
     expect(data.record?.id).toBe("u1")
     expect(data.record?.name).toBe("Alaap Kanchwala")
     expect(data.record?.email).toBe("alaap@x.com")
@@ -252,7 +267,7 @@ describe("shapeMemberDetail", () => {
 
 describe("shapeInviteDetail", () => {
   it("shapes the record + uses INVITE_STATUS for status", () => {
-    const data = shapeInviteDetail(invite, audit, activity)
+    const data = shapeInviteDetail(invite, audit, activity, "en")
     expect(data.record?.id).toBe("i1")
     expect(data.record?.email).toBe("guest@x.com")
     expect(data.record?.status).toBe(INVITE_STATUS.pending)
@@ -261,12 +276,12 @@ describe("shapeInviteDetail", () => {
   })
 
   it('shows accepted as "—" when the invite was not accepted', () => {
-    const data = shapeInviteDetail(invite, audit, activity)
+    const data = shapeInviteDetail(invite, audit, activity, "en")
     expect(data.record?.accepted).toBe("—")
   })
 
   it('falls back invitedBy to "—" when there is no audit', () => {
-    const data = shapeInviteDetail(invite, null, activity)
+    const data = shapeInviteDetail(invite, null, activity, "en")
     expect(data.record?.invitedBy).toBe("—")
     expect(data.record?.accepted).toBe("—")
   })
@@ -280,6 +295,7 @@ describe("shapeTeamDetail", () => {
       logoUrl: null,
       meta,
       activity,
+      lang: "en",
     })
     expect(data.record?.id).toBe("t1")
     expect(data.record?.name).toBe("Acme")

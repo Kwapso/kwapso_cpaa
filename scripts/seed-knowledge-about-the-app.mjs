@@ -194,29 +194,39 @@ function screens() {
   if (!rows.length) throw new Error("web/lib/pages.ts no longer parses — this script is reading the wrong shape")
 
   const sidebar = rows.filter((r) => r.placement === "sidebar")
-  const daily = sidebar.filter((r) => r.group === "daily")
-  const rest = sidebar.filter((r) => r.group !== "daily")
+  // THE GROUP ORDER AND LABELS ARE THE SCREEN'S OWN WORDS, not a paraphrase —
+  // read out of pages.ts's own NAV_GROUP_ORDER/NAV_GROUP_LABELS rather than
+  // typed here, so this document follows a rename or a regrouping instead of
+  // silently describing a rail the app no longer draws. Earned 1 Sep 2026: the
+  // rail moved from two named halves to three ("My work" / "Build" /
+  // "Accounts") and this script still filtered on the old "daily" key,
+  // matching nothing — the assistant would have told somebody about a sidebar
+  // half that no longer exists.
+  const orderMatch = src.match(/NAV_GROUP_ORDER:[^=]*=\s*\[([^\]]+)\]/)
+  const groupOrder = orderMatch ? [...orderMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : []
+  if (!groupOrder.length) throw new Error("NAV_GROUP_ORDER no longer parses — this script is reading the wrong shape")
+  const labelsMatch = src.match(/NAV_GROUP_LABELS:[^{]*\{([^}]+)\}/)
+  const labels = Object.fromEntries(
+    [...(labelsMatch?.[1] ?? "").matchAll(/(?:"([^"]+)"|(\w[\w-]*)):\s*"([^"]+)"/g)].map((m) => [
+      m[1] ?? m[2],
+      m[3],
+    ])
+  )
+  if (!Object.keys(labels).length) throw new Error("NAV_GROUP_LABELS no longer parses — this script is reading the wrong shape")
   const line = (r) =>
     `${r.title} — at /${r.segment}. A person needs the "${r.module}" read right to see it; ` +
     `without that right the page is not even listed for them.`
+  const section = (group) =>
+    `\n\n${labels[group]}:\n\n` + sidebar.filter((r) => r.group === group).map(line).join("\n\n")
   return {
     title: "The screens in the agency app, and who can see each one",
     body:
-      // THE HEADINGS ARE THE SCREEN'S OWN WORDS, not a paraphrase. This source is
-      // what the assistant reads when somebody asks what is in the menu, so a
-      // person told about a group called "Every day" who then looks at a rail
-      // headed "Frequent" has been given a true sentence about an app that does
-      // not exist. Renamed with the rail on 1 Sep 2026 for exactly that reason —
-      // and it is the reason to check here whenever a heading moves.
-      `The agency app's sidebar has two halves, each with a heading and a collapse ` +
-      `chevron of its own. Above is "Frequent", what somebody opens most days; below ` +
-      `is "Occasional", what they open when they need it. Every page is gated by a ` +
-      `read right, so two people signed into the same team can see different menus — ` +
-      `that is the permission spine working, not a fault.` +
-      `\n\nFrequent:\n\n` +
-      ["Home — the team, and the way in to everything else."].concat(daily.map(line)).join("\n\n") +
-      `\n\nOccasional:\n\n` +
-      rest.map(line).join("\n\n") +
+      `The agency app's sidebar is divided into named sections, each with a heading and ` +
+      `a collapse chevron of its own: ${groupOrder.map((g) => `"${labels[g]}"`).join(", ")}. ` +
+      `Every page is gated by a read right, so two people signed into the same team can ` +
+      `see different menus — that is the permission spine working, not a fault.` +
+      `\n\nHome — the team, and the way in to everything else.` +
+      groupOrder.map(section).join("") +
       `\n\nSettings — your account, the team, its members, its roles and its invitations.` +
       `\n\nThe client portal is a different app at a different address, with four screens: ` +
       `home, tickets, value and my company. A client never sees the agency app's menu.`,

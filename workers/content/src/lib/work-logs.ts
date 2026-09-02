@@ -23,10 +23,11 @@
 
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { boundedInner, countCollection, isCapped, reportedTotal } from "@shared/workers/count"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { LIST_HARD_CAP, WORK_LOG_GROUP_CAP } from "@shared/workers/limits"
 import { pulseWeekStarts } from "./insights"
 import type { RunningTimer, WorkLog, WorkLogSummary } from "@shared/types"
@@ -107,14 +108,16 @@ const LABEL_SQL = `CASE ${Object.entries(WORK_LOG_TARGETS)
   .join(" ")} END`
 
 /** THE SHORT REFERENCE beside the label, built the same way and for the same
- * reason. Every one of the four targets carries a `ref` (`lib/refs.ts` mints
- * `BERG-T0412`, `BERG-S0188`, …), it is drawn on all five of their own screens,
- * and the one place it never reached was the running timer — where a person
- * with two clocks going has nothing but two durations to tell them apart.
+ * reason. Every one of the four targets carries a `ref` (`shared/workers/refs.ts`
+ * mints `T412`, `B188`, …, team-wide since 2026-08-31 — a task's own is always
+ * null, it never carried one that reached a screen), it is drawn on all five of
+ * their own screens, and the one place it never reached was the running timer —
+ * where a person with two clocks going has nothing but two durations to tell
+ * them apart.
  *
- * It is NULLABLE and often null on purpose: a ref needs an account with a short
- * code, so the agency's own internal work has none. Callers fall back to the
- * label, which is why this is an extra column rather than a replacement. */
+ * It is NULLABLE and often null on purpose: a ref needs a client to quote it,
+ * so the agency's own internal work has none. Callers fall back to the label,
+ * which is why this is an extra column rather than a replacement. */
 const REF_SQL = `CASE ${Object.keys(WORK_LOG_TARGETS)
   .map((table) => `WHEN w.target_table = '${table}' THEN (SELECT t.ref FROM ${table} t WHERE t.id = w.target_id)`)
   .join(" ")} END`
@@ -198,9 +201,49 @@ export type LogFilter = {
    * It rides the list AND the two totals beside it, so the hours under a
    * filtered list are the hours OF that list (R16). */
   meetingTime?: "exclude" | "only"
+  /** THE SEARCH BOX (R14: the door answers, never the loaded page) — who logged
+   * it, or what it was against. Matched against the caller's own name and the
+   * same label the rows themselves render (`LABEL_SQL`), so "Confia onboarding"
+   * finds every hour against that story without knowing which of the four
+   * target tables it lives in. */
+  q?: string
+  /** A CLOSED WINDOW ON `started_at`, the toolbar's one date question — the
+   * rolling number of days back from now. Not a free-form range: nothing on
+   * either front door draws one, and a closed vocabulary is a filter this door
+   * can validate outright rather than trust two arbitrary dates handed to it. */
+  period?: "7d" | "30d" | "90d"
 }
 
-function logWhere(guard: MemberGuard, filter: LogFilter): { sql: string; params: string[] } {
+/** Escaped, case-folded and wrapped for a `LIKE`, or nothing at all — the same
+ * shape `help.ts`'s own `searchClause` uses, so a screen typing "Confia" finds a
+ * work log the same way it finds a ticket. */
+function searchClause(q: string | undefined): { sql: string; params: string[] } {
+  if (!q) return { sql: "", params: [] }
+  const needle = `%${likeLiteral(q.toLowerCase())}%`
+  return {
+    // A CORRELATED SUBQUERY, not the `target_label` alias `LOG_COLS` selects:
+    // SQLite cannot see a SELECT-list alias from its own WHERE clause, so the
+    // label is re-read here off the allow-listed CASE expression it is built
+    // from — the same one, reused, never a second definition of "the label".
+    sql: `(LOWER(COALESCE(w.user_name, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE((${LABEL_SQL}), '')) LIKE ? ESCAPE '\\')`,
+    params: [needle, needle],
+  }
+}
+
+/** The three windows the toolbar offers, each a number of days back from now. */
+const PERIOD_DAYS: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90 }
+
+function periodClause(period: string | undefined, now: Date): { sql: string; params: string[] } {
+  const days = period ? PERIOD_DAYS[period] : undefined
+  if (!days) return { sql: "", params: [] }
+  return { sql: "w.started_at >= ?", params: [new Date(now.getTime() - days * 86400000).toISOString()] }
+}
+
+function logWhere(
+  guard: MemberGuard,
+  filter: LogFilter,
+  now: Date = new Date()
+): { sql: string; params: string[] } {
   // Discarded rows are never in a list of time. They survive on the table for the
   // audit — who binned a runaway timer, and when — and nothing else reads them.
   const parts = ["w.discarded_at IS NULL"]
@@ -231,12 +274,32 @@ function logWhere(guard: MemberGuard, filter: LogFilter): { sql: string; params:
     parts.push("w.target_id = ?")
     params.push(filter.targetId)
   }
+  const search = searchClause(filter.q)
+  if (search.sql) {
+    parts.push(search.sql)
+    params.push(...search.params)
+  }
+  const period = periodClause(filter.period, now)
+  if (period.sql) {
+    parts.push(period.sql)
+    params.push(...period.params)
+  }
   return { sql: parts.join(" AND "), params }
 }
 
-/** THE SORT: newest first, which for time is the only order anybody wants. The id
- * breaks ties so the order is TOTAL, which is what the keyset cursor needs. */
-const LOG_ORDER = "w.started_at"
+/** THE SORTS the toolbar offers: date (the order this list has always had),
+ * how long an entry ran, and who logged it. `duration` zero-pads into the
+ * keyset the same way `PROCESS_SORTS.steps` does (workers/tenancy/src/lib/
+ * processes.ts) — a cursor's key is text, so "10" must not sort before "9". */
+export const WORK_LOG_SORTS: SortMenu<LogRow> = {
+  started: { expr: "w.started_at", dir: "desc", key: (r) => r.started_at },
+  duration: {
+    expr: "printf('%010d', w.seconds)",
+    dir: "desc",
+    key: (r) => String(r.seconds).padStart(10, "0"),
+  },
+  person: { expr: "w.user_name", dir: "asc", key: (r) => r.user_name },
+}
 
 /** R14 GROWING collection: work logs are keyset-PAGED. 2,940 arrived from two
  * years of the previous system and the rate only goes up — a ceiling here would
@@ -245,10 +308,13 @@ export async function listWorkLogs(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: LogFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<LogRow> = resolveOrdering(WORK_LOG_SORTS, "started", undefined, undefined)
 ): Promise<Page<WorkLog>> {
-  const pos = decodeCursor(cursor)
-  const after = keysetAfter(pos, LOG_ORDER)
+  // The ORDER BY, the keyset predicate and the cursor's key come off ONE
+  // ordering, so a sort can never reach the rows and miss the cursor.
+  const pos = decodeCursor(cursor, ordering.sig)
+  const after = keysetAfter(pos, ordering.expr, ordering.dir)
   const where = logWhere(guard, filter)
   const clauses = [where.sql, ...(after.sql ? [after.sql] : [])]
   const rows = await d1Query<LogRow>(
@@ -256,10 +322,10 @@ export async function listWorkLogs(
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
     `SELECT ${LOG_COLS} FROM work_logs w WHERE ${clauses.join(" AND ")}
-      ORDER BY ${LOG_ORDER} DESC, w.id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering)} LIMIT ${PAGE_SIZE + 1}`,
     [...where.params, ...after.params]
   )
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.started_at, r.id])
+  const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return { ...page, rows: page.rows.map(toLog) }
 }
 
@@ -341,7 +407,7 @@ export async function summariseWorkLogs(
   filter: LogFilter,
   now: Date
 ): Promise<WorkLogSummary> {
-  const where = logWhere(guard, filter)
+  const where = logWhere(guard, filter, now)
   const starts = pulseWeekStarts(now)
   const weekSums: string[] = []
   const weekParams: string[] = []

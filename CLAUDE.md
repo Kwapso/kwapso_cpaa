@@ -96,8 +96,8 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   `npm run lang` before you commit — extract, then prune — and both deploy
   scripts refuse on a stale catalogue. (`catalogued-strings`)
 - **The page has one width, and a screen does not get its own (R29).** Each front
-  door owns exactly ONE page container, `web/components/deep-link-screen.tsx` at
-  `max-w-[1600px]` and `web-portal/components/portal-shell.tsx` at `max-w-3xl`
+  door owns exactly ONE page container, `web/components/app-shell.tsx` at
+  `max-w-none` and `web-portal/components/portal-shell.tsx` at `max-w-3xl`
   (narrower on purpose), and no other component sets a page-level width. A page
   container is identified POSITIONALLY, as R20 identifies a checked field: one line
   carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the signature of a

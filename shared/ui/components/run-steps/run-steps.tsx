@@ -30,10 +30,13 @@
      — colour on the pill, never smeared across the row (ruling 26: "colour
      is the whole treatment"). The row itself keeps its paper, and the words
      always say what happened; the mark never carries it alone.
-   · `--warning` is the quiet chip and is provisional (tokens.css §3 resolves
-     it to poppy), so a SKIPPED step does not reach for it: skipped is the
-     quiet fill with disabled ink, which is exactly how the kit already draws
-     a stage that is not the present.
+   · `--warning` IS a colour as of 2026-09-02 — the client's new orange
+     (tokens.css §3) — where this line used to say it was the quiet chip. A
+     SKIPPED step still does not reach for it, and now for the reason rather
+     than for want of anything better: skipped is not a warning, it is a
+     stage that did not run. Skipped stays the quiet fill with disabled ink,
+     which is exactly how the kit already draws a stage that is not the
+     present.
    · A step that has not started renders its NUMBER, not a zero and not a
      dash — the same two-digit tabular figure `StatusStepper` formats.
    · Disabled is a fill and an ink. Hover is a token. Never an opacity.

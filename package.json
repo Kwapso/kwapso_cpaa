@@ -24,6 +24,7 @@
     "lang": "node scripts/i18n-extract.mjs && node scripts/i18n-prune.mjs",
     "lang:check": "node scripts/i18n-extract.mjs --check && node scripts/i18n-prune.mjs --check",
     "account:check": "node scripts/check-cloudflare-account.mjs",
+    "kit:drift": "node scripts/kit-drift.mjs",
     "migrations:check": "node scripts/check-team-migrations.mjs",
     "check": "npm run lint && npx tsc --noEmit -p web && npx tsc --noEmit -p web-portal && npx tsc --noEmit -p workers/auth && npx tsc --noEmit -p workers/tenancy && npx tsc --noEmit -p workers/content && npx tsc --noEmit -p workers/data-ops && npx tsc --noEmit -p workers/realtime && npx tsc --noEmit -p workers/gateway && npx tsc --noEmit -p workers/portal-gateway && npx tsc --noEmit -p workers/mcp && npm test",
     "check:built": "npm run build && REQUIRE_EXPORT=1 npm run test --workspace=kwapso-web && REQUIRE_EXPORT=1 npm run test --workspace=kwapso-portal-web",

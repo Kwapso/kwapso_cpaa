@@ -348,7 +348,7 @@ export function HelpFormDialog({
         <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
           <div className="flex flex-col gap-2">
             {pending.length > 0 && (
-              <ul className="divide-border divide-y rounded-[var(--radius)] border">
+              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
                 {pending.map((file, i) => (
                   <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
                     <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
@@ -473,12 +473,17 @@ export function HelpFormDialog({
             id="help-contact"
             value={values.raisedByContactId || NONE}
             onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
+            // A CONTACT IS A PERSON (R35's "round" shape) — the same face
+            // `StakeholdersPanel` already draws a client-side stakeholder
+            // with. No photo comes through `listAccountLinks` today, so this
+            // falls back to their initial like every unphotographed person.
             options={(detailQ.data?.links ?? [])
               .filter((l) => l.active)
               .map((l) => ({
                 value: l.personAccountId,
                 label: l.personName,
                 hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
+                shape: "round" as const,
               }))}
             emptyOption={{ value: NONE, label: t("Not said") }}
             placeholder={t("Not said")}

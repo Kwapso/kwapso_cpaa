@@ -7,7 +7,7 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
 import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP } from "@shared/workers/limits"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalMark, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
@@ -70,9 +70,11 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
   const type = requireText(body.type, "Group", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
   // R20: the glyph goes through the same seam as the words. `TEXT_LIMITS.tiny`
-  // because a type mark is one pictograph, not a sentence — and a pictograph is
-  // several code units, so it is a character cap rather than a length of one.
-  const mark = optionalText(body.mark, "Mark", TEXT_LIMITS.tiny)
+  // because a type mark is a short word, initial or two-letter code, not a
+  // sentence, and `optionalMark` (not `optionalText`) because the client's
+  // ruling on 2026-08-31 means this is exactly the field a pictograph reached
+  // staging through — see optionalMark's own comment.
+  const mark = optionalMark(body.mark, "Mark", TEXT_LIMITS.tiny)
   const id = await createSelectable(cfg, guard, actor, type, value, mark)
   // Row-level: carry the new value's id so open lists can patch just that row.
   await publishChange(env, guard.teamId, "selectable_data", id, "add")
@@ -90,7 +92,7 @@ export async function postUpdateSelectable(request: Request, env: Env): Promise<
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Option", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
-  const mark = optionalText(body.mark, "Mark", TEXT_LIMITS.tiny)
+  const mark = optionalMark(body.mark, "Mark", TEXT_LIMITS.tiny)
   await updateSelectable(cfg, guard, actor, id, value, mark)
   await publishChange(env, guard.teamId, "selectable_data", id)
   return json(await listAndCount(cfg, guard))

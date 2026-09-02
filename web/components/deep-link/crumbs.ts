@@ -96,6 +96,10 @@ export const RECORD_FACE: Record<
   }
 > = {
   accounts: { idField: "id", list: "accounts", resource: "accounts", name: (r) => str(r, "name"), fallback: "Account" },
+  // A contact IS an account row (type "individual") — same table, same list,
+  // same by-id door — so its crumb reads the identical row `accounts` does.
+  // Only the fallback word differs, matching what the sidebar calls this view.
+  contacts: { idField: "id", list: "accounts", resource: "accounts", name: (r) => str(r, "name"), fallback: "Contact" },
   members: {
     idField: "userId",
     list: "members",

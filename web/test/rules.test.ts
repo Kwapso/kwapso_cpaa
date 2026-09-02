@@ -582,9 +582,17 @@ describe("RULES — the laws of the base", () => {
     // A paged list screen that deliberately offers NO filters, each with its
     // reason. Silence about a control has to be written down, or "nobody wired
     // it" and "nobody wanted it" are the same green build.
-    const UNFILTERED: Record<string, string> = {
-      help: "the tickets screen narrows by stage and kind through its own sub-tab strip, which asks the DOOR (helpFacetFilter → <PagedFind fixed>). A Status select beside it would be a second control on one field — the clutter the accounts screen removed when its Type select became the All/Companies/People strip — and the two would fight, because `fixed` wins over a facet.",
-    }
+    // "help" LEFT THIS LIST on 2026-08-31: it still narrows by stage and kind
+    // through its own sub-tab strip (helpFacetFilter → <PagedFind fixed>, and a
+    // Status select beside it would still be the two-controls-on-one-field
+    // clutter this map exists to name) — but the screen's separate All-tickets/
+    // Archived STRIP retired the same day (the client: "there can never be 2
+    // rows of tabs … just never"), and Archived is a real door parameter
+    // (`view`) with nowhere left to live but a facet. So `help` now has one
+    // real entry in COLLECTION_FILTERS (`view`) and no line here — narrow
+    // enough that `status`/`helpType` staying off the toolbar is still true,
+    // just no longer the WHOLE truth about this collection's filters.
+    const UNFILTERED: Record<string, string> = {}
 
     for (const [name, c] of PAGED) {
       // 1 — the frame's own (in-memory, page-one) filter bar is off, because the
@@ -1109,6 +1117,25 @@ describe("RULES — the laws of the base", () => {
   // exact total, hasMore, an opaque cursor — and a client that can actually reach
   // page two. Paging no one can reach is dead code wearing a law's clothes.
   it("bounded-lists: every GROWING collection pages by key, end to end", () => {
+    // THE SHARED BODY, PROVED ONCE. A caller may reach `<LoadMore>` through a
+    // shared component instead of drawing it directly — `work-panels.tsx`'s own
+    // `PagedPanelBody` is `<PagedFind>` + `<LoadMore>` written ONCE and reused
+    // by several panels (todos among them) — so the per-entry loop below trusts
+    // a `listKey` PASSED INTO that body without re-deriving that the body
+    // itself really ends in a live `<LoadMore>`. Proved here, once, off the
+    // function's own text: its declared `listKey` parameter must be the same
+    // name the `<LoadMore>` inside it reads.
+    const sharedBody = read(join(WEB, "components", "work-panels.tsx"))
+    const bodyAt = sharedBody.indexOf("function PagedPanelBody")
+    expect(bodyAt, "PagedPanelBody must exist — the shared-body proof below has nothing to check").toBeGreaterThan(-1)
+    const bodyEnd = sharedBody.indexOf("\n}\n", bodyAt)
+    const bodySrc = sharedBody.slice(bodyAt, bodyEnd === -1 ? undefined : bodyEnd)
+    expect(bodySrc, "PagedPanelBody must actually render a <LoadMore>").toMatch(/<LoadMore\b/)
+    expect(
+      bodySrc,
+      "PagedPanelBody's own <LoadMore> must read the SAME listKey the function was handed, not a different name"
+    ).toMatch(/<LoadMore[\s\S]{0,200}?listKey=\{[^}]*\blistKey\b[^}]*\}/)
+
     for (const [name, c] of Object.entries(GROWING_COLLECTIONS)) {
       const lib = read(join(ROOT, c.lib))
       const at = lib.indexOf(`export async function ${c.fn}`)
@@ -1167,12 +1194,40 @@ describe("RULES — the laws of the base", () => {
       // weaker-looking sentence it replaced had gone red. One branch cannot stand
       // for three collections; `pagerFile`/`pagerKey` name each one's own.
       const pager = read(join(WEB, c.pagerFile))
-      const wired = [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) =>
-        m[0].includes(c.pagerKey)
-      )
+      // A CALLER MAY REACH `<LoadMore>` THROUGH A SHARED BODY, not just draw it
+      // directly — `work-panels.tsx`'s own `PagedPanelBody` is `<PagedFind>` +
+      // `<LoadMore listKey={found.listKey ?? listKey} .../>` written ONCE and
+      // reused by several panels' worth of collections (todos among them), so
+      // the panel's own key-building call never sits inside the shared tag's
+      // 400 characters the way a one-off `<LoadMore listKey={x}>` does. What
+      // still has to hold, and is checked here instead: the panel's own call
+      // INTO that shared body names its listKey from `c.pagerKey`, which is
+      // real per-collection proof — a caller cannot pass a name it never
+      // computed, and `PagedPanelBody`'s own body (read once, above the
+      // per-entry loop) is what proves that prop always reaches a real
+      // `<LoadMore>` beneath it.
+      const wired =
+        [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.pagerKey)) ||
+        // THE SHARED-BODY CASE IS SCOPED TO THE ENCLOSING FUNCTION, not a fixed
+        // window: `<PagedPanelBody<Todo> listKey={key} .../>` reads a plain
+        // `key` variable, and the call that actually BUILDS it
+        // (`const key = todosListKey(...)`) can sit thousands of characters
+        // earlier in the same component — real distance, measured, not a
+        // guess. So for each shared-body tag this walks back to the nearest
+        // preceding `export function`/`function` (the component that owns
+        // it) and asks whether `c.pagerKey` appears ANYWHERE between that
+        // component's own start and the tag — wide enough to reach the real
+        // call, narrow enough that a DIFFERENT panel's key builder elsewhere
+        // in the file still cannot satisfy it.
+        [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
+          const tagAt = m.index ?? 0
+          const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
+          const scopeStart = fnAt ? (fnAt.index ?? 0) : Math.max(0, tagAt - 2000)
+          return pager.slice(scopeStart, tagAt).includes(c.pagerKey)
+        })
       expect(
         wired,
-        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> whose listKey is built from ${c.pagerKey}`
+        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> (directly, or through a shared paged body) whose listKey is built from ${c.pagerKey}`
       ).toBe(true)
       // …and the collection's cache key is NAMED by a component, which on the
       // record feed is the second half of the pairing rather than a restatement of
@@ -1701,7 +1756,7 @@ describe("RULES — the laws of the base", () => {
           // thing it guards is a database row's byte ceiling, not a paragraph —
           // locked by workers/content/test/validate.test.ts with the rest.
           const checked =
-            /(?<![\w$.])(?:requireText|optionalText|optionalDocument|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
+            /(?<![\w$.])(?:requireText|optionalText|optionalMark|optionalDocument|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
               before
             ) ||
             /(?<![\w$.])typeof\s*$/.test(before) ||
@@ -2486,12 +2541,17 @@ describe("RULES — the laws of the base", () => {
  * door written against a right no role can hold refuses everybody, and the
  * Admin role is locked, so nobody can tick their way out of it.
  *
- * FOUR PLACES ASK FOR A RIGHT, and a census that knew only the first would have
+ * FIVE PLACES ASK FOR A RIGHT, and a census that knew only the first would have
  * called four live rights dead — `work:create` among them:
  *   1 · a literal pair — requireRight/gated/gatedBody(…, "help", "create")
  *   2 · the MCP surface — TOOL_GATES values, which are "help:create" strings
  *   3 · the record activity feed — every ACTIVITY_GATE_MAP module, asked for read
  *   4 · the importer — every TARGETS module, asked for create
+ *   5 · the record activity WRITE (add-a-note) — the SAME map, asked for
+ *       create: postActivityNote resolves its gate from the body's `table` at
+ *       runtime, so no literal pair names it, exactly as (3)'s read sibling
+ *       never named one either — the reason (3) exists as its own line rather
+ *       than folding into (1).
  */
 describe("offered-rights: no permission switch decides nothing", () => {
   const RIGHTS = ["read", "create", "edit", "delete"] as const
@@ -2517,6 +2577,8 @@ describe("offered-rights: no permission switch decides nothing", () => {
     }
     // 3 · the record feed asks every mapped module for read
     for (const mod of Object.values(ACTIVITY_GATE_MAP)) add(mod, "read")
+    // 5 · the record activity WRITE (add-a-note) asks the same map for create
+    for (const mod of Object.values(ACTIVITY_GATE_MAP)) add(mod, "create")
     // 4 · the importer asks every target's module for create
     const targets = read(join(ROOT, "workers", "data-ops", "src", "lib", "targets.ts"))
     const targetModules = [...targets.matchAll(/module\s*:\s*"([a-z_]+)"/g)].map((m) => m[1])
@@ -2798,8 +2860,25 @@ describe("closing a form is not a decision to discard it", () => {
 // The architecture was fine — one TabsView, one kit Tabs control, one `variant`.
 // What was wrong is that sixteen screens had hard-coded `variant: "line"` before
 // the folder existed, so the central value governed nothing. It is the DEFAULT
-// now, and a screen that wants a line has to be one of the two that genuinely
-// do: a strip filtering WITHIN a collection, which has no card to attach to.
+// now, for a COLLECTION's own strip (a main screen switching between records,
+// or between collections).
+//
+// AMENDED 2026-08-31 — THE CLIENT, verbatim: "Detail screens are using the
+// folder-tab design, but that style belongs to main screens only. Detail
+// screens should use the line (underline) tabs." This is the same ruling
+// `RecordDetail`'s own internal tab strip already states explicitly
+// (record-detail.tsx: "client ruling E … a record IS the detail screen, so
+// `line` is stated rather than inherited"), just reaching the twelve detail
+// screens that hand their tabs to `RecordScreen`'s `children` instead of that
+// prop, and so never got the memo — the App detail screen's Overview / Sprints
+// / Stories strip was drawing folder tabs, because every one of them spread
+// `defaultTabsConfig` (the COLLECTION default) with no override. So a screen
+// that wants a line now has THREE reasons, not two: a strip filtering WITHIN a
+// collection (no card to attach to), and — new — a RECORD's own top-level
+// section strip, which is `web/components/record-chrome.tsx`'s
+// `RECORD_TABS_CONFIG` (ONE constant, spread by every detail screen's own
+// tabsConfig, so the decision is made once rather than twelve times — exactly
+// the defect this describe block exists to catch).
 describe("a tab strip's shape is decided in one place", () => {
   it("tab-shape: the default is the folder", () => {
     const src = stripComments(read(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx")))
@@ -2807,10 +2886,32 @@ describe("a tab strip's shape is decided in one place", () => {
     expect(decl.slice(0, decl.indexOf("}") + 1), "the one default must be the folder").toContain('variant: "folder"')
   })
 
-  it("tab-shape: only the two inner filter strips override it", () => {
+  it("tab-shape: only the inner filter strips and the record strip override it", () => {
     const allowed = new Set([
       "web/components/tickets-collection.tsx",
       "web/components/meetings-screen.tsx",
+      // ACCOUNTS' COMPANIES/ALL STRIP IS NOT ON THIS LIST, and that is a
+      // correction, not an oversight. It was added here for a day (client
+      // ruling, 2026-08-31, annotating a screenshot of this exact screen: the
+      // search/sort/filter toolbar moved to sit BETWEEN the strip and the
+      // list) on the assumption that ANY intervening element breaks the
+      // folder tab's attachment the way it does for tickets-collection.tsx and
+      // meetings-screen.tsx above. Checked rather than trusted (client, same
+      // day, first on losing the shape entirely — "bring back the rounded
+      // active tabs!" — then on a reference screenshot of the kit's own
+      // collection composition, tabs flush against the SAME card as the
+      // toolbar, zero gap): the strip switches between COLLECTIONS (all
+      // accounts vs. just the companies), which is `defaultTabsConfig`'s own
+      // folder case, not the "filters WITHIN one collection" case the two
+      // lines above are for. tickets-collection.tsx's and meetings-screen.tsx's
+      // toolbars sit in the outer flex column, a real gap away from their
+      // card, which is genuinely fatal to the attachment; Accounts' toolbar
+      // now renders through `PagedFind`'s own `renderAbove`/`wrap` slots
+      // (paged-find.tsx), which put the tab strip and the card in ONE
+      // zero-gap column of their own, the same join `SectionWithCreate`'s
+      // `folderTabs` slot draws for apps-screen.tsx/sprints-screen.tsx/
+      // tasks-screen.tsx below. So the strip is back to saying nothing here,
+      // same as any other collection-switching strip.
       // The steps view switch (List / Flow / Compare) sits INSIDE the Steps
       // folder tab. Two folders stacked put one strip's feet through the
       // other's toolbar — seen on a phone the moment the default flipped.
@@ -2823,6 +2924,13 @@ describe("a tab strip's shape is decided in one place", () => {
       // routinely mounted INSIDE a record's folder strip (a client's To-dos
       // tab), which is exactly the stacking the steps-panel line describes.
       "web/components/work-panels.tsx",
+      // RECORD_TABS_CONFIG — the ONE seam every detail screen's own top-level
+      // tab strip spreads (help/role/sprint/wave/contact/selectable/account/
+      // meeting/knowledge/app/story/task/process detail), per the client's
+      // 2026-08-31 ruling above. A record's OWN section strip is a line; a
+      // MAIN screen's strip (switching between records or collections) stays
+      // the folder default untouched.
+      "web/components/record-chrome.tsx",
     ])
     const offenders: string[] = []
     let scanned = 0
@@ -2839,8 +2947,9 @@ describe("a tab strip's shape is decided in one place", () => {
     expect(scanned, "the override census found nothing — it has stopped matching").toBeGreaterThan(1)
     expect(
       offenders,
-      `these screens opt out of the one tab shape. A record's tabs and a collection's ` +
-        `tabs are the folder; only a strip filtering INSIDE a collection is a line: ${offenders.join(", ")}`
+      `these screens opt out of the one tab shape. A collection's tabs are the ` +
+        `folder; a strip filtering INSIDE a collection, or a record's own top-level ` +
+        `strip, is a line: ${offenders.join(", ")}`
     ).toEqual([])
   })
 
@@ -2872,23 +2981,46 @@ describe("a tab strip is not nested inside another one", () => {
    * stacked put one strip's feet through the other's toolbar, seen on a phone
    * the moment the default flipped. An entry here is somebody accepting that
    * cost with their eyes open, not a disagreement about whether it exists. */
-  const TWO_FOLDERS_OK: Record<string, string> = {
-    "web/components/tickets-collection.tsx":
-      "Owner's ruling, 2026-08-28: \"there's no way out .. lets' keep 2 tabs but " +
-      "both as the folder tabs.\" He was shown ch27.13's alternative — the inner " +
-      "picker moves into the toolbar — and chose two folder strips over moving a " +
-      "control between regions. His screen, his call.",
-  }
+  // EMPTY ON PURPOSE, since 2026-08-31. The one entry this ever held
+  // (tickets-collection.tsx, on the owner's 2026-08-28 ruling to keep two
+  // folder strips rather than move the inner one into the toolbar) was
+  // overruled by the CLIENT the following business day, verbatim: "there can
+  // never be 2 rows of tabs, no folder tabs, no line tabs. just never." That is
+  // not a narrower version of the 28 Aug ruling, it is the opposite of it — so
+  // the screen was redesigned to one strip (the kind/stage tabs; the old
+  // All-tickets/Archived strip is now the "Archived" filter in
+  // COLLECTION_FILTERS, the same shape Accounts' own archive toggle already
+  // uses) rather than given a `line` inner tab to satisfy the rule below. An
+  // entry here again means somebody has re-accepted the stacked-strip cost
+  // with their eyes open — which, after this ruling, means asking the client
+  // first.
+  const TWO_FOLDERS_OK: Record<string, string> = {}
 
   it("tab-shape: any screen with two strips gives the inner one a line", () => {
+    // THE SANITY CHECK IS ON FILE ENUMERATION, not on finding an offender.
+    // Until 2026-08-31 this counted `<TabsView` occurrences and demanded at
+    // least one file with two of them, because tickets-collection.tsx
+    // genuinely had two and the count existing was the proof the regex still
+    // matched. That screen is the fix now (see TWO_FOLDERS_OK above), so the
+    // client's ruling means the RIGHT number of two-strip screens across the
+    // whole app is zero — a census that finds none is the goal, not a broken
+    // scan. What a broken scan actually looks like is `sourceFiles` walking
+    // nothing, which is what this checks instead.
+    const files = [
+      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
+      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
+    ]
+    expect(files.length, "the component census found no files — sourceFiles has stopped matching").toBeGreaterThan(50)
+
     const offenders: string[] = []
     const staleRulings = new Set(Object.keys(TWO_FOLDERS_OK))
     let scanned = 0
-    for (const f of [
-      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
-      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
-    ]) {
-      const src = read(f.path)
+    for (const f of files) {
+      // stripComments first (31 Aug 2026) — the toolbar sweep's own
+      // explanatory comments in screen-bits.tsx name `<TabsView>` in prose
+      // twice ("renders `<TabsView>` from it"), which counted as two real
+      // strips on a file with zero actual JSX usages of the component.
+      const src = stripComments(read(f.path))
       if ((src.match(/<TabsView/g) ?? []).length < 2) continue
       scanned++
       const rel = f.path.replace(ROOT + "/", "")
@@ -2900,7 +3032,13 @@ describe("a tab strip is not nested inside another one", () => {
       [...staleRulings],
       "TWO_FOLDERS_OK names screens that no longer stack two strips — delete these"
     ).toEqual([])
-    expect(scanned, "the nested-strip census found nothing — it has stopped matching").toBeGreaterThan(0)
+    expect(
+      scanned,
+      "a screen is rendering two <TabsView> strips — the client's ruling is " +
+        "\"there can never be 2 rows of tabs … just never\", with no exceptions " +
+        "clause, so this must stay zero. Either undo the stacking, or take the " +
+        "ruling back to the client and add a reasoned TWO_FOLDERS_OK line above."
+    ).toBe(0)
     expect(
       offenders,
       `these screens stack two folder strips; the inner one switches a VIEW and takes ` +

@@ -1,5 +1,778 @@
 # Changelog
 
+## v1.2.25 — 2026-09-02
+
+The client released two brand colours — lavender `#B1A3CF` and orange
+`#F7953E`, her own typed values — and they close the two oldest colour gaps in
+the file. Both were real defects and both were the same defect twice: a
+distinction the system draws in words, drawn in one colour on screen.
+
+`--chart-4` and `--chart-5` repeated `--chart-1` and `--chart-2`, so a
+four-series chart had one duplicated pair and a five-series chart had two.
+`--warning` and `--warning-foreground` resolved to `--surface-quiet` and
+`--ink-secondary`, which is *exactly* what `Badge variant="secondary"` already
+draws — measured live in `verify/accents/` at a contrast of **1.000 on both the
+fill and the ink, in both palettes**. `DataPreviewTable` draws that pair side by
+side: `unchanged` takes `secondary` and `changed` takes `warning`, and its own
+header reasons the two outcomes apart at length.
+
+Both hexes are written in `tokens.css` §2 and nowhere else. The client also
+attached a brand sheet drawing near-neighbours `#BDADD5` and `#F29436`; that
+difference is back with her and unresolved. Every use is a `var()` at one of the
+two names, so a correction is one line per colour.
+
+### Added — two accents, admitted against the palette's own rule
+
+§2 states the rule at its head: *"A new accent is admitted only if it carries
+charcoal type at both its light and its dark value."* Charcoal measures
+**7.53:1** on lavender and **7.79:1** on orange, against AA's 4.5. Each clears
+it at a single value, so neither has a second one — for scale, the four accents
+already in the file carry charcoal at mango 12.07, sky 8.69, forest 4.61 and
+poppy 4.59, which puts the two admitted today second and third in the palette.
+
+**Neither is a lift, and that is measured rather than reasoned by analogy.**
+Forest and poppy carry `-lift` hexes because their own values land at 4.07 and
+4.05 against a dark card; `--kw-sky` carries none and is not redefined in dark
+because it measures 7.68 there. Lavender and orange measure 6.65 and 6.88 — in
+sky's band, not forest's. A `-lift` would have been a hex invented against a
+number that already passes, and a value that does not flip between palettes is
+not given a dark half.
+
+**Neither is an ink.** As TEXT both fail on both light papers — lavender 2.31 on
+off-beige and 2.09 on soft paper, orange 2.23 and 2.02 — and both pass on a dark
+card at 6.65 and 6.88. Nothing writes a word in either colour.
+
+### Fixed — `--chart-4` and `--chart-5` are colours, not repeats
+
+`--chart-4` = `--kw-lavender`, `--chart-5` = `--kw-orange`.
+
+**The assignment is decided by hue distance**, because this palette's series are
+told apart by hue and not by lightness. As HSL angles: poppy 7.9, orange 28.2,
+forest 150.3, sky 207.1, lavender 259.1. Orange sits **20.3** from poppy, by far
+the tightest pair in the set — every other pair is at least 52.0 apart. So
+orange goes last, where a chart only reaches it at five series:
+
+| | series | closest pair that is actually adjacent |
+|---|---|---|
+| four series | sky · forest · poppy · lavender | 52.0 (sky/lavender, and they are not neighbours) |
+| five series | the above, then orange | 108.8 (poppy/lavender); 5 wraps to 1 at 178.9 |
+
+The reverse assignment stands poppy and orange side by side at 3 and 4, 20.3
+apart, in **every** four-series chart in the system.
+
+Neither takes a dark entry, for the reason above — 2 and 3 are re-pointed in
+dark at their lifts, 1 is not re-pointed at all, and these two follow 1.
+
+**An observation about the whole set, recorded and not solved.** Every mark in
+this palette is a pastel or mid-tone read against paper. On a light card: sky
+2.00, orange 2.23, lavender 2.31, forest 3.77, poppy 3.79; on a light panel each
+drops again (1.81 / 2.02 / 2.09 / 3.42 / 3.43). The already-shipped `--kw-sky`
+is the *lowest* of the five, so the two admitted today land above the bar in the
+file rather than under it — this is not a new defect and not these colours'
+doing. What is worth stating plainly is that the set separates on hue alone:
+forest and poppy differ in luminance by a ratio of **1.00** and lavender and
+orange by **1.03**, so in greyscale, in print, or to a reader with a
+colour-vision deficiency each of those pairs is one mark. A series in this
+system needs a direct label, a pattern or a shape as well as its colour. That is
+a charting rule and not a token.
+
+### Fixed — `--warning` is a colour again, and it is the orange
+
+The block this replaces was written as a holding position and named its own
+exit in its last line: *"The client is adding colours; when an amber or
+equivalent exists, `--warning` should take it and this block goes."* It exists.
+
+`--warning` = `--kw-orange`. `--warning-foreground` = `--ink-on-accent`, and
+**that half is not cosmetic** — it is the consumer the repoint would otherwise
+have broken. `--ink-secondary` is an ink tuned for paper; on the new fill it
+measures **4.00 in light**, under AA, and **1.48 in dark**, which is not a label,
+it is a stain. Charcoal measures 7.79 on the new fill in both palettes. Neither
+token takes a dark half, because the fill has none.
+
+**Every consumer, found and checked.** `badge.tsx`'s `variant="warning"` is the
+one and only place in `components/` or `compositions/` that reads either token,
+as `bg-warning text-warning-foreground`; it is fixed by the repoint and needed no
+edit beyond its comment. `DataPreviewTable` reaches it indirectly, mapping
+`changed` → `warning`, and gets the colour its own header always argued for.
+Nothing reads `--warning-strong` at all.
+
+**Poppy is untouched** and still means blocked and nothing else. Ruling 3B moved
+warning *off* poppy; this moves it off the quiet chip it was parked on, and 3B
+stands.
+
+**`--warning-strong` did not move, and that is a measurement rather than an
+omission.** It is the ink half — the warning *word*, not the fill — with zero
+call sites across the kit. Orange AS TEXT measures 2.23 on off-beige and 2.02 on
+soft paper, so pointing it at `--kw-orange` would ship a word nobody can read;
+minting it a darkened orange the way ruling 43 gave poppy `--kw-poppy-ink` would
+invent a hex the client never typed, for a consumer that does not exist. Ruling
+43 moved because every destructive word in the system was failing AA; nothing is
+failing here. It stays `--ink-primary` and stays the one flagged token in
+`manifest.json`'s `notDelivered` for this family.
+
+**One divergence, logged rather than settled.** `Alert variant="warning"` draws
+a **mango** dot — ch20's own drawing, restored by the 2026-08-26 fidelity
+re-audit under override 17 after it had once already followed this very token
+down to the quiet fill. It reads `--primary`, not `--warning`, so this ruling
+does not reach it. A warning *badge* is now orange and a warning *alert dot* is
+still mango: two components spelling one word in two colours. That needs a
+client ruling, not a repoint of a value the artifact states outright.
+
+### Considered and declined
+
+* **A lavender or orange status dot.** There are exactly six `--dot-*` tokens
+  and exactly six dot tones in `badge.tsx`; no state is without a colour, so a
+  seventh would be inventing a semantic rather than filling a gap.
+* **Splitting `--dot-shipped` from `--dot-done`.** They resolve identically
+  (forest, 3.77 against a light pill and 5.95 against a dark one) but that is
+  ruling 04's deliberate synonym — the system says "shipped" and the portal says
+  "Done" for one state — not a collapsed distinction.
+* **Moving `--info` or `--dot-review` off sky.** Sky also backs `--chart-1`, but
+  those are different token families and are never drawn against each other in
+  one view. Nothing collapses.
+* **`--pill-fill-building`'s mango dark fill.** Which accent it should be is
+  `GAPS-TRACK1.md` STA-1, an open client question that predates these colours.
+
+### Verified
+
+`verify/accents/` (Vite + React, port 5241, kept). Screenshots are useless in
+this environment — the Browser pane renders at roughly 42×46px whatever the
+viewport is emulated to — so nothing on that page is checked by eye.
+`window.__ACCENTS__()` reads every swatch out of `getComputedStyle` on the live
+element, flips `data-theme` on `<html>`, reads again, and returns both palettes
+as JSON. The page names tokens and never a hex; R32 holds inside the harness.
+
+Read back, light / dark: `--chart-4` `#B1A3CF` / `#B1A3CF` and `--chart-5`
+`#F7953E` / `#F7953E` through the real `bg-chart-*` utilities, against
+`--chart-2` and `--chart-3` flipping to their lifts as they always did; the
+warning badge `#F7953E` under `#1A1918` at **7.79 in both palettes**; and the
+old binding beside the quiet chip, which is the defect this release closes.
+
+That last one, stated as the numbers it actually was rather than as one
+headline — the first draft of this entry said "1.00 on fill and 1.00 on ink"
+and only half of that was true:
+
+| | fill | ink |
+|---|---|---|
+| light | 1.21 | 1.95 |
+| dark | **1.00** | 1.51 |
+
+In DARK the two chips were the same token — `--warning` and `--secondary` both
+resolved to `--kw-unlit-secondary`, so "Will change" and "Unchanged" in
+`DataPreviewTable` were one chip and the label carried the whole distinction.
+In LIGHT they were two pale beiges a fifth of a step apart: bad, but not the
+same colour. After: **2.02** light, **5.20** dark.
+
+`tokens.json` regenerated and diffed — `--check` runs the guards only and does
+not compare output. `unresolvedFlagged` falls 21 → 13. `npm run check` green.
+
+## v1.2.24 — 2026-09-02
+
+Four of the five entries below existed already, as corrections written
+downstream in the app's `shared/web/library-overrides.css` because a vendored,
+hash-pinned `shared/ui/` could not be hand-edited. Three of those blocks each
+carried the same closing sentence — "the real fix is upstream; delete this the
+day a synced tag ships it" — and none of them had ever travelled. They travel
+here. An override is a second place a decision lives, and that file's own
+header says what a second place costs: a rule written on 30 June was still
+fighting a library fix that had shipped in v0.13.0, and it tinted every card
+in both apps for nine days before anyone connected the two.
+
+### Changed — the focus ring is drawn ON the edge it answers for, not 2px beside it
+
+`--focus-offset` is `0px`. Client, 2026-08-31, over a plain "Price sold" text
+input: "when in select something you draw an overline bigger [than] the
+already existing outline. do not do that. just change the color of the
+existing outline. everywhere where you show the selected whatever."
+
+The fix is geometric and not chromatic — `--focus` is already the ink this
+system uses for every other "selected" mark, so the colour was never the bug.
+An `outline` paints outside its border box by `outline-offset`, while a
+field's own edge is an INSET shadow painted immediately inside that same box,
+and `input.tsx` says outright that the hairline does not move on focus (review
+1A · fix 4 stopped it moving on purpose). At 2px those were therefore two
+concentric strokes with a visible gap between them: precisely "an overline
+bigger than the already existing outline", never a recolour of anything. At 0
+the ring lands on the box the hairline is drawn against, so a focused control
+reads as its own edge changing colour and weight in place.
+
+`--focus-width` and `--focus` do not move: still 1px, still charcoal
+(off-beige on an inverse ground), still `:focus-visible` only, still §8's one
+rule for every control at once. Only where it is drawn changed. This is the
+SECOND override of kit ruling 24 — the width went to 1px on 2026-08-22 (B2) —
+and §3 now carries both rulings in full beside the values. `docs/TOKENS.md`
+and `docs/RULES.md` both stated `2px` for the width AND the offset; the width
+had been wrong in the docs since 22 Aug and both rows are corrected here.
+
+Measured in `verify/writeback/` §A, on a focused `Input`, both palettes: a
+`1px solid` outline at `outline-offset: 0px` on the control's own 999px
+radius, immediately outside the border box its own `0 0 0 1px inset` hairline
+is drawn inside. Rebinding the token back to `2px` on the live page moved the
+ring to `2px` and nothing else, which is the whole of the change.
+
+`rail.tsx`'s scroll gutter needed no edit and got none: it is written as
+`calc(var(--focus-offset) + var(--focus-width))` and states no literal, so it
+narrows from 3px to 1px and still clears the ring exactly.
+
+### Fixed — the assistant's mark rides the bubble's top, not its full height
+
+`AgentChat`'s turn row was `flex items-end`, which bottom-aligned the mark
+against the row's tallest child on every turn. A one-line reply hides this
+completely — there is only one line to align against either way — which is why
+it survived to be reported from an app, on a genuinely tall answer where the
+mark sat level with the bubble's BOTTOM rather than beside the first line a
+reader's eye starts at.
+
+The kit already drew this the other way one component over: `chat.tsx`'s own
+`Message` is `items-start` and states the ruling in its own words, "CH19 view
+16 levels the 24 mark with the TOP of the bubble". `AgentChat` was the one
+surface still drawing the older behaviour, so this is not a new rule — it is
+the already-ruled alignment reaching the last component that had not picked it
+up. The thinking turn takes the same row shape for the same reason; its own
+dots are never tall enough to show the difference, which is not a reason for
+two sibling rows to disagree.
+
+The avatar's `mb-1` went with it. It was the bottom-aligned row's nudge, and
+at `items-start` a cross-axis END margin moves the mark nowhere — it only
+padded the row's own height on a short turn.
+
+Measured in `verify/writeback/` §B on a 163.875px bubble: the mark's top is
+now 0.000px from the bubble's top. Forcing the old `items-end` + `mb-1` back
+on the live row puts it 141.125px lower, 4px clear of the bubble's bottom.
+Row height is 163.875px either way — the mark moved, the layout did not.
+
+### Fixed — the composer's ring belongs to the pill, not to the bare field inside it
+
+Client, 2026-09-01, over the assistant's message field: "when i select the
+text field, the 'select' outline is inside? should outline the full component!
+but remember, this should only change the color of the outline (like in the
+add/edit screens)."
+
+`AgentChat`'s composer is a decorated pill (`bg-card`, its own radius and
+padding) wrapped around a BARE `<textarea>` — `border-0`, `shadow-none`, no
+fill and no radius of its own. Focus lands on the textarea, which has no
+visible box, so the ring drew a plain rectangle sized to it, sitting inside
+the rounded pill the reader perceives as the field.
+
+`tokens.css` §8 has named and solved this shape since review 1A · fix 4, for
+`search-input.tsx` and `filter-bar.tsx`'s facet field: the bare node hands its
+ring to the shell it sits in through `:has()` and suppresses its own. This
+composer was simply never marked with either attribute. It is marked now —
+`data-focus-shell` on the pill, `data-focus-proxy` on the Textarea, on the
+INSTANCE and not in `textarea.tsx`, because a standalone Textarea is its own
+visible box and already rings correctly. No ring is written in the component;
+§8 still owns the only one, and §8's own tally of who carries the pair is
+updated rather than left one file short.
+
+Measured in `verify/writeback/` §C, with the textarea focused: the pill draws
+`1px solid rgb(26,25,24)` at offset 0 on its own `999px` radius across its
+full 487.5 × 45 box, and the textarea's own `outline-style` is `none` — its
+408.75 × 30 rectangle is no longer ringed. Typed to three lines, the ring
+follows the pill into the stadium radius without a second rule, because an
+outline always takes the radius of the box it is drawn on.
+
+### Fixed — `WebEmbed`'s sandbox default was the documented escape hatch
+
+`DEFAULT_SANDBOX` was `"allow-scripts allow-same-origin"` while the file's own
+header said "THE SANDBOX IS DEFAULTED CLOSED". The header was right about the
+intent and the code was the wrong half: the HTML standard says of this exact
+pair that framed content served from the embedder's origin can reach its own
+DOM through `window.parent`, rewrite its own `sandbox` attribute and reload
+itself out of the sandbox entirely. The default permitted the one thing the
+paragraph above it claimed to prevent.
+
+The default is now `allow-scripts` and nothing else, which puts the frame in
+an opaque origin — the thing that actually walls it off from this app's
+cookies, storage and DOM. It costs an ordinary third-party embed nothing: a
+video, a map or a form on somebody else's origin was already cross-origin and
+was never reading ours.
+
+The one legitimate need is an opt-in prop rather than a default. A first-party
+embed — our own page, needing its own storage — passes `allowSameOrigin`. A
+named boolean, not a hand-typed `sandbox` string, so the dangerous pair is one
+greppable word at the call site instead of a token buried in a string nobody
+re-reads, and the call site states the trust rather than inheriting it.
+
+A second untrue sentence went with it: the header claimed
+`sandbox={undefined}` removed the attribute entirely. It never did —
+`sandbox` was a defaulted parameter, so `undefined` is exactly the value that
+selects the default — and it is not wanted either. An unsandboxed frame is not
+a state "defaulted closed" can have. `sandbox` is no longer defaulted in the
+destructure (the default depends on `allowSameOrigin` now) and a call site's
+own string still replaces everything wholesale, empty string included.
+
+Measured in `verify/writeback/` §D, off the rendered `<iframe>`'s own
+attribute: default `allow-scripts`; with `allowSameOrigin`, `allow-scripts
+allow-same-origin`; with `sandbox="allow-forms"`, `allow-forms`.
+
+`map.tsx` carries the same pair and KEEPS it, deliberately: its `src` is a
+provider's embed URL by its own definition, where the pair grants the provider
+its own storage and grants it nothing of ours. Its comment said "same default
+as `web-embed`", which is no longer true and is rewritten — including the part
+that is a judgement and not a ruling, since nothing in the type system makes
+that `src` third-party. Whether it should follow is logged there, unruled: the
+demo makes no network calls, so which providers actually break without
+`allow-same-origin` cannot be measured in this repo.
+
+### Fixed — the right is called `create`, and the matrix called it `add`
+
+`PermissionMatrix` shipped `RIGHTS = ["see", "add", "edit", "delete"]` and
+`WRITE_RIGHTS = ["add", "edit", "delete"]`. The client SAID "add" on
+2026-08-24 and the ids were transcribed straight out of that sentence, but the
+application that enforces these switches has one name for the right and it is
+`create` — `shared/workers/gating.ts` types it `"read" | "create" | "edit" |
+"delete"`, the sheet stores `can_create`, and the glossary's own definition of
+an access right reads "read, create, edit, or delete". An id is a key two
+systems match on, not a transcript.
+
+The label follows the id rather than keeping a second word for the same
+switch, which was already this file's own stated rule — "keeping a second set
+of words for the same four things is how two lists drift" — and had been
+broken by this id since the day it was written. The slot letters stay four
+distinct initials: S · C · E · D. The demo's own permission data and section
+summary move with it, and the header's three passages that spelled the order
+"see · add · edit · delete" are corrected rather than left describing a build
+that no longer exists.
+
+`see` is left alone and the divergence is recorded rather than tidied away:
+the enforcing name for that one is `read`, it was not asked for, and it is a
+word in front of a reader where `Create` versus `Add` is not.
+
+Measured in `verify/writeback/` §E, off the rendered grid: the slot letters
+read S · C · E · D, the legend reads "See · Create · Edit · Delete", and a
+slot's accessible name reads "Owner · Accounts · Create: held".
+
+**Downstream note.** The app maps both vocabularies in one place
+(`web/components/role-detail.tsx`, `RIGHT_TO_KIT` / `KIT_TO_RIGHT`). Its
+`create: "add"` / `add: "create"` halves become `create: "create"` /
+`create: "create"` when this tag is vendored, and `KIT_TO_RIGHT`'s type will
+not compile until they do.
+
+### Housekeeping — `tokens.json` caught up on two tokens it had never seen
+
+Rebuilding the generated file for `--focus-offset` also picked up
+`--spine-paper-member-fill` and `--spine-ink-member-fill`, which have been in
+`tokens.css` since the spine work and had never reached the JSON. Nothing
+flagged it, because `build-tokens.mjs --check` runs the four guards and does
+not diff the emitted file against the one on disk — worth knowing, since the
+same silence would hide the next one. Declared count 279 → 281.
+
+## v1.2.23 — 2026-09-02
+
+### Fixed — the rail's collapse toggle and member chip no longer scroll with the entries
+
+Client, verbatim: "when i svroll down the expand/collpase button in navbar
+also moved. make sure this does not happen."
+
+`Rail` (`rail.tsx`) scoped no scroll region of its own anywhere — the file
+contained no `overflow-y-auto` and no `min-h-0` before today. Its `<nav>`
+carried `flex-1` and nothing else, so a rail with more entries than fit
+simply grew past the bottom of its column, and the only box a consuming
+application could then put `overflow-y-auto` on was the whole `<Rail>`,
+foot included. That is why the collapse toggle and the member chip — real
+siblings AFTER the `<nav>`, already structurally at the foot — travelled
+upward with the list.
+
+The scroll is the composition's now, and it is the `<nav>`'s: `min-h-0`
+(without which `flex-1` still floors that item at its content's height and
+nothing can ever overflow) plus `overflow-y-auto`. The toggle and the chip
+sit outside the scroller and cannot move, in both rail states. The rail
+root also gained `max-h-full` alongside its existing `min-h-full`, so the
+rail is EXACTLY its column wherever the column has a height to be exact
+about; against an auto-height parent 100% resolves against nothing and the
+rail grows exactly as it always did.
+
+The `<nav>` also takes a `calc(--focus-offset + --focus-width)` negative
+margin and an equal padding. That is not spacing: a scroll container clips
+its other axis too, and tokens.css §8 rings every control off its edge, so
+a focused row against the new box's edges would have had its ring sliced.
+The two cancel exactly — 212 elements across the harness's three static
+cases were compared before and after, and the only computed difference in
+any of them is that padding/margin pair on the `<nav>`, which paints
+nothing. No row shape, no active pill, no spine colour, no chip styling, no
+token moved.
+
+`verify/rail/` gains a `scroll` case: two height-bounded columns, expanded
+and collapsed, each with more entries than fit and each keeping the
+application's own outer `overflow-y-auto` in place, because the fix has to
+hold with that wrapper still there. Measured on it, scrollTop 0 → max: the
+toggle and the chip move 0px in both states while the rows move the full
+675px (expanded) / 472px (collapsed). Before the fix the same probe moved
+the toggle and the chip 630px / 473px, in lockstep with the rows.
+
+## v1.2.22 — 2026-09-02
+
+### Changed — the rail's active row is an inset pill, not a full-bleed one
+
+Client, after the rounding itself finally landed: "allow a bit of blank
+space on the sides so it's not touching the edge." `ROW_EXPANDED` used to
+cancel the rail's own ambient `--rail-inset` with a negative inline margin
+to reach the column's true edge, then pay the inset back as padding so the
+icon/label still landed where an idle row's already sat. Dropping the
+cancel-and-respend leaves the row inside the same padding every other row
+already sits in — the blank space is exactly `--rail-inset`, the value the
+shell already publishes on the column, not a new number. `rounded-pill`
+and the row's height are unchanged; only the outer box's own bleed is
+gone. Two other passages in this file described the old full-bleed
+mechanic as current and were updated to match (the geometry summary's
+"FULL-BLEED" bullet, and the brand mark's own alignment comment); a third,
+the historical record of the square-vs-pill reversal, is left alone since
+it correctly describes what was true at the time.
+
+## v1.2.21 — 2026-09-02
+
+### Changed — the fused sort chip's order flipped: arrow on the left, field on the right
+
+Client, verbatim: "on the sort by, cange the ordre: so on tge left of the
+fused we have the arrow and on the right the value and dropdow." The chip's
+DOM order in `SortControl` (`sort-control.tsx`) is now `[direction, field]` —
+the arrow button first, the field (value + chevron) second — reversing the
+order set the same day in v1.2.20's fusion.
+
+Rounding was reasoned in logical terms throughout, not swapped by literal
+side: `directionVariants` now carries `rounded-s-pill rounded-e-none` (its
+outer corner is the chip's START, since it is now the first half) and
+`fieldVariants`'s `fused` variant carries `rounded-e-pill rounded-s-none`
+(its outer corner is now the chip's END). The file's own RTL paragraph is
+rewritten to match: the direction control sits at the chip's inline start,
+the field's own chevron stays at ITS inline end via `SelectTrigger`'s
+`justify-between`, unaffected by the outer reorder.
+
+Verified in `verify/sort-chip/`, extended with an explicit `dir="rtl"` row.
+Read back via `getBoundingClientRect` and computed `border-radius`: in LTR
+the direction control sits left of the field with `border-radius: 999px 0 0
+999px` against the field's `0 999px 999px 0` (one seamless pill, rounded
+outer corners only); in RTL the two swap physical sides (direction right of
+field) and each one's rounded corner follows it, confirming the reorder is
+driven by logical properties and not hardcoded sides. Separately confirmed,
+and NOT part of this fix: `SelectTrigger`'s own corner is governed by Radix,
+which stamps `dir="ltr"` on itself absent a mounted `DirectionProvider` —
+`demo/App.tsx` already documents this as a pre-existing, out-of-scope
+limitation (client ruling 10: the system is LTR-only). That limitation
+existed identically before this reorder, just mirrored to the other corner,
+and is unrelated to the swap.
+
+### Changed — tabs now use the rail's exact idle/active font weights, not just its hover preview
+
+Client: tabs should use "the same weights as in navbar." The rail's own
+`ROW_IDLE` (`compositions/templates/rail.tsx`) states an idle row's weight
+explicitly as `--font-weight-light` (300) and its active row (and an
+inactive row's hover) as `--font-weight-medium` (500). Tabs
+(`components/tabs/tabs.tsx`) already got the HOVER half of this right
+tonight — `enabled:hover:font-[var(--font-weight-medium)]` on both
+variants — but the RESTING state carried no weight class at all. A
+`<button>` inherits `font: inherit` from Preflight and nothing in
+`text-sm`/`text-caption` sets a weight, so an idle tab's computed weight was
+the browser's default 400 — a third value the rail never draws.
+
+`TRIGGER_SKIN.line` and `TRIGGER_SKIN.folder` both now carry
+`font-[var(--font-weight-light)]` at rest, alongside the untouched hover and
+active rules, so a tab's idle/hover/active sequence reads the identical
+three numbers (300/500/500) the rail's nav rows do.
+
+Verified in `verify/tabs-hover/`, extended with `data-probe` attributes and
+a live computed-`font-weight` readout. Read back via
+`getComputedStyle(...).fontWeight`: idle tabs read `300` and active tabs
+read `500` in both `line` and `folder`, matching the rail exactly. The
+hover rule was confirmed present and correctly compiled — `.enabled\:hover\
+:font-\[var\(--font-weight-medium\)\]:enabled:hover { font-weight:
+var(--font-weight-medium); }` — in the built stylesheet; genuine `:hover`
+could not be triggered reliably through this session's browser automation,
+but the compiled rule and token are identical to the one the rail already
+uses and already ships.
+
+### Investigated — `ScalePicture`'s three states drew a different AMOUNT of content, not just a different size
+
+Client, verbatim: "the representation is worng, chnaging the size chnages
+the size of the text, not how much data is show. so your display is
+wrong." Confirmed: `ScalePicture` (`compositions/screens/settings.tsx`) drew
+"compact" with a SECOND metadata line ("Sprint 24 · shipped"), "default"
+with one, and "large" with a SHORTER one (just "Status", the "· 4 open"
+dropped) — so scrubbing the setting looked like it changed how much the
+app shows. `shared/scale.ts` (kwapso_system) confirms the real mechanism is
+a single root font-size per step; it never adds, removes or shortens a row.
+
+Redrawn to show the SAME content — one title, one metadata line, word for
+word — at three point sizes (12/10, 14/12, 16/14), with the block's own gap
+and padding stepping up alongside the type so "spacing scales too" is
+visible without touching content.
+
+Verified in `verify/scale-picture/`: reads back each step's rendered text
+nodes. All three arrays are identical (`["Record title", "Status · 4
+open"]`); computed `font-size`/`gap`/`padding` increase monotonically
+compact → default → large.
+
+### Fixed — the error register was missing the eyebrow and dot the client's own reference card showed
+
+Client: "but i gave you a specific design inside a card, you took it only
+partially" — about the 27 call sites in kwapso_system moved onto
+`ShapeStateBody` for their load-failure state. Her reference card ("LOAD
+FAILED") showed a small red dot beside an uppercase eyebrow, a bold title,
+a description, and TWO buttons (Retry + a plain-text Copy) side by side.
+
+Traced `ShapeStateBody` (`compositions/states/states.tsx`) into
+`ScreenRegister` (`components/screen-renderer/screen-renderer.tsx`) and
+found the eyebrow was genuinely absent — `screen-renderer.tsx`'s own SCR-4
+comment already logged it: "The EYEBROW half of CH21's register is still
+missing here and needs a new prop, so it is logged, not smuggled in." The
+kit had already drawn it correctly once, in `form.tsx`'s own LOCAL
+`Register` (chapter 21's failure eyebrow: a 7px poppy dot, `--dot-status`,
+`bg-destructive`, then an uppercase micro word at weight 500) — it had
+simply never reached the shared component `ShapeStateBody` renders through.
+The two-button action row needed no fix: `ScreenRegister`'s `action` slot is
+already a `flex flex-wrap` row, so a Retry and a secondary Copy both fit one
+`action` node exactly as a single button does — the 27 call sites passing
+only one plain button is a call-site choice in the other repo, not a kit
+limitation, and is not this repo's to fix.
+
+Added `eyebrow` to `ScreenRegisterProps`, transcribed straight off
+`form.tsx`'s own recipe, with the poppy dot scoped to `tone="error"` only
+(the other three registers get an eyebrow with no dot, matching chapter
+21). Added `errorEyebrow` to `ShapeStateCopy` (default "Load failed",
+matching `form.tsx`'s own default for the identical register), wired into
+`ShapeStateBody`'s call to `ScreenRegister`.
+
+Verified in `verify/state-error/`, rendering `ShapeStateBody` at
+`state="error"` inside a `--surface-panel` card with a Retry + "Copy error
+code" action pair. Screenshot shows the dot, the "LOAD FAILED" eyebrow, the
+bold title, the description and both buttons side by side, matching the
+reference. Read back the dot's own computed `background-color`:
+`rgb(233, 74, 50)` — exactly `--kw-poppy` / `#E94A32`.
+
+## v1.2.20 — 2026-09-02
+
+### Changed — Filter and Sort brought to the toolbar's one pill, matching `ViewSwitch` exactly
+
+Client, verbatim: "all the components in toolbar (the sort, the filter, the
+view) i want them in the same pill aspect exactly. match filter and sort to
+the existing view selector component (i am happy with how that is)."
+`ViewSwitch` was the reference: `--control-height-button` (40) tall,
+`--btn-secondary-fill` solid with no hairline, `--btn-secondary-hover` on
+hover, weight 500 — `select.tsx`'s trigger, overridden exactly that way.
+Measured against it, `FilterBar`'s chips and `SortControl`'s field were both
+off, in different ways.
+
+`FilterBar`'s three toolbar-row pills (`filterChipVariants` — an applied
+facet chip and the "Clear filters" control it's shared with — and `CHIP_ADD`,
+the "+ filter" idle affordance) all took `--control-height-pill` (26, `.kw-
+chip`'s own drawn height, right for a chip inside a facet's results but short
+for this row) and `--surface-raised` for their fill — a token that happens to
+equal `--btn-secondary-fill` in light mode only, and visibly splits from it in
+dark. `CHIP_ADD` also carried "the one bordered control in the system": a
+dashed `1px dashed var(--hair-strong)` outline, ch26's drawn "not yet set"
+cue. The client's ruling is explicit that this dash goes too. All three now
+take `--control-height-button`, `--btn-secondary-fill`, `--btn-secondary-
+label`, and `CHIP_ADD` gains `--btn-secondary-hover` on hover and drops its
+border entirely.
+
+`SortControl`'s field (`fieldVariants`) was already the right height, but
+still wore `select.tsx`'s CH09 field skin wholesale: `bg-background`, a
+resting `--hair-strong` hairline, weight 300, no hover — correct for a lone
+select, and a visibly different pill from `ViewSwitch` standing next to it.
+It now overrides the same four properties `ViewSwitch` does. The direction
+button fused to it (`directionVariants`, the 2 Sep fusion) mirrored the
+field's OLD skin to draw one continuous hairline across both halves; mirroring
+that same skin now that the field has moved would have put the hairline back
+on one side of a chip built specifically to erase it, so the direction half
+was brought to the same `--btn-secondary-fill`/`shadow-none`/`--btn-secondary-
+hover` skin instead of a bare hairline mirror. Its own active-press nudge and
+focus-visible ink shadow are untouched.
+
+`RangeFacet` and `SearchableFacet` draw no toolbar-row pills of their own —
+their fields and search pill live inside a facet's popover, not the bar —
+and are unchanged.
+
+Verified in `verify/toolbar-pills/`: Search, Filter (idle and one facet
+picked), the fused Sort chip and `ViewSwitch` rendered on the real toolbar
+ground (`collectionPanelVariants`'s panel, not a generic `.bg-surface-panel`),
+in both palettes. Computed `height`/`background-color`/`box-shadow` now read
+identical across all five controls in both light and dark; before this
+change they matched only by light-mode coincidence.
+
+## v1.2.19 — 2026-09-02
+
+### Added — three more client rulings on the rail and on tabs: the member chip's fill, weight as a third nav signal, and hover-weight on tab labels
+
+Three follow-ups to v1.2.18, same review.
+
+**The rail's member chip is black in dark mode, and always black on mango.**
+Verbatim: the foot chip's fill should be black whenever the app is in dark
+mode (any spine) or whenever the spine is mango (either palette); light-paper
+and light-ink are unchanged. `MemberChip`'s `shell` read `--spine-chip-fill`,
+which also re-binds `--btn-secondary-fill` / `--pill-fill` for anything else a
+route renders inside the rail column (`screen-shell.tsx`'s `RAIL_COLUMN`), so
+repointing it would have blackened controls the client never saw. Two new
+tokens instead, read only by the chip: `--spine-member-fill` (paper and ink
+keep today's chip in light, both go to `--kw-charcoal` in dark; mango is
+`--kw-charcoal` unconditionally, needing no dark half — same law as the rest
+of tokens.css §7b) and `--spine-member-ink` (reuses `--spine-ink` on paper and
+ink, since that was already the right value against both the old fill and the
+new black one; mango gets its own `--kw-off-beige`, because on mango the
+chip's fill just became the same charcoal the name text already was, and the
+text has to invert rather than vanish against its own background). Two new
+helper variables, `--spine-paper-member-fill` / `--spine-ink-member-fill`,
+carry the light/dark split alongside the four existing ones in §4.
+
+### Changed — font-weight is now a third, explicit signal on the rail's nav rows
+
+Alongside fill and colour, an inactive row now hovers to `--font-weight-
+medium` — `ACTIVE_TREATMENT`'s own weight, the heaviest this face ships,
+`--font-weight-semibold`/`bold`/`extrabold` all alias to the same 500 — with
+NO `--spine-active-fill` wash added: "the pill is earned by being current, not
+by being pointed at." Resting weight (`--font-weight-light`, 300) is unchanged
+in value but is now named on `ROW_IDLE` instead of merely inherited from the
+body default, so it survives a rail rendered somewhere that default doesn't
+reach. `rail.tsx` only; the collapsible toggle shares `ROW_IDLE` and picks up
+the same hover for free.
+
+### Changed — an inactive tab's hover previews the active weight, in both variants
+
+`components/tabs/tabs.tsx`'s `TRIGGER_SKIN.line` and `.folder` each gain one
+line, `enabled:hover:font-[var(--font-weight-medium)]`, beside the existing
+`enabled:hover:text-foreground` — which is untouched, per the client's
+explicit instruction that colour does not move. A no-op on an already-active
+trigger (already at that weight, unconditionally), so neither needs a
+`data-[state=inactive]` guard.
+
+## v1.2.18 — 2026-09-02
+
+### Fixed — the rail's idle nav text was gray on every spine; the client wants full ink, always
+
+Live against all six spine × theme combinations, the client's verdict was
+verbatim: "nav text should ALWAYS be either pure black or pure white — never
+gray — depending on what it sits on." `rail.tsx`'s `ROW_IDLE` was reading
+`--spine-ink-quiet`, D5 = C's deliberate muted resting tier (26.01's ghost,
+darkening to full on hover) — correct for the hierarchy ruling it implements,
+but not what this client instruction asks for on this component. The idle
+label now reads `--spine-ink` outright, the same full-contrast token the row
+used to darken TO on hover (so the hover rule is gone, not redundant-but-kept):
+charcoal on mango and on paper-in-light, off-beige on ink and on
+paper-in-dark, at rest and unconditionally. The mango spine's own resting
+colour does not visibly change — D3/D5 already pin its quiet ink to
+`--ink-on-accent`, so `--spine-ink-quiet` and `--spine-ink` were already the
+same value there — which is why her mango findings read as already-correct
+once this was checked live. Scoped to the destination label alone:
+`--spine-ink-quiet` itself is untouched in `tokens.css`, so the group heading
+and the idle count badge — neither of them "nav text" — keep the quiet tier
+exactly as D5 = C drew it. The active row's own ink (`--spine-active-ink`)
+was not touched; it was never the complaint. Separately, the reported
+dark-mode-mango logo defect (the mark must always be the black cut on any
+mango ground, per `brand.tsx`'s own law) could not be reproduced against this
+repo's current `rail.tsx` → `brand.tsx` path — `markField` already resolves
+mango to `"brand"` in both palettes, `BrandArtwork` renders only the black
+`<img>` for that field with no dark-mode class applied to it, and a repo-wide
+search turned up no second render path and no CSS filter or recolour
+targeting `[data-slot="brand-cut"]`. Verified correct, live, in all six
+combinations at `verify/spine-colors/`; left alone rather than "fixed" with
+no defect to point at.
+
+## v1.2.17 — 2026-09-02
+
+### Changed — `SortControl`'s field and direction button fuse into one chip
+
+The client's reference artifact draws the sort control as one seamless chip;
+the built control drew the field's own full pill beside a borderless
+direction glyph, separated by a gap — two boxes, not one, and the artifact
+was explicit that this reads wrong. Both halves now draw the SAME resting/
+disabled/read-only hairline (`select.tsx`'s own convention, not restated
+elsewhere) right up to where they meet, and each squares off only its
+shared inner corner (`fieldVariants`'s new `fused` variant, on when
+`showDirection` is true) — two 1px inset shadows on the same line read as
+one border, with no wrapper duplicating `select.tsx`'s state logic and no
+change to `showDirection: false`'s field-alone shape. The two remain
+separately focusable and clickable (WCAG's two-hit-target reasoning this
+file already documents is unchanged) — only the seam between them is gone.
+
+## v1.2.15 — 2026-09-01
+
+Five UI-level decisions the client confirmed against live `kwapso_system`
+screens the night of 2026-08-31, re-imported here rather than left as the
+app's own CSS overrides — see GAPS-RULINGS.md R-4 for the full record,
+including which of these are bug fixes against this kit's OWN pre-existing
+rules and which are genuinely new decisions made that night. Both kinds are
+covered below; neither is unauthorized drift.
+
+### Fixed — a folder tab's count was a `Badge` a second time, and a line tab's was a `Badge` a first time
+
+`screen-renderer.tsx` put a `<Badge count={…} />` inside every folder-variant
+tab, which is the exact defect override 45 had already fixed once elsewhere
+(`collection-frame.tsx`) — ch14's "counts are quiet, never badges" was never
+swept into this file. `record-detail.tsx`'s line-variant tabs had the same
+`Badge`, which CH27's own "underline strip with a quiet count" forbids too.
+Both now go through one new component, `TabsCount` (`components/tabs/tabs.tsx`),
+so the shape lives in one place instead of three.
+
+### Added — an active line-variant tab's count is a small mango circle, by ruling
+
+The client's new decision, on top of the fix above: `line`'s count stays quiet
+at rest, and on the ACTIVE tab only, becomes a small fully circular mango fill
+with primary-ink text (`TabsCount`, same file). `folder`'s count is unchanged
+by this — ch14's law was never in question, only whether the build kept it.
+
+### Verified — the rail's active-item pill is already a deliberate, named shape
+
+No code change. `compositions/templates/rail.tsx`'s collapsed active item
+already reads `rounded-pill` (999px) by the kit's own name, not an accidental
+clamp of radius and row height; its expanded active row is deliberately
+SQUARE, per an existing 2026-08-24 ruling (KWAPSO-SPEC.md row 55) that reversed
+an earlier pill build on the client's own screenshots. Checked and left alone.
+
+### Added — Badge's quiet fill gets a documented, non-border fallback for an ambient ground
+
+`badge.tsx`'s `secondary` fill is now `bg-[var(--badge-quiet-fill,
+var(--surface-quiet))]` rather than a bare token — every existing call site is
+pixel-identical — so a caller whose badge sits on `--muted` (measured at 1.175
+contrast in dark, worse than the already-exempted panel case in
+GAPS-CONTRAST.md) can rebind one custom property to a darker quiet tone. A
+fill shift only, never a border or a shadow, matching this kit's law
+throughout.
+
+### Added — a hairline divider between a rail's named sections
+
+`compositions/templates/rail.tsx` groups now separate with a thin inset-shadow
+hairline (never before the first group), reading a new spine-aware token,
+`--spine-hair` (`foundations/tokens/tokens.css` §7b) — one value per rail
+spine, following the same "the mango spine never flips with the palette" law
+`--spine-active-hover` already states in the same block.
+
+### Not changed — no floating rail collapse toggle exists in this kit
+
+Checked and confirmed there is nothing to fix or document: this kit's collapse
+control is an in-flow row at the foot of the rail's own column
+(`data-slot="rail-collapse"`), per KWAPSO-SPEC.md line 4316, not a floating
+control overlapping the rail's edge.
+
+## v1.2.14 — 2026-08-31
+
+### Added — `AgentChat onAttach`/`attachLabel`, and a per-turn `eyebrow`
+
+Two gaps a consuming app logged rather than worked around by hand-editing the
+vendored copy (Brimba's `agent-panel.tsx`, ITEM 4 and ITEM 7, 31 Aug – 1 Sep
+2026): the composer had no attach slot, and a turn had no field for anything
+drawn ABOVE the bubble, on the panel's own ground.
+
+`TicketThread` already carries both shapes, for the same composition
+(ch27.10 — "the assistant… [is] the same composition with a different header
+and a different participant list"): `onAttach`/`attachLabel` draw a real
+paperclip button inside the composer's own pill, left of the field; its
+author/authorMeta/time row draws outside the bubble, above it. `AgentChat`
+had neither, so a caller reaching for either had to lay a control outside
+the composer's own row by hand, or squeeze a timestamp inside the bubble's
+own padding via a negative margin escape hatch.
+
+Both are mirrored onto `AgentChat`, not re-invented: `onAttach`/`attachLabel`
+render the identical control `TicketThread` does (absent by default — a
+caller with nothing to attach gets the unchanged composer), and `eyebrow`
+takes the author/time row's visual register (tertiary ink, the micro step,
+tabular figures) as a single node per turn, since a two-party assistant
+conversation has no second author field to draw — the sighted counterpart to
+the `sr-only` role name already beside it, not a second one.
+
+Not carried over: `TicketThread`'s `hidden sm:inline-flex` on its attach
+button, which exists because that thread can fall back to a per-message
+attachment list on a narrow screen. `AgentChat` has no such fallback, so its
+attach control stays in the row at every width.
+
 ## v1.2.13 — 2026-08-31
 
 Three, from three lanes, batched so a consuming app syncs once. Two are the

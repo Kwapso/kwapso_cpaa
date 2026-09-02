@@ -25,6 +25,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Plus } from "@shared/ui/foundations/icons"
 
 import { invalidate } from "@shared/web/store"
@@ -61,10 +62,19 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         label={t("Your company's tickets")}
         total={total}
         action={
-          <Button onClick={() => setRaising(true)}>
-            <Plus className="size-3.5" />
-            {t("Ask us something")}
-          </Button>
+          // ICON-ONLY (client ruling, 2026-08-31: "+ actions never have a
+          // word, they are only the + icon") — the words become the button's
+          // accessible name and its tooltip, the same seam the agency app's
+          // own `AddButton` (web/components/deep-link/screen-bits.tsx) draws
+          // create actions from.
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" onClick={() => setRaising(true)} aria-label={t("Ask us something")}>
+                <Plus className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("Ask us something")}</TooltipContent>
+          </Tooltip>
         }
       />
 
@@ -75,7 +85,9 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
           <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
         </div>
       ) : (tickets ?? []).length === 0 ? (
-        <div className="text-muted-foreground rounded-[var(--radius)] border border-dashed p-8 text-center">
+        // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
+        // impact-screen.tsx's own note on this box for the full reasoning.
+        <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
           <p>{t("Nothing here yet.")}</p>
           <p className="mt-1 text-sm">
             {t("Anything you ask us, a question, a problem, a change, lives on this page.")}

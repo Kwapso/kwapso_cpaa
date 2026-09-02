@@ -70,6 +70,17 @@ const nextConfig: NextConfig = {
   // Lets us import the repo-level shared/ tree — the shapes, the host seams, and
   // now the component library itself.
   experimental: { externalDir: true },
+  // NEXT_DIST_DIR — an isolated `.next` for a one-off dev server run beside
+  // an already-running one on the same checkout. Several agent sessions can
+  // each be running `next dev` against this same `web/` at once, and every
+  // one of them defaults to `web/.next`: two writers on one build cache
+  // stepped on each other mid-session (2026-08-31) — ENOENT on
+  // `app-paths-manifest.json`, then on `_not-found/page.js` — corrupting
+  // BOTH servers rather than just the newer one. Unset (the default), this
+  // changes nothing. Set to a scratch path for a throwaway verification
+  // server and it gets its own cache, so it can't corrupt or be corrupted by
+  // a sibling dev server reading the default `.next`.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   ...staticExport,
 }
 

@@ -26,12 +26,12 @@ import * as React from "react"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { OverviewList } from "@/components/overview-list"
-import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
+import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api"
 import { selectableOneKey } from "@/lib/live-resources"
@@ -118,7 +118,7 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -139,15 +139,42 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
       // one (it is the glyph this very screen sets), and the initial stands in
       // where it has none, which is the same square in the same slot either way.
       leading={<RecordMark name={value.value} mark={value.mark} size="band" />}
-      collectionLabel={t("Dropdown value")}
-      chips={value.type ? <Badge>{value.type}</Badge> : null}
+      // The bare record-type word, client ruling 2026-08-31 — the same string
+      // this screen already used for its loading/empty title.
+      eyebrow={t("Dropdown value")}
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
+      // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Dropdown value")` a second time as a chip, directly under the
+      // eyebrow that already says it.
+      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
+      // scheme is not only for tickets … map colors"). A dropdown value's
+      // only two states are active and switched off — the account/wave/
+      // process pattern: `archived` while inactive, wordless while active.
+      // `value.type` is a classification, not a status, so it stays the
+      // kit's plain, uncoloured `Badge`.
+      chips={
+        <>
+          {!value.active && (
+            <Badge variant="status" dot="archived">
+              {t("Inactive")}
+            </Badge>
+          )}
+          {value.type ? <Badge>{value.type}</Badge> : null}
+        </>
+      }
       title={value.value}
-      status={[
-        value.active ? t("Active") : t("Inactive"),
-        value.isDefault ? t("Default") : undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      // "DEFAULT" IS GONE FROM THIS LINE — CLIENT RULING, 2026-08-31,
+      // VERBATIM: "what is this 3rd component in the title under the chips?
+      // kill everywhere. chips is the last component of headers!" `status`
+      // mapped to `RecordChrome`'s `meta`, drawn directly under the chips
+      // row (`data-record-region="header"`). Not lost: it's already a row
+      // in the Overview tab (`overviewItems`: "One of the defaults").
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column. Read by the single-row door only, which is
+      // why the list screen has never shown it and this screen can.
+      audit={{ createdByName: value.createdByName, createdAt: value.createdAt }}
+      activity={activity}
     >
       <TabsView
         className={STICKY_TABS}
@@ -159,11 +186,6 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
           return <OverviewList items={overviewItems} />
         }}
       />
-
-      {/* D7 / CHECKLIST 11.3 — who made it and when, grey, at the foot. Read by
-          the single-row door only, which is why the list screen has never shown
-          it and this screen can. */}
-      <RecordFooter audit={{ createdByName: value.createdByName, createdAt: value.createdAt }} />
     </RecordScreen>
   )
 }

@@ -3,6 +3,20 @@
 // FIND — the search box, the filter bar and the SORT a PAGED collection (R14)
 // has to wear, and the one place any of the three is answered.
 //
+// `tabs` + `wrap` + `actions` below are ALSO one of the two general
+// mechanisms every main screen's tab strip draws through — see the rule at the
+// top of `web/components/deep-link/screen-bits.tsx` for the other half (a
+// BOUNDED collection's `folderTabs`) and the shape both must land on. `tabs`
+// (a `FolderTabStrip` — config/value/onValueChange, screen-engine/tabs-view.tsx)
+// draws ONLY the tab strip, because that is all its shape CAN draw; `actions`
+// draws the row's own buttons (New/Import/Export…) at the right of the
+// TOOLBAR below it, inside `wrap`'s box — never sharing the tab strip's own
+// line (client ruling, 2026-08-31, correcting that same day's earlier fix).
+// It used to be `renderAbove`, a `(ctx) => ReactNode` render prop — which
+// could just as easily have returned a tab strip WITH a button beside it, the
+// exact shape the ruling forbids, and did for a few hours. A spec object with
+// no ReactNode parameter cannot.
+//
 // WHY THIS EXISTS. The library's CollectionFrame searches and filters IN MEMORY,
 // over the array it was handed. On a bounded list (members, roles, dropdowns)
 // that is exactly right and costs nothing. On a GROWING one it is a lie with a
@@ -58,6 +72,7 @@ import { FilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
+import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
@@ -104,6 +119,13 @@ export type Found<T> = {
    * "export what I'm looking at" and "list what I'm looking at" must not be two
    * different books. */
   queryString: string
+  /** THE SAME QUESTION, structured — exactly what `queryString` is built from
+   * (search + facets + `fixed` + sort, once one is on). For a caller that
+   * needs to forward a NARROWED copy of it to a second door rather than a URL
+   * — the meetings screen's own month-scoped calendar read is the one that
+   * exists today, which used to read a fixed month and nothing else and so
+   * never narrowed with the search box above it. */
+  query: FindQuery
   /** page two OF WHAT IS ON SCREEN: the find's next page, or the list's. */
   fetchPage: (cursor: string) => Promise<{ rows: T[]; nextCursor: string | null }>
 }
@@ -130,6 +152,9 @@ export function PagedFind<T>({
   sorts = [],
   defaultSort = "",
   fixed,
+  tabs,
+  wrap,
+  actions,
   children,
 }: {
   /** the collection's OWN cache key (accountsKey(teamId), …) */
@@ -186,6 +211,42 @@ export function PagedFind<T>({
    * different question from the screen — the same defect this whole file was
    * written for, committed one control along. */
   fixed?: FindQuery
+  /**
+   * Rendered BEFORE the toolbar row, OUTSIDE whatever `wrap` boxes the toolbar
+   * and the rendered rows in — a folder tab strip that must sit OUTSIDE that
+   * box with no gap, the way a folder tab's own negative-margin overlap needs
+   * a real, adjacent sibling to melt into (tabs-view.tsx: "any gap here would
+   * pull them apart"). A `FolderTabStrip` (config/value/onValueChange), never
+   * a `ReactNode` — see this file's header comment for why the shape changed:
+   * the slot renders `<TabsView>` from it, so a caller cannot fold an action
+   * button in beside the tabs the way `renderAbove`'s old render-prop shape
+   * once let one in for a few hours (client ruling, 2026-08-31: the toolbar's
+   * own action buttons live in `actions` below, never beside the tab strip).
+   * `undefined` where a collection has no tab strip at all (Knowledge).
+   */
+  tabs?: FolderTabStrip
+  /**
+   * Boxes the toolbar row(s) and the rendered rows together. Identity (no box)
+   * by default — every existing call site keeps its current, naked toolbar.
+   * Pass a `CollectionCard`-shaped wrapper to read the toolbar and the list as
+   * ONE panel, e.g. when a folder tab strip above (`tabs`) needs a real,
+   * zero-gap card to attach to (screen-bits.tsx's own `CollectionCard`,
+   * `attached`).
+   */
+  wrap?: (toolbarAndRows: React.ReactNode) => React.ReactNode
+  /**
+   * THE ROW'S OWN ACTION BUTTONS (New/Import/Export/Raise ticket…), rendered
+   * at the FAR RIGHT of the toolbar's own first line — beside search and sort,
+   * inside `wrap`'s box, never beside the `tabs` strip (client ruling,
+   * 2026-08-31, correcting the same day's earlier fix: "never align the
+   * button with the tabs — that button belongs in the right of the toolbar,
+   * part of the toolbar"). Handed the same `queryString` the CSV export href
+   * narrows by, so an Export href moved here still narrows by what is on
+   * screen — `tabs` carries no such context, on purpose: a `FolderTabStrip`
+   * has nowhere to put an action even if it wanted to. `undefined` by
+   * default, which is every existing call site's markup, unchanged.
+   */
+  actions?: (ctx: { queryString: string }) => React.ReactNode
   children: (found: Found<T>) => React.ReactNode
 }) {
   // ── WHAT SHE WAS ASKING THIS DOOR, WHEN SHE LEFT ───────────────────────────
@@ -303,27 +364,84 @@ export function PagedFind<T>({
   // TAB is not a failed search either, so the sentence follows what was asked.
   const emptyText = asked ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
 
-  return (
+  // Computed once, ahead of the toolbar and the `children` call below, so
+  // `actions` and the CSV export href (inside `children`) narrow by the exact
+  // same question. `tabs` gets none of it — a `FolderTabStrip` draws only
+  // itself, never a narrowing that would need this.
+  const queryString = active ? `?${new URLSearchParams(query).toString()}` : ""
+
+  const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
+        {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
+            control sits inside one pill, `bg-background` against the card's
+            own `bg-surface-panel`, not floating loose on the panel's bare
+            paper (client, 1 Sep 2026, pointing at her own reference artifact).
+            `relative` — `filter-bar.tsx`'s open panel anchors to THIS box via
+            `position: absolute`/`top-full`, so its own tall height (several
+            facets deep) never feeds this pill's `rounded-pill` (2 Sep 2026,
+            second pass: it did, once, and drew a giant oval). */}
         {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
             the filter row's "Clear all" — one control quietly owning two
             questions — and the kit's bar says "Clear filters" and now means
             only that. */}
-        <SearchInput
-          value={text}
-          onChange={(e) => setText(e.currentTarget.value)}
-          onClear={() => setText("")}
-          placeholder={placeholder}
-          className="w-56"
-        />
-        {/* THE ORDER, beside the search box because the two are asked with the
-            same gesture — you type, then you say what order. (The filters moved
-            to the row below when the kit's bar arrived: hers is a full-width
-            strip of chips, not a control that sits in a toolbar. All three are
-            still one question and still one cache key.) What it changes is what
-            the DOOR is asked, so the answer spans the whole collection rather
-            than the page in front of you. */}
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": the reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+            chips/sort/count/actions after it to the track's far edge instead
+            of sitting immediately after a narrow box. Wrapped, the same
+            technique this file's own comment below already argues for a
+            `w-full` child: a `flex-1` box here claims the row's remaining
+            width, and only then does the plain `w-full` `SearchInput` inside
+            fill exactly that box. */}
+        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+          <SearchInput
+            value={text}
+            onChange={(e) => setText(e.currentTarget.value)}
+            onClear={() => setText("")}
+            placeholder={placeholder}
+            className="w-full"
+          />
+        </div>
+        {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
+            ruling, 2026-09-01, the toolbar spec Aurora approved that night
+            against a real Tickets mockup: search, then the facet chips, then
+            "+ Filter", then sort, then create, pinned right).
+
+            NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
+            superseding the wrapper this slot used to carry): `FilterBar`
+            (`shared/web/screen-engine/filter-bar.tsx`) renders its chip
+            cluster inline as a normal flex child — it wraps itself in a
+            non-growing box internally, the same "wrap a `w-full` root" trick
+            this comment used to explain (CSS Sizing §5.3) — and its own OPEN
+            panel out of flow entirely, `position: absolute` against this
+            div's own `relative` two lines up, so the panel is never part of
+            THIS flexbox's layout math at all and cannot feed the pill's
+            height. `<FilterBar>` bare is correct either way: in flow for the
+            chips, out of it for the panel. See `filter-bar.tsx`'s own header
+            for the full account, including the second pass that got here. */}
+        {showFilters && (
+          <FilterBar
+            facets={facets}
+            values={values}
+            // Empty on purpose: every facet above carries its own options, so
+            // there is nothing for the bar to derive from the rows on screen.
+            data={[]}
+            onChange={(field, value) => {
+              const next = { ...values }
+              if (value === "") delete next[field]
+              else next[field] = value
+              setValues(next)
+            }}
+            onClearFacets={() => setValues({})}
+            resultCount={total}
+          />
+        )}
+        {/* THE ORDER, after search and the facet chips because the three are
+            asked with the same gesture — you type, you narrow, then you say
+            what order. What it changes is what the DOOR is asked, so the
+            answer spans the whole collection rather than the page in front
+            of you. */}
         {showSort && (
           <SortControl
             options={sorts}
@@ -331,6 +449,7 @@ export function PagedFind<T>({
             onValueChange={(by) => setSortBy(by)}
             direction={sortDir ?? landsOn}
             onDirectionChange={(dir) => setSortDir(dir)}
+            hideLabel
           />
         )}
         {/* THE FILTERED TOTAL — the exact server count of the question being
@@ -347,30 +466,18 @@ export function PagedFind<T>({
                 : fill(matches.many, { count: formatSearchTotal(total) })}
           </span>
         )}
+        {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
+            correcting the `ml-auto` this slot carried until then. Her
+            reference artifact never stretches the track open to park the
+            button at its far edge; it is just the last chip in the same
+            left-packed cluster as search/filters/sort/the match count
+            (still rightmost of what's showing, part of the toolbar, never
+            beside the tab strip — the 2026-08-31 ruling — just not pushed
+            there by a growing gap). */}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
+        )}
       </div>
-
-      {/* THE FILTERS, ON THEIR OWN ROW. The kit's bar is a full-width strip of
-          chips above whatever they are narrowing: what is on stays visible and
-          removable in one press at every width, and the facet controls live
-          behind its own "+ filter" slot. Putting it back inside the row above
-          would be the first step of theming it into the row it replaced. */}
-      {showFilters && (
-        <FilterBar
-          facets={facets}
-          values={values}
-          // Empty on purpose: every facet above carries its own options, so
-          // there is nothing for the bar to derive from the rows on screen.
-          data={[]}
-          onChange={(field, value) => {
-            const next = { ...values }
-            if (value === "") delete next[field]
-            else next[field] = value
-            setValues(next)
-          }}
-          onClearFacets={() => setValues({})}
-          resultCount={total}
-        />
-      )}
 
       {children({
         active,
@@ -387,10 +494,25 @@ export function PagedFind<T>({
             setSortDir(by === null ? null : dir)
           },
         },
-        queryString: active ? `?${new URLSearchParams(query).toString()}` : "",
+        queryString,
+        query,
         fetchPage: (cursor: string) =>
           fetchPage(askedRef.current, cursor).then((p) => ({ rows: p.rows, nextCursor: p.nextCursor })),
       })}
+    </div>
+  )
+
+  // ZERO GAP, on purpose — the same reason `screen-bits.tsx`'s own `folderTabs`
+  // slot draws its column with no `gap-4`: a folder tab strip pulled down by
+  // `--folder-tab-overlap` needs its ACTUAL next sibling to be the panel it
+  // melts into, and a `gap` here (even the outer column's) would put daylight
+  // back between them. A caller with no `tabs` gets one more `<div>` around
+  // exactly the markup this returned before — no gap to apply with a single
+  // child, so nothing moves.
+  return (
+    <div className="flex w-full flex-col">
+      {renderFolderTabs(tabs)}
+      {wrap ? wrap(toolbarAndRows) : toolbarAndRows}
     </div>
   )
 }

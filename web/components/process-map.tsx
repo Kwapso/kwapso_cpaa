@@ -89,20 +89,30 @@ function toneOf(line: MapLine): Tone {
   return "same"
 }
 
+/** REGRESSION FIX, 2026-09-01: every one of these drew a literal CSS `border`
+ * round the box — the exact "outlined container" BUILD-A-SCREEN.md §6.1
+ * forbids ("no CSS border, ever"; separation is a fill or an inset shadow).
+ * The vendored kit already solves precisely this job — a diagram of boxes
+ * that needs a visible edge — in `flowchart.tsx`, and it never reaches for
+ * `border` either: `shadow-[var(--hairline-strong)]` / `shadow-[var(--hairline-ink)]`,
+ * an inset stroke used AS shading, not a literal outline property. Same
+ * technique here, tone-coloured with `color-mix` the same way the kit's own
+ * `--hairline-error` token is built (tokens.css), so the edge and the fill
+ * agree without inventing a fifth stroke colour. */
 const TONE_CLASS: Record<Tone, string> = {
   // The neutral surface for a step that did not move — most of them, most of the
   // time, and a diagram where most boxes are coloured is a diagram nobody reads.
-  same: "border-border",
-  faster: "border-success/50 bg-success/5",
-  slower: "border-destructive/50 bg-destructive/5",
-  gone: "border-border opacity-60",
-  new: "border-chart-1/50 bg-chart-1/5",
+  same: "shadow-[var(--hairline)]",
+  faster: "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--success)_50%,transparent)] bg-success/5",
+  slower: "shadow-[var(--hairline-error)] bg-destructive/5",
+  gone: "shadow-[var(--hairline)] opacity-60",
+  new: "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--chart-1)_50%,transparent)] bg-chart-1/5",
 }
 
 /** The OLDER side's one look: the quiet past. Never a change tone — the change
  * is a fact about where the step ENDED UP, and saying it twice per line is the
  * colour soup the owner reported. */
-const OLD_CLASS = "border-border bg-muted/40"
+const OLD_CLASS = "shadow-[var(--hairline)] bg-muted/40"
 
 function StepBox({
   step,
@@ -123,15 +133,21 @@ function StepBox({
   // "this did not exist in that version"; leaving the line short would just look
   // like the two columns had drifted.
   if (!step)
+    // REGRESSION FIX, 2026-09-01: was `border border-dashed` — the ONE place
+    // the kit itself draws a dashed CSS `border` is `file-upload.tsx`'s own
+    // drag-and-drop dropzone edge, documented there as deliberately not a
+    // pattern to extend. This gap marker is not a dropzone, so it takes the
+    // same neutral fill the "gone"/"same" boxes use instead of borrowing that
+    // edge.
     return (
-      <div className="border-border/50 text-muted-foreground rounded-[var(--radius)] border border-dashed p-3 text-xs">
+      <div className="text-muted-foreground rounded-[var(--radius)] bg-muted/20 p-3 text-xs">
         {chip ? <span className="mr-2 font-medium">{chip}</span> : null}
         {t("Not in this version")}
       </div>
     )
   const chipVariant = side === "old" ? "secondary" : "inverse"
   return (
-    <div className={`relative rounded-[var(--radius)] border p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
+    <div className={`relative rounded-[var(--radius)] p-3 ${side === "old" ? OLD_CLASS : TONE_CLASS[tone]}`}>
       {chip ? (
         <Badge variant={chipVariant} className="float-right ms-2 h-auto py-0.5 text-[0.625rem]">
           {chip}

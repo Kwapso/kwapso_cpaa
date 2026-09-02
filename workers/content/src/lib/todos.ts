@@ -20,7 +20,7 @@
 
 import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { logActivity, type Actor } from "@shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
@@ -29,7 +29,7 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
 import type { Todo, TodoViewName } from "@shared/types"
 
-import { nextRef, REF_KINDS } from "./refs"
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 
 type TodoRow = {
   id: string
@@ -125,7 +125,23 @@ function orderingFor(view: TodoViewName) {
   return resolveOrdering(TODO_SORTS, view === "done" ? "completed" : "due", undefined, undefined)
 }
 
-type TodoFilter = { accountId?: string; view?: TodoViewName }
+type TodoFilter = { accountId?: string; view?: TodoViewName; q?: string }
+
+/** The SAME search clause `whereFor` and `countTodos` both fold in — a to-do has
+ * no backlog-sized table of its own to page a search over, but it is nested
+ * inside an account's or a sprint's own tab exactly like the collections that
+ * do, and a toolbar with no way to narrow forty outstanding requests is the gap
+ * this whole file's asks-the-door design was written to close. Same shape as
+ * `storyWhere`'s own search clause: the reference and the words somebody would
+ * recognise the request by, ESCAPED because a search box is not a pattern box. */
+function todoSearchClause(q: string | undefined): { sql: string | null; params: string[] } {
+  if (!q) return { sql: null, params: [] }
+  const needle = `%${likeLiteral(q.toLowerCase())}%`
+  return {
+    sql: `(LOWER(t.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.detail, '')) LIKE ? ESCAPE '\\')`,
+    params: [needle, needle, needle],
+  }
+}
 
 /** The WHERE both the page and its counts are built from — the fence, the
  * withdrawn, the client, and which pile. One function, because R16 is not "an
@@ -138,6 +154,11 @@ function whereFor(scope: AccountScope, filter: TodoFilter): { sql: string; param
   if (filter.accountId) {
     clauses.push("t.account_id = ?")
     params.push(filter.accountId)
+  }
+  const search = todoSearchClause(filter.q)
+  if (search.sql) {
+    clauses.push(search.sql)
+    params.push(...search.params)
   }
   return { sql: clauses.join(" AND "), params }
 }
@@ -191,7 +212,14 @@ export async function countTodos(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  filter: { accountId?: string }
+  /** `q` is OPTIONAL and answers a different question than the other two
+   * fields: called without it, this is the tab badges' own unfiltered pile
+   * (R16 — a search must never move the number on a tab it did not narrow).
+   * Called WITH it (the paged panel's own search total), it counts the SAME
+   * question `listTodos` is answering, over both piles at once — a search
+   * asked while the Open tab is open still knows the Done pile's match, cheaply,
+   * from the one query. */
+  filter: { accountId?: string; q?: string }
 ): Promise<TodoCounts> {
   // The list's own WHERE minus the pile — the counts have to see both.
   const fence = todoFence(scope)
@@ -200,6 +228,11 @@ export async function countTodos(
   if (filter.accountId) {
     clauses.push("t.account_id = ?")
     params.push(filter.accountId)
+  }
+  const search = todoSearchClause(filter.q)
+  if (search.sql) {
+    clauses.push(search.sql)
+    params.push(...search.params)
   }
   const row = await countCollectionWith<{ all_n: number; open_n: number | null }>(
     cfg,
@@ -279,7 +312,10 @@ export async function createTodo(
 
   const id = ulid()
   const now = new Date().toISOString()
-  const ref = await nextRef(cfg, guard, input.accountId, REF_KINDS.todo)
+  // TEAM-WIDE, kind `I` (the client's own 2026-08-31 follow-up ruling, naming
+  // Input where the first pass had left it alone) — the same door every other
+  // record's reference mints through. See shared/workers/refs.ts.
+  const ref = await nextTeamRef(cfg, guard, TEAM_REF_KINDS.input)
   await d1ExecScript(
     cfg,
     guard.databaseId,

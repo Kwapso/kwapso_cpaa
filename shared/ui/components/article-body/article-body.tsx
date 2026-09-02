@@ -136,11 +136,11 @@ const PROSE = [
   /* ---- the one serif ------------------------------------------------- */
   // Chapter 13's pull-quote. One per page is an editorial rule, not one a
   // component can hold, so nothing here counts them.
-  "[&_blockquote]:font-[var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)]",
+  "[&_blockquote]:font-[family-name:var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)]",
   "[&_blockquote]:text-2xl [&_blockquote]:text-foreground",
   "[&_blockquote]:my-[var(--space-8)]",
   "[&_blockquote_p]:text-inherit",
-  "[&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[var(--font-sans)]",
+  "[&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)]",
   "[&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal",
   "[&_blockquote_footer]:text-ink-tertiary",
 

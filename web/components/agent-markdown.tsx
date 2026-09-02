@@ -47,6 +47,29 @@ import { splitReply } from "@/lib/agent-segments"
 import { AgentBlockView } from "@/components/agent-blocks"
 import { PROSE } from "@shared/web/rich-text-view"
 
+// ITEM 3 (owner, 31 Aug 2026): "fix the color of the texts from assistant...
+// you invented that color. refer to guide and rules for colors!" Tracing every
+// text colour in the assistant's bubble back to its source turned up exactly
+// one that wasn't an app token: `inline()` (shared/web/markdown-html.ts) emits
+// a bare `<a>` with no class at all, so a link inside a reply rendered in the
+// BROWSER's own default blue — never an app colour, and the one genuine hit
+// for "invented" in this trace. `RichText`'s own renderer (rich-text-view.tsx,
+// used for ticket replies) never had this gap: it draws through the kit's
+// `ArticleBody`, which already states the rule in its own words — "A link is
+// ink, underlined, never coloured" — as `[&_a]:text-foreground [&_a]:underline
+// [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong`.
+// `AgentMarkdown` builds its own HTML rather than going through `ArticleBody`
+// (this file's header explains why: a `<Cite>` component can't be injected
+// into a string), so it never inherited that rule — copied here verbatim
+// rather than re-derived, so the two renderers say the same thing about a
+// link once the kit ever unifies them.
+const LINK_INK = [
+  "[&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem]",
+  "[&_a]:decoration-hair-strong",
+  "[&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso",
+  "[&_a:hover]:decoration-current",
+].join(" ")
+
 /** One line of prose — the inline markup injected as before, with the kit's
  * citation mark standing where the model put it. A line with no mark is one
  * span, exactly as it always was. */
@@ -114,7 +137,7 @@ function Block({ block }: { block: MdBlock }) {
             <thead>
               <tr>
                 {block.head.map((c, i) => (
-                  <th key={i} className="border-b px-2 py-1 font-[var(--font-weight-medium)] whitespace-nowrap">
+                  <th key={i} className="shadow-[var(--hairline-under)] px-2 py-1 font-[var(--font-weight-medium)] whitespace-nowrap">
                     <Line escaped={c} />
                   </th>
                 ))}
@@ -125,7 +148,7 @@ function Block({ block }: { block: MdBlock }) {
             {block.rows.map((row, r) => (
               <tr key={r}>
                 {row.map((c, i) => (
-                  <td key={i} className="border-b px-2 py-1 align-top">
+                  <td key={i} className="shadow-[var(--hairline-under)] px-2 py-1 align-top">
                     <Line escaped={c} />
                   </td>
                 ))}
@@ -177,7 +200,7 @@ export function AgentMarkdown({ text }: { text: string }) {
           return (
             <pre
               key={i}
-              className="my-2 overflow-x-auto rounded-[var(--radius)] border bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
+              className="my-2 overflow-x-auto rounded-[var(--radius)] bg-muted p-3 text-xs whitespace-pre-wrap text-muted-foreground"
             >
               {seg.text}
             </pre>
@@ -185,7 +208,7 @@ export function AgentMarkdown({ text }: { text: string }) {
         const blocks = mdBlocks(seg.text)
         if (!blocks.length) return null
         return (
-          <div key={i} className={PROSE}>
+          <div key={i} className={`${PROSE} ${LINK_INK}`}>
             {blocks.map((b, j) => (
               <Block key={j} block={b} />
             ))}

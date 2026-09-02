@@ -38,12 +38,17 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Input } from "@shared/ui/components/input/input"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Eye, EyeOff, Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 import {
   InternalRecordDialog,
   deliverableFields,
@@ -54,7 +59,7 @@ import { deliverablesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import type { Deliverable, SelectableValue } from "@shared/types"
 import { formatDate } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordCover } from "@shared/web/record-mark"
 import { primeCache, useCached } from "@shared/web/store"
@@ -66,8 +71,39 @@ function initial(d: Deliverable): string {
   return (d.kind || d.title).trim().slice(0, 1).toUpperCase()
 }
 
+/** WHAT A DELIVERABLE MAY BE ORDERED BY — the two fields on the card itself
+ * (the kind sits above both and is a FILTER, not an order: "sorted by kind"
+ * would just be "grouped", which this shelf doesn't do). Newest-handed-over
+ * first is the shelf's own natural order, so it is the default. */
+const DELIVERABLE_SORTS: SortOption[] = [
+  { value: "date", label: "Date", defaultDir: "desc" },
+  { value: "title", label: "Title" },
+]
+
+/** A date that sorts null-last whichever way the arrow points — a deliverable
+ * filed with no date yet is an ordinary state, not "the year zero". */
+function deliverableDateKey(d: Deliverable): number {
+  return d.datedOn ? Date.parse(d.datedOn) : Number.NaN
+}
+
+/** `dir` is applied INSIDE, never by negating the whole comparator at the call
+ * site — an undated deliverable must sort last whichever way the arrow points,
+ * and multiplying the null tie-break by -1 would put it FIRST the moment
+ * somebody flips to newest-first (caught live, verification harness: an
+ * undated card jumped to the top of a "Date, descending" sort). */
+function compareDeliverables(a: Deliverable, b: Deliverable, by: string, dir: "asc" | "desc"): number {
+  const dirMul = dir === "desc" ? -1 : 1
+  if (by === "title") return a.title.localeCompare(b.title) * dirMul
+  const ad = deliverableDateKey(a)
+  const bd = deliverableDateKey(b)
+  if (Number.isNaN(ad) && Number.isNaN(bd)) return 0
+  if (Number.isNaN(ad)) return 1
+  if (Number.isNaN(bd)) return -1
+  return (ad - bd) * dirMul
+}
+
 export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: string }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = deliverablesKey(appId)
   const q = useCached<Deliverable[]>(key, () =>
     contentApi.deliverables(appId).then((r) => {
@@ -94,6 +130,15 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   const [editing, setEditing] = React.useState<Deliverable | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [find, setFind] = React.useState("")
+  // Filter (kind, client visibility) + sort (date, title) — this tab's own
+  // toolbar chrome, same shape the main screens wear. Not remembered: it is a
+  // per-app shelf a person browses in one sitting, not a screen she leaves and
+  // comes back to.
+  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
+  const [sort, setSort] = React.useState<{ by: string; dir: "asc" | "desc" }>({
+    by: "date",
+    dir: "desc",
+  })
   /** THE ONE ACTION ON THIS SCREEN THAT ASKS FIRST, and only in one direction.
    *
    * The house rule pairs the destructive colour WITH a confirm; this is neither
@@ -128,7 +173,19 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
     }
   }
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the deliverables.")}</p>
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the deliverables.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   const needle = find.trim().toLowerCase()
@@ -136,35 +193,111 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   // whole (R14), so the array in hand IS the shelf. On a paged list the same five
   // lines would answer about page one while looking like an answer about all of
   // it, which is why the paged screens ask their door instead.
-  const rows = needle
+  let rows = needle
     ? q.data.filter((d) => `${d.title} ${d.kind ?? ""}`.toLowerCase().includes(needle))
     : q.data
+  // …THEN THE FACETS, same reason: narrowing in the browser is honest here only
+  // because the WHOLE shelf is already in hand, so a facet is a plain filter
+  // over it, never a door parameter.
+  if (facetValues.kind) rows = rows.filter((d) => d.kind === facetValues.kind)
+  if (facetValues.visible === "yes") rows = rows.filter((d) => Boolean(d.visibleToClientAt))
+  if (facetValues.visible === "no") rows = rows.filter((d) => !d.visibleToClientAt)
+  // …AND THE SORT LAST — it reorders the shelf, it never narrows it.
+  rows = [...rows].sort((a, b) => compareDeliverables(a, b, sort.by, sort.dir))
+
+  // OPTIONS FROM THE WHOLE SHELF (never the already-narrowed `rows`), so
+  // picking one facet never hides the other's choices — the same rule the
+  // apps screen's own client/stage facets follow.
+  const kindOptions = Array.from(
+    new Set(q.data.filter((d): d is Deliverable & { kind: string } => Boolean(d.kind)).map((d) => d.kind))
+  )
+    .sort((a, b) => a.localeCompare(b))
+    .map((k) => ({ value: k, label: k }))
+  const facets: FilterFacet[] = [
+    { field: "kind", label: t("Kind"), control: "select", options: kindOptions },
+    {
+      field: "visible",
+      label: t("Client visibility"),
+      control: "select",
+      options: [
+        { value: "yes", label: t("Visible to the client") },
+        { value: "no", label: t("Not shared") },
+      ],
+    },
+  ]
+  const sortOptions = DELIVERABLE_SORTS.map((o) => ({ ...o, label: t(o.label) }))
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {q.data.length > 0 && (
-          <Input
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-            placeholder={t("Search what we handed over…")}
-            className="w-full sm:max-w-xs"
-            aria-label={t("Search what we handed over…")}
-          />
-        )}
-        {canCreate && (
-          <div className="ml-auto">
-            <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />
-          </div>
-        )}
-      </div>
+      {/* ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
+          approved that night). `filters` used to be a `<FilterBar>` rendered
+          as this row's own sibling below it — the same shape her Apps
+          screenshot caught (search+sort on one row, a stranded filter chip
+          under it) — so it is `<ToolbarRow>`'s own `filters` slot now
+          (screen-bits.tsx), never a second row this call site draws for
+          itself. */}
+      <ToolbarRow
+        search={
+          q.data.length > 0 && (
+            <SearchInput
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              placeholder={t("Search what we handed over…")}
+              className="w-full"
+              aria-label={t("Search what we handed over…")}
+            />
+          )
+        }
+        filters={
+          q.data.length > 0 && (
+            <FilterBar
+              facets={facets}
+              values={facetValues}
+              data={[]}
+              onChange={(field, value) =>
+                setFacetValues((prev) => {
+                  const next = { ...prev }
+                  if (value === "") delete next[field]
+                  else next[field] = value
+                  return next
+                })
+              }
+              onClearFacets={() => setFacetValues({})}
+              resultCount={rows.length}
+            />
+          )
+        }
+        sort={
+          q.data.length > 0 && (
+            <SortControl
+              options={sortOptions}
+              value={sort.by}
+              onValueChange={(by) => {
+                const opt = DELIVERABLE_SORTS.find((o) => o.value === by)
+                setSort({ by, dir: opt?.defaultDir ?? "asc" })
+              }}
+              direction={sort.dir}
+              onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+              label={t("Sort by")}
+              hideLabel
+            />
+          )
+        }
+        actions={canCreate && <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />}
+      />
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {q.data.length === 0
-            ? t("Nothing has been handed over on this app yet.")
-            : t("Nothing here matches that.")}
-        </p>
+        q.data.length === 0 ? (
+          // No `deliverables` import target exists — a handover is filed one
+          // at a time, with a title/kind/date/link/picture a spreadsheet row
+          // cannot carry on its own.
+          <CollectionEmptyState
+            title={t("Nothing has been handed over on this app yet.")}
+            onCreate={canCreate ? () => setAddOpen(true) : undefined}
+          />
+        ) : (
+          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        )
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((d) => {
@@ -210,7 +343,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                     <span className="truncate text-sm font-medium">{d.title}</span>
                   )}
                   <span className="text-muted-foreground truncate text-xs">
-                    {[formatDate(d.datedOn), d.active ? null : t("Archived")].filter(Boolean).join(" · ") ||
+                    {[formatDate(d.datedOn, lang), d.active ? null : t("Archived")].filter(Boolean).join(" · ") ||
                       t("No date")}
                   </span>
                   {/* WHO CAN SEE IT, SAID ON THE CARD. A shared deliverable looks

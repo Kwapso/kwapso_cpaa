@@ -49,7 +49,7 @@ import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shar
 
 import type { Env } from "../env"
 import { teamMemberNames } from "./notify"
-import { nextRef, REF_KINDS } from "./refs"
+import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 
 export { STORY_STATUSES, type StoryStatus }
 
@@ -623,7 +623,10 @@ export async function createStory(
   // Resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a story that exists for a moment with no number is a story
   // somebody screenshots with no number.
-  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.story)
+  //
+  // TEAM-wide now (shared/workers/refs.ts), gated on `accountId` the same way
+  // a ticket's is: internal work with nobody to quote it gets no number.
+  const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.story) : null
   const rank = await topRank(cfg, guard)
 
   await d1ExecScript(
@@ -1107,7 +1110,9 @@ export async function createSprint(
 
   const id = ulid()
   const now = new Date().toISOString()
-  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.sprint)
+  // TEAM-wide (shared/workers/refs.ts), gated on `accountId` — same reasoning
+  // as a ticket's and a story's above it.
+  const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.sprint) : null
   await d1ExecScript(
     cfg,
     guard.databaseId,
@@ -1135,7 +1140,8 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
  *
  * WHAT THIS DOOR WILL NOT MOVE, deliberately: the CLIENT and the APP. Both are
  * load-bearing rather than descriptive. The reference a client quotes was minted
- * against the account (`nextRef`, counted per account), and completing this
+ * against this sprint's having a client at all (`nextTeamRef`, team-wide since
+ * 2026-08-31 — see shared/workers/refs.ts), and completing this
  * sprint used to cut a version of every process map inside its app (purged in
  * 0051 — versions are cut by hand now) — and re-pointing
  * either after the fact rewrites what an already-published number means. Same

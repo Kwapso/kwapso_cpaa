@@ -904,10 +904,15 @@ not one picture everywhere:
 | a **company**, an **app**, an **asset** | `rounded-xl` | `object-contain` — a wordmark is shown WHOLE | the type's own glyph, else its initial |
 | anything with no picture concept | `rounded-xl` | — | the type's own glyph, else its initial |
 
-**Three sizes and no fourth:** `row` (the leading slot of a row), `tile` (a card in
-a tile grid), `band` (the square in a record's header, `RecordScreen`'s `leading`).
-A size passed as a class name would put two Tailwind size rules on one element and
-leave the winner to stylesheet order.
+**Four sizes, each one decided once, and none hand-rolled:** `choice` (a checklist's
+own checkbox row, 24px — the kit's own `--avatar-sm`), `row` (the leading slot of an
+ordinary row, 36px), `tile` (a card in a tile grid, 48px), `band` (the square in a
+record's header, `RecordScreen`'s `leading`, 56–72px). `choice` was added 2026-08-31:
+`row` was never the smallest box this component could draw, and a checklist that
+hand-rolled a smaller className to get one was fighting the `size` prop for the same
+box — this file's own repeated failure mode. A size passed as a class name would put
+two Tailwind size rules on one element and leave the winner to stylesheet order; the
+fix is always a new NAMED size decided here, never a className at the call site.
 
 **A picture that fails to load falls back to the mark.** That is the whole reason
 this holds state rather than being a ternary: `logoUrl` being SET is not the same

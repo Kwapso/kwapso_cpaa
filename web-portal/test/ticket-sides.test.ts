@@ -130,6 +130,8 @@ describe("the side never becomes a fingerprint", () => {
       language: null,
       // …and never chose a size either, which reads as comfortable.
       scale: null,
+      // …or a sidebar colour, which reads as paper.
+      spine: null,
     },
     teamId: "team_1",
     accounts: [{ id: "acc_1", name: "Northwind" }],

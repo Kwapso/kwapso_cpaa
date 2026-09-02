@@ -45,9 +45,12 @@
      unchanged — quiet. Nothing will happen to this row; it is the baseline.
      added     — `info`, sky. The kit's informational tone: a fact, not a
                  success. Forest would claim the row had already landed.
-     changed   — `warning`. Per the batch ruling `--warning` is the QUIET chip
-                 and poppy means blocked only; a changed row is the one to
-                 look at, not the one that is broken.
+     changed   — `warning`. Poppy means blocked only; a changed row is the
+                 one to look at, not the one that is broken. RULED 2026-09-02
+                 `--warning` is the client's new orange, so this outcome now
+                 has a colour of its own. Until then it was the quiet chip —
+                 the same two values `unchanged` takes — and these two
+                 reasoned-apart outcomes drew one identical chip.
      invalid   — `destructive`, poppy. Blocked: this row cannot be written.
      skipped   — `outline`. The one uncoloured variant, and so the only one
                  that may carry a hairline. A row that takes no part in the

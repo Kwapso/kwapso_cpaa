@@ -262,14 +262,19 @@
    ─────────────────────────────────────────────────────────────────────────
    · WIDTH — "Fixed 208px" (26.02). The shell owns it (`RAIL_WIDTH`, 13rem);
      this file writes no width in its expanded form and fills the column.
-   · RADIUS — NONE, expanded. See the reversal above. The COLLAPSED row keeps
-     999: 27.8 and 27.1's tablet render both draw the icon rail as a column of
-     circles, "at the same circular size as the avatar", and a full-bleed
-     square inside a 32-wide column is not a thing the kit draws anywhere.
-   · "FULL-BLEED" — edge to edge of the rail's COLUMN, out through the shell's
-     own padding via `--rail-inset`. The label does not move when a row
-     lights: the row's inline padding is `--rail-inset + --space-3`, which is
-     exactly where an unlit row's label already sat.
+   · RADIUS — `rounded-pill`, both states. See the reversal above (the
+     expanded row was briefly square, then reversed live, repeatedly, by the
+     client). The COLLAPSED row has always kept 999: 27.8 and 27.1's tablet
+     render both draw the icon rail as a column of circles, "at the same
+     circular size as the avatar", and a square inside a 32-wide column is
+     not a thing the kit draws anywhere.
+   · "FULL-BLEED", RETIRED 2 Sep 2026 — the expanded row used to bleed edge to
+     edge of the rail's COLUMN, out through the shell's own padding via
+     `--rail-inset`; the client asked for "a bit of blank space on the sides"
+     instead, so it now sits inside that padding like every other row (see
+     `ROW_EXPANDED`'s own header). The label's own position is unaffected
+     either way — it was never on the negative margin, only the row's outer
+     box was.
    · COLLAPSED ICON — 26.02 says "the same 36px circular size as the avatar".
      THE AVATAR LADDER HAS NO 36. Ruling 30 states three sizes absolutely and
      they are 24 / 32 / 48. The caption's operative words are "the same size
@@ -469,22 +474,34 @@ const ROW_SHAPE = cn(
 );
 
 /**
- * Expanded: FULL-BLEED AND SQUARE, per 26.02's dev note and the client's
- * screenshots. The negative inline margin is the shell's own `--rail-inset`,
- * published on the column for exactly this; the row then pays it back in
- * padding, so the label sits where an unlit row's label already sat and
- * nothing shifts when a row lights. No `w-full`: the row is a flex item in a
- * stretching column, so dropping the width lets the negative margins take it
- * to both edges instead of pushing a 100% box sideways.
+ * Expanded: A PILL, INSET, NOT FULL-BLEED — client, 2 Sep 2026, after the
+ * rounding itself finally landed: "allow a bit of blank space on the sides
+ * so it's not touching the edge." This reverses "full-bleed" specifically,
+ * not the pill shape it was paired with.
  *
- * `--rail-inset` carries a `0px` fallback so a rail rendered outside the
- * shell degrades to a plain flush row rather than to `NaN`.
+ * THE SPACE IS NOT A NEW NUMBER. This row used to CANCEL the rail's own
+ * ambient inset with a negative inline margin (`-mx-[var(--rail-inset)]`) to
+ * reach the column's true edge, then pay the inset back as padding so the
+ * icon/label still landed where an idle row's already sat. Dropping the
+ * cancel-and-respend entirely leaves the row inside the SAME padding every
+ * other row already sits in — the blank space this asks for is exactly
+ * `--rail-inset`, the value the shell already publishes on the column, read
+ * here by not fighting it rather than by naming it again. `px-[var(--space-
+ * 3)]` is the row's own internal breathing room around its icon/label,
+ * unchanged from what the old padding calc's "+ --space-3" term already
+ * added on top of the cancelled inset.
+ *
+ * `rounded-pill` at this row's own fixed height (`--control-height-button`)
+ * still draws the same stadium — the earlier note that this shape "is the
+ * correct pill shape for a full-bleed bar" is retired, not the shape: a pill
+ * with air on both sides is the ordinary reading of the word, no longer one
+ * that needed defending against "full-bleed" specifically.
+ *
+ * No `w-full`: the row is a flex item in a stretching column, so it already
+ * fills the column's own content box (inside the ambient padding) without
+ * one.
  */
-const ROW_EXPANDED = cn(
-  "h-[var(--control-height-button)] w-auto rounded-none",
-  "-mx-[var(--rail-inset,0px)]",
-  "px-[calc(var(--rail-inset,0px)+var(--space-3))]",
-);
+const ROW_EXPANDED = cn("h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]");
 
 /**
  * Collapsed: "only its icon remains, centered in the rail, at the same …
@@ -511,9 +528,56 @@ const ROW_COLLAPSED = cn(
  */
 const MARK_STEP = "[--brand-step:var(--icon-20)]";
 
-/** A quiet entry. 26.01's ghost: quiet ink, darkening to full on hover. */
-const ROW_IDLE =
-  "text-[var(--spine-ink-quiet)] hover:text-[var(--spine-ink)]";
+/* ----------------------------------------------------------------------------
+   AN IDLE ENTRY, AND D5 = C's COLOUR HALF IS OVERRULED ON THIS ROW, 2026-09-02.
+
+   Until today this was 26.01's ghost — `--spine-ink-quiet`, darkening to
+   `--spine-ink` on hover — which is what D5 = C asked for: "THE QUIET TIER IS
+   MADE BY WEIGHT AND SIZE, NOT BY COLOUR", with the colour distinction kept
+   wherever a ground already had one (ink and paper read `--fg2`-shaped quiet
+   ink; only mango had none). That reading is live on screen now, and the
+   client's verdict on all six spine × theme combinations she reviewed is
+   verbatim: "nav text should ALWAYS be either pure black or pure white — never
+   gray — depending on what it sits on."
+
+   THAT IS A NARROWER LAW THAN D5 = C, NOT A DIFFERENT ONE, and this row is
+   where the two collide. D5 = C is still right about WEIGHT AND SIZE carrying
+   the lit/quiet distinction — `ACTIVE_TREATMENT`'s `font-weight-medium` against
+   this row's body weight is untouched — and it is still right that the mango
+   spine has no second ink, which `--spine-ink-quiet` already resolves to
+   `--ink-on-accent` for and this change does not disturb. What the client is
+   removing is the ink AND paper spines' own quiet tier, which used to read
+   `--ink-on-inverse-secondary` (light ink spine, #d5d1c9) or `--muted-
+   foreground` (dark ink and paper, #bdb9b1 / #5f5d59 in light paper) — three
+   real greys an idle row was resting in. So THIS ROW takes `--spine-ink`
+   outright, the same full-contrast token the row already darkens TO on hover,
+   which makes the hover rule redundant and is why it is gone: charcoal on
+   mango and paper-in-light, off-beige on ink and paper-in-dark, unconditionally
+   and at rest.
+
+   NOT TOUCHED: the group heading (`text-[var(--spine-ink-quiet)]` two blocks
+   down, still `--text-micro` and still quiet — a heading is not a nav item and
+   the client's sentence was about "nav text") and the idle count badge, for
+   the same reason. `--spine-ink-quiet` ITSELF is unchanged in tokens.css, so
+   neither of those moved. Scoped to the one thing the client actually looked
+   at: the destination's own label.
+
+   ADDENDUM, SAME DAY — WEIGHT BECOMES A THIRD, EXPLICIT SIGNAL, NOT JUST THE
+   BODY'S DEFAULT. `ROW_SHAPE`'s own comment above still says "no weight here
+   … a row's resting weight is the body's", and the body's IS `--font-weight-
+   light` (300, the only weight below `--font-weight-medium` this face ships —
+   see tokens.css §5) — so nothing here contradicts that. What changed is that
+   it is now named instead of merely inherited, and a HOVER step is added:
+   the client wants three signals reading together (fill, colour, weight), not
+   two, and wants hover to preview the ACTIVE weight without previewing the
+   active FILL — "the pill is earned by being current, not by being pointed
+   at." So an inactive row hovers to `--font-weight-medium`, `ACTIVE_TREATMENT`'s
+   own weight two names below, with no `--spine-active-fill` wash added — this
+   class carries no `hover:bg-*` and never has. */
+const ROW_IDLE = cn(
+  "font-[var(--font-weight-light)] text-[var(--spine-ink)]",
+  "hover:font-[var(--font-weight-medium)]",
+);
 
 /** 27.7's blocked entry: still there, in disabled ink, and NOT filled. */
 const ROW_BLOCKED = "cursor-not-allowed text-[var(--spine-ink-disabled)]";
@@ -955,8 +1019,13 @@ function RailRow({ item, active, collapsed, reserveIcon, onSelect }: RowProps) {
  *                      Collapsed, a tooltip carries the label as well.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once,
  *                      and every entry in here is a real `<a>` or `<button>`.
- *                      An expanded row is square now, so its ring is square:
- *                      the global rule follows the control's own radius.
+ *                      The ring follows the control's own radius, so an
+ *                      expanded row rings as a pill — square until v1.2.22,
+ *                      when `ROW_EXPANDED` became one (this line said "square
+ *                      now" for a day after it stopped being true). The nav
+ *                      that holds these rows scrolls, and a scroll container
+ *                      clips: it keeps a `--focus-offset` + `--focus-width`
+ *                      pad so a ring on the first or last row is not sliced.
  *  4. active/pressed — the 1px downward nudge AND NOTHING ELSE. 26.01: "Press
  *                      state is a 1px downward translate, no color flash."
  *                      Never on a blocked row.
@@ -1075,7 +1144,17 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
              the SHELL paints it, on the column, because the spine has to run
              the column's full height and reach edges this component sits
              inside the padding of. */
-          "flex min-h-full min-w-0 flex-1 flex-col gap-[var(--space-6)]",
+          /* AND IT MAY NOT GROW PAST THE COLUMN EITHER. `min-h-full` alone
+             says "at least the column's height"; a rail with more entries
+             than fit then quietly says "and as much more as I like", which
+             pushes the toggle and the chip out of the bottom of the spine and
+             leaves the application no box to scroll but this whole component.
+             Capping at the same 100% makes the rail EXACTLY its column
+             wherever the column has a height to be exact about, and where it
+             has not (an auto-height parent), 100% resolves against nothing
+             and the rail grows exactly as it always did. What gives instead
+             is the nav below, which is now the one thing here that scrolls. */
+          "flex max-h-full min-h-full min-w-0 flex-1 flex-col gap-[var(--space-6)]",
           isCollapsed && "w-[var(--avatar-md)] flex-none items-center",
           className,
         )}
@@ -1096,12 +1175,13 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
               /* ONE LEADING EDGE DOWN THE WHOLE COLUMN. The client's
                  reference aligns the lockup with the leading edge of the
                  destinations below it, not with the column's padding — and
-                 every other thing in this rail already sits at
-                 `--rail-inset + --space-3`: a row pays its inset back in
-                 padding after bleeding out through it, and a group heading
-                 writes the same `--space-3` directly. The head was the one
-                 block starting 12 to the left of everything else. Collapsed,
-                 the column centres instead and the inset would fight it. */
+                 every other thing in this rail already writes the same
+                 `--space-3` of its own, a group heading directly and an
+                 expanded row too (`ROW_EXPANDED`, since 2 Sep 2026 no longer
+                 bleeding past the ambient `--rail-inset` first). The head was
+                 the one block starting 12 to the left of everything else.
+                 Collapsed, the column centres instead and the inset would
+                 fight it. */
               isCollapsed ? "justify-center" : "px-[var(--space-3)]",
             )}
           >
@@ -1142,17 +1222,49 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
           </div>
         ) : null}
 
-        {/* THE ENTRIES. `flex-1` so the member chip is pinned to the foot at
-            every height, which is what every in-situ screen draws. */}
+        {/* THE ENTRIES — AND THE ONLY THING IN THIS COLUMN THAT SCROLLS.
+
+            `flex-1` so the toggle and the member chip are pinned to the foot
+            at every height, which is what every in-situ screen draws.
+
+            AND `min-h-0` + `overflow-y-auto`, SINCE 2026-09-02, BECAUSE THE
+            FOOT WAS NOT ACTUALLY PINNED. Client, verbatim: "when i svroll
+            down the expand/collpase button in navbar also moved. make sure
+            this does not happen." Until today this component scoped NO scroll
+            region of its own anywhere, so a rail with more entries than fit
+            had to be scrolled by the APPLICATION — and the only box an
+            application can reach is the whole `Rail`, foot included, which is
+            precisely why the toggle and the chip travelled with the list.
+            Owning the scroll here is the fix, and it belongs here: only this
+            file knows which of its children are the list and which are the
+            foot. `min-h-0` is half of it and not optional — `flex-1` alone
+            still floors this item at its content's height (`min-height:auto`
+            is a flex item's default), so without it nothing can ever overflow
+            and `overflow-y-auto` would never fire. The toggle and the chip
+            are siblings AFTER this element, so they are structurally outside
+            the scroller and cannot move, expanded or collapsed.
+
+            THE GUTTER IS NOT SPACING, AND IT IS NOT A NEW NUMBER. A scroll
+            container clips its OTHER axis too (CSS: `visible` computes to
+            `auto` opposite a non-`visible` value), and tokens.css §8 rings
+            every control at once with a `--focus-width` line held
+            `--focus-offset` off its edge — so a focused row against any of
+            this box's four edges would have its ring sliced off. The negative
+            margin and the equal padding cancel each other exactly, so the
+            entries' content box is the byte-for-byte one they already sat in
+            and every gap in this column is unchanged; only the clip moved out
+            of the ring's way. */}
         <nav
           data-slot="rail-nav"
           aria-label={label}
           className={cn(
-            "flex min-w-0 flex-1 flex-col gap-[var(--space-5)]",
+            "flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--space-5)] overflow-y-auto",
+            "-m-[calc(var(--focus-offset)_+_var(--focus-width))]",
+            "p-[calc(var(--focus-offset)_+_var(--focus-width))]",
             isCollapsed && "items-center gap-[var(--space-3)]",
           )}
         >
-          {groups.map((group) => {
+          {groups.map((group, groupIndex) => {
             const open = !closed.includes(group.id);
             return (
               <div
@@ -1161,6 +1273,23 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
                 className={cn(
                   "flex min-w-0 flex-col gap-[var(--space-2)]",
                   isCollapsed && "items-center",
+                  /* SECTION DIVIDER, GAPS-RULINGS.md R-4d. A hairline between
+                     ADJACENT groups only — never before the first, which
+                     already sits under the brand mark with nothing to
+                     separate it from. `--spine-hair` (tokens.css §7b) is the
+                     spine-aware read of `--hair`: the paper spine's own
+                     hairline, `--hair-inverse` on the ink spine's charcoal
+                     fill, and a fixed charcoal alpha on mango — the same
+                     "does not move with the palette" law `--spine-active-hover`
+                     already states two blocks up in that file. Drawn as an
+                     INSET box-shadow on the group's own top edge, never a
+                     `border` property — this file's law throughout, and the
+                     kit's ("No borders. Ever."). Collapsed groups carry no
+                     heading at all ("nothing to collapse further"), so they
+                     carry no divider either — the two disappear together. */
+                  !isCollapsed &&
+                    groupIndex > 0 &&
+                    "shadow-[inset_0_0.0625rem_0_var(--spine-hair)]",
                 )}
               >
                 {/* 26.02: "the group headers and chevrons disappear entirely
@@ -1251,11 +1380,13 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
           </button>
         ) : null}
 
-        {/* THE MEMBER CHIP — a container, in `--spine-chip-fill`: the paper
-            one rung off whichever spine it is standing on. On paper that is
-            the off-beige chip 27.1 and 27.26 draw at the foot; on ink and
-            mango it is the same relationship, one rung, and nothing here
-            picks a colour.
+        {/* THE MEMBER CHIP — a container, in `--spine-member-fill`: the paper
+            one rung off whichever spine it is standing on, EXCEPT where the
+            client's 2026-09-02 ruling forces it to black instead (dark mode,
+            any spine; mango, either palette) — see `MemberChip` for the token
+            and why it is not `--spine-chip-fill`. On light paper and light
+            ink that rung is still the off-beige / raised chip 27.1 and 27.26
+            draw at the foot; nothing here picks a colour.
 
             26.02: "no member list (that lives in Settings)". One chip. */}
         {member !== null && member !== undefined ? (
@@ -1348,7 +1479,7 @@ function MemberChip({
         as="span"
         size="sm"
         aria-hidden={abbreviated ? true : undefined}
-        className="min-w-0 flex-1 truncate font-[var(--font-weight-medium)] text-[var(--spine-ink)]"
+        className="min-w-0 flex-1 truncate font-[var(--font-weight-medium)] text-[var(--spine-member-ink)]"
       >
         {shown}
       </Text>
@@ -1356,9 +1487,21 @@ function MemberChip({
     </>
   );
 
+  /* THE CHIP'S OWN FILL, NOT `--spine-chip-fill` — CLIENT RULING, 2026-09-02.
+     Verbatim: the chip is BLACK whenever the app is in dark mode (any spine)
+     or whenever the spine is mango (either palette); light-paper and
+     light-ink are unchanged. `--spine-member-fill` is a dedicated token for
+     exactly that (tokens.css §4/§7b) rather than a repoint of `--spine-chip-
+     fill`, because that token also re-binds `--btn-secondary-fill` /
+     `--pill-fill` for anything else a route renders inside the rail column
+     (`screen-shell.tsx`'s `RAIL_COLUMN`) — blackening it would have changed a
+     button the client never saw. `--spine-member-ink` above moves WITH this
+     fill, not with `--spine-ink`: on mango the fill is now the same charcoal
+     the name text used to be, so the text inverts to off-beige rather than
+     vanishing against its own new background. */
   const shell = cn(
     "flex min-w-0 items-center gap-[var(--space-3)] text-start",
-    "rounded-pill border-0 bg-[var(--spine-chip-fill)]",
+    "rounded-pill border-0 bg-[var(--spine-member-fill)]",
     /* 4 around a 32 avatar in a 999 pill: the pill's radius (20) is the
        avatar's (16) plus its own padding, so the two circles are concentric.
        This was already the intent; with two lines of type the TEXT was taller

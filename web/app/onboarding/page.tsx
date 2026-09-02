@@ -1,8 +1,53 @@
 "use client"
 
-// Onboarding (locked flow): first name + last name + optional photo, then the
-// tenancy worker either accepts waiting invites or creates "{First}'s team"
-// with its own database. Everything here is library components.
+// Onboarding (locked flow): first name + last name + optional photo + the
+// sidebar's colour, then the tenancy worker either accepts waiting invites or
+// creates "{First}'s team" with its own database. Everything here is library
+// components.
+//
+// THE SPINE IS OFFERED HERE — client ruling, 2026-09-02, verbatim: "default
+// spine to mango, but everyone can change it during the onboarding or anytime
+// at settings". This screen is the "during the onboarding" half; Settings ·
+// Appearance is the other. STILL ONE SCREEN: the flow's own comment calls it a
+// locked flow, and a second step to hold three cards would trade a one-screen
+// sign-up for a wizard in exchange for nothing — the kit's own three-step
+// OnboardingRoute is exempted for exactly that mismatch (COMPOSITION_EXEMPT,
+// "screens/onboarding.tsx"), and adding the step it describes would be
+// adopting the shape we wrote the exemption to refuse.
+//
+// AND IT IS THE SAME CONTROL SETTINGS DRAWS, not a lighter one invented for
+// this screen. `SpineChoice` (shared/web/spine-section.tsx) is the kit's own
+// `AppearanceOptionGroup` + `SpinePicture` with the section furniture — the
+// heading, the prose and the save-on-press — taken off.
+//
+// A LIGHTER CONTROL WAS CONSIDERED AND IS NOT AVAILABLE, which is the whole
+// answer to "picture cards are heavy for a one-screen flow". Kit ruling 26.05
+// is explicit and is a client ruling: "a choice that changes how the app looks
+// is never a row of pills … one card per option: a small picture of the thing
+// itself, the option's name, one line of prose, and a mango badge on the one
+// that is set". A Select or a pill row here would break that, and it would put
+// a second vocabulary on the same question Settings already answers — which is
+// exactly what `SpineChoice` was extracted to prevent. The kit's own
+// onboarding composition reaches the same conclusion independently: its step 2
+// draws `AppearanceOptionGroup` with these three `SpinePicture` cards.
+//
+// SO THE SCREEN IS TALLER, AND THAT IS THE PRICE, PAID KNOWINGLY. The kit's
+// group is `repeat(auto-fit, minmax(13.125rem, 1fr))` above a 45rem VIEWPORT,
+// and this column is `max-w-sm` (24rem) — two 13.125rem tracks do not fit, so
+// on a desktop the three cards resolve to one column of full-width picture
+// cards (~3.625rem of picture each) rather than the compact rows a phone gets
+// below 45rem. The main is `min-h-[100svh]` and not `h-`, so it grows and the
+// page scrolls; nothing is clipped. Worth a look on a real screen before this
+// ships — it is the one thing here a test cannot see, because jsdom lays
+// nothing out.
+//
+// SKIPPING IT LANDS ON MANGO, and lands there by writing NOTHING. The cards
+// open on `toSpine(user.spine)` — mango for anybody who has never chosen — and
+// the submit posts only when the person moved them, so `users.spine` stays
+// NULL for somebody who simply took the default. NULL means "never chosen" and
+// shared/spine.ts keeps that distinct from a deliberate mango on purpose; a
+// screen that wrote mango just for being looked at would destroy the
+// distinction for every person who ever onboards.
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
@@ -22,6 +67,7 @@ import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 // screen that is already drawn.
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"
@@ -32,9 +78,22 @@ import { useT } from "@shared/web/language"
 import { MarkLoader, useMarkHold } from "@shared/web/mark-loader"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { InvitationsPanel } from "@/components/invitations"
+import { SpineChoice } from "@shared/web/spine-section"
+import { toSpine, type Spine } from "@shared/spine"
 
 const firstNameField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
+/* R33's sanctioned way out: `label:`/`helpText:` on an object that spreads a
+   field config is translated on the way to the screen by shared/web/field.tsx,
+   because `t` is a hook and this is a module-level constant. "Sidebar" is the
+   word Settings · Appearance heads the same three cards with — one thing, one
+   name (R34). The help line is the client's own second clause said out loud:
+   nobody should feel they are deciding something now that they cannot undo. */
+const spineField = {
+  ...defaultFieldConfig,
+  label: "Sidebar",
+  helpText: "You can change this later in Settings.",
+}
 
 /** The code every agency door answers a client login with (`refusePortalCaller`,
  * shared/workers/account-scope.ts). Named once here rather than typed at each of
@@ -52,6 +111,12 @@ export default function OnboardingPage() {
   const [firstName, setFirstName] = React.useState("")
   const [lastName, setLastName] = React.useState("")
   const [photo, setPhoto] = React.useState<string | undefined>()
+  // THE SPINE, HELD LOCALLY UNTIL THE SUBMIT. `savedSpine` is what the row says
+  // right now (null for almost everybody here, which reads as mango); `spine` is
+  // what the cards show. Keeping both is what lets the submit post ONLY when the
+  // person actually moved the cards — see `finish`.
+  const [savedSpine, setSavedSpine] = React.useState<string | null>(null)
+  const [spine, setSpine] = React.useState<Spine>(toSpine(null))
   const [busy, setBusy] = React.useState(false)
   // Someone who already finished onboarding and has NO team didn't arrive here
   // to sign up — they were removed from their last one (or their team's creation
@@ -100,6 +165,12 @@ export default function OnboardingPage() {
         setFirstName(user.firstName ?? "")
         setLastName(user.lastName ?? "")
         setPhoto(user.imageUrl ?? undefined)
+        // Read, not assumed. Somebody who bounced back here (a removed member,
+        // a failed team creation) may already have chosen a spine in a previous
+        // life, and showing them mango would be this screen telling them their
+        // own setting is something else.
+        setSavedSpine(user.spine ?? null)
+        setSpine(toSpine(user.spine))
         setChecking(false)
       } catch {
         router.replace("/login")
@@ -124,6 +195,32 @@ export default function OnboardingPage() {
     e.preventDefault()
     setBusy(true)
     try {
+      // THE SPINE GOES FIRST, AND IT IS PART OF THIS SUBMIT RATHER THAN A SAVE
+      // OF ITS OWN. Settings saves on press because it can revert a failure
+      // into a screen the person is still standing on; here there is no such
+      // screen — a preference written while the profile is still half-entered
+      // is a preference saved for somebody who may abandon the form, and it
+      // would be the only half of this submit that survived a failure of the
+      // rest. So the cards are local until Continue is pressed, and the whole
+      // press is one act.
+      //
+      // FIRST, of the three calls, on purpose: it is the only reversible and
+      // cheap one. `updateProfile` mints a NEW R2 key for the photo every time
+      // it runs, and `bootstrap` ACCEPTS pending invites — neither is something
+      // to have already done when a later call fails and the person presses
+      // Continue again. A refusal here costs one retry and leaves nothing
+      // behind; a refusal after them costs an orphaned object or a re-run of an
+      // acceptance.
+      //
+      // AND ONLY WHEN THEY MOVED IT. Equal to what the row already says (which
+      // is null → mango for almost everybody) means the person took the
+      // default, and taking the default writes nothing — `users.spine` stays
+      // null, which is the honest record of "never chosen" that shared/spine.ts
+      // keeps distinct from a deliberate mango.
+      if (spine !== toSpine(savedSpine)) {
+        await auth.setSpine(spine)
+        setSavedSpine(spine)
+      }
       await auth.updateProfile({ firstName, lastName, imageDataUrl: photo })
       // THE LOOP THAT COST AN AFTERNOON WAS THIS ONE LINE'S FAULT. Bootstrap
       // succeeds and returns NO TEAMS for anybody with no invitation waiting —
@@ -178,7 +275,12 @@ export default function OnboardingPage() {
         </div>
         <div className="motion-panel-in w-full max-w-sm text-center">
           <BrandMark className="mb-1" />
-          <h1 className="mt-2 text-2xl font-medium">{t("You're in the right place")}</h1>
+          {/* display-m — CLIENT CORRECTION, 2026-08-31: main-screen titles must
+              be the kit's own named "Page title" step (56/500), not h2 (32) —
+              see collection-heading.tsx's own note for the full ruling. This
+              standalone screen has no collection or record under it, but it is
+              still the page's own name, in the same role. */}
+          <Headline as="h1" size="display-m" className="mt-2">{t("You're in the right place")}</Headline>
           {/* The worker's own sentence, not a second copy written here. */}
           <p className="text-muted-foreground mt-2 text-sm">{wrongDoor}</p>
           <p className="text-muted-foreground mt-4 text-sm">
@@ -199,9 +301,10 @@ export default function OnboardingPage() {
       <div className="motion-panel-in w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
-          <h1 className="text-2xl font-medium">
+          {/* display-m — see this file's other Headline for the ruling. */}
+          <Headline as="h1" size="display-m">
             {teamless ? t("You're not in a team") : t("Set up your profile")}
-          </h1>
+          </Headline>
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
               ? t("An admin can invite you back — ask them to send a new invite to this email address.")
@@ -258,6 +361,21 @@ export default function OnboardingPage() {
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder={t("Martin")}
                 disabled={busy}
+              />
+            </Field>
+
+            {/* Below the name and above Continue: the two things that identify
+                the person come first, and the one that decorates their app
+                comes last, so nobody reads it as a step they have to complete.
+                The badge says "Picked" rather than Settings' "In use" — 27.14's
+                own word for the same card, and the true one here, since nothing
+                is in use until the form is submitted. */}
+            <Field config={spineField}>
+              <SpineChoice
+                value={spine}
+                onChange={setSpine}
+                disabled={busy}
+                badgeLabel={t("Picked")}
               />
             </Field>
 

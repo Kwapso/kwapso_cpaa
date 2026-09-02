@@ -10,7 +10,20 @@
 // eleven detail components, which is eleven chances for the twelfth to be built
 // two-column and for nobody to notice until a client screenshot arrives.
 //
-// Anything beyond that one override belongs at the call site, or in the library.
+// THE CARD, added 2026-08-31 and REMOVED the same night, was a false fix.
+// Client ruling at the time read a live App detail's Overview tab against the
+// kit's own reference and asked for "the content is its own card" — but the
+// screenshot that followed showed exactly what that produces: a white
+// `variant="raised"` box floating inside the panel's own off-beige
+// `bg-surface-panel` band, a container inside a container. Her ruling on
+// THAT screenshot was unambiguous: no nested card at all, the fact list's
+// text sits directly on the panel. `RecordScreen` (record-chrome.tsx) still
+// hands its whole `TabsView` to the kit's `RecordDetail`, which still draws
+// the ONE outer `Card` around the panel — that OUTER seam stands. This file
+// goes back to putting nothing of its own between the `<dl>` and that panel.
+//
+// Anything beyond that one override (see above) belongs at the call site, or
+// in the library.
 
 import * as React from "react"
 

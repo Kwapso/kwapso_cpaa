@@ -27,7 +27,7 @@ import { invalidate } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { usePortalTodos } from "@/lib/todos"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
 /** What a browser will turn into a data URL for us. Generous for a logo or a
@@ -35,7 +35,7 @@ import { RichText } from "@shared/web/rich-text-view"
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 
 export function WaitingOnYou() {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // THE DOOR ANSWERS THE NARROWER QUESTION NOW, and that is not a tidy-up.
   // This used to fetch the to-do list and keep the rows with no `completedAt`,
   // which was honest while the door handed back every row it had. The list PAGES
@@ -73,7 +73,7 @@ export function WaitingOnYou() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-medium">{t("We're waiting on you")}</h2>
+      <h2 className="text-lg font-medium">{t("Awaiting your input")}</h2>
       {/* THIS ONE STAYS HAND-ROLLED, and the kit's `List` was tried and reverted.
        *
        * A `ListRow` is a title, a quiet line, and ONE action pinned to the
@@ -88,12 +88,12 @@ export function WaitingOnYou() {
        * short meta, no wrap needed. */}
       <ul className="flex flex-col gap-2">
         {open.map((todo) => (
-          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border p-4">
+          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
             <div className="min-w-0">
               <p className="font-medium">{todo.title}</p>
               {todo.detail && <RichText html={todo.detail} className="text-muted-foreground" />}
               <p className="text-muted-foreground text-sm">
-                {todo.dueOn ? `By ${formatDate(todo.dueOn)}` : t("No date on it")}
+                {todo.dueOn ? `By ${formatDate(todo.dueOn, lang)}` : t("No date on it")}
                 {todo.ref ? ` · ${todo.ref}` : ""}
               </p>
             </div>

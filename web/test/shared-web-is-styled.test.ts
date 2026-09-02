@@ -25,6 +25,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8")
 
@@ -70,7 +72,14 @@ describe("FormShell cannot spill out of its dialog (UI-RULEBOOK F2/F3)", () => {
       "a hairline with a gap under it can always collide with the button below at some " +
         "type scale; a border-t on a padded bar cannot"
     ).toBe(false)
-    const edged = (src.match(/className="[^"]*\bborder-t\b[^"]*"/g) ?? []).length
+    // A bare `border-t` names no colour token and Tailwind v4 resolves that to
+    // currentColor, not the pale hairline token — see the file's own note above
+    // `shadow-[var(--hairline-over)]`. Both edges below draw that shape instead.
+    expect(
+      /className="[^"]*\bborder-t\b[^"]*"/.test(src),
+      "a bare border-t resolves to currentColor under Tailwind v4; use shadow-[var(--hairline-over)]"
+    ).toBe(false)
+    const edged = (stripComments(src).match(/shadow-\[var\(--hairline-over\)\]/g) ?? []).length
     expect(edged, "one edge above the fields, one above the action bar").toBe(2)
   })
 

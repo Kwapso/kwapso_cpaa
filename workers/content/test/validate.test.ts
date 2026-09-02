@@ -11,7 +11,7 @@ import { sourceFiles } from "@shared/rules/source-scan"
 import { GuardError } from "@shared/workers/gating"
 import { MENTIONS_LIMIT } from "@shared/workers/limits"
 import { dataUrlBytes, MAX_IMAGE_BYTES } from "@shared/workers/image"
-import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalMark, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 const NUL = String.fromCharCode(0)
 
@@ -76,6 +76,50 @@ describe("optionalText", () => {
 
   it("throws a 400 when over the length cap", () => {
     expect(thrown(() => optionalText("a".repeat(TEXT_LIMITS.long + 1), "Field", TEXT_LIMITS.long))?.status).toBe(400)
+  })
+})
+
+// R20, THE CLIENT'S RULING (2026-08-31): a live example reached staging — a
+// warning sign saved as the "Issue" ticket kind's mark — because the write door
+// used bare `optionalText`, which type-checks and caps length and was never
+// asked to refuse a GLYPH. `optionalMark` is the fix; this locks it against the
+// exact character that got through, plus the multi-code-point shapes named in
+// its own comment (a flag's Regional_Indicator pair, a variation selector).
+describe("optionalMark — optionalText plus 'no emoji'", () => {
+  // Named by codepoint rather than pasted as a literal character, the same way
+  // `optionalMark`'s own comment and UI-RULEBOOK.md name a glyph.
+  const warningSign = String.fromCodePoint(0x26a0, 0xfe0f) // the exact glyph that reached staging
+  const usFlag = String.fromCodePoint(0x1f1fa, 0x1f1f8) // a Regional_Indicator PAIR, not Extended_Pictographic on its own
+  const thumbsUpWithSkinTone = String.fromCodePoint(0x1f44d, 0x1f3fb) // a base glyph + a modifier, two code points, one emoji
+
+  it("throws a 400 for a bare pictograph — the exact bug reported on staging", () => {
+    const err = thrown(() => optionalMark(warningSign, "Mark"))
+    expect(err).toBeInstanceOf(GuardError)
+    expect(err?.status).toBe(400)
+    expect(err?.message).toBe("Mark should be a short word or initial, not an emoji.")
+  })
+
+  it("throws a 400 for a flag (a Regional_Indicator pair, no Extended_Pictographic code point involved)", () => {
+    expect(thrown(() => optionalMark(usFlag, "Mark"))?.status).toBe(400)
+  })
+
+  it("throws a 400 for a multi-code-point emoji (base glyph + skin-tone modifier)", () => {
+    expect(thrown(() => optionalMark(thumbsUpWithSkinTone, "Mark"))?.status).toBe(400)
+  })
+
+  it("throws a 400 for an emoji sitting beside ordinary text, not just a bare one", () => {
+    expect(thrown(() => optionalMark(`Issue ${warningSign}`, "Mark"))?.status).toBe(400)
+  })
+
+  it("accepts a normal short word or initial", () => {
+    expect(optionalMark("IS", "Mark")).toBe("IS")
+    expect(optionalMark("Voucher", "Mark", TEXT_LIMITS.short)).toBe("Voucher")
+  })
+
+  it("still maps null/undefined/blank to undefined, and still enforces the length cap (both optionalText's jobs)", () => {
+    expect(optionalMark(undefined, "Mark")).toBeUndefined()
+    expect(optionalMark("   ", "Mark")).toBeUndefined()
+    expect(thrown(() => optionalMark("a".repeat(TEXT_LIMITS.tiny + 1), "Mark"))?.status).toBe(400)
   })
 })
 

@@ -3853,16 +3853,10 @@
       "owner": "client"
     },
     {
-      "item": "--warning / --warning-foreground / --warning-strong",
-      "reason": "There is no warning colour in the kwapso palette — seven brand colours and none is amber. The kit assigns overdue to Poppy, and ruling 26 states mango is the brand, not a status. Folded into danger by decision, so Badge variant=\"warning\" still renders (poppy). --warning-strong resolves identically to --warning rather than inventing a deeper amber.",
-      "recommendation": "Leave folded, or open a kit ruling to admit an eighth brand colour.",
+      "item": "--warning-strong",
+      "reason": "--warning and --warning-foreground were SETTLED 2026-09-02: the client released two brand colours and --warning takes the orange #F7953E, with --warning-foreground at --ink-on-accent (charcoal, 7.79:1). --warning-strong is the ink half -- the warning WORD -- and did not move. Orange as text measures 2.23 on off-beige and 2.02 on soft paper, so it cannot take the fill; and nothing in components/ or compositions/ reads this token, so minting it a darkened orange (as ruling 43 gave poppy --kw-poppy-ink) would invent a hex for a consumer that does not exist. It resolves to --ink-primary.",
+      "recommendation": "Leave at --ink-primary. Open a client ruling the day a component writes a warning in words.",
       "severity": "accepted"
-    },
-    {
-      "item": "--chart-4 and --chart-5",
-      "reason": "The kit designs three series colours (sky, forest, poppy) and says they cycle. 4 and 5 are placeholders repeating 1 and 2, so a five-series chart currently shows two indistinguishable pairs.",
-      "recommendation": "Two dedicated data-safe hues need a kit ruling. Never mango (brand, not data) and never grey (reads as disabled).",
-      "severity": "known-limitation"
     },
     {
       "item": "A non-editorial quote register on ArticleBody",

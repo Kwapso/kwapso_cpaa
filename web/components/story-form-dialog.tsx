@@ -396,14 +396,18 @@ export function StoryFormDialog({
     value: string,
     placeholder: string,
     searchPlaceholder: string,
-    options: { id: string; label: string }[],
+    // `picture`/`shape` optional: the app and sprint calls below pass neither,
+    // and the PERSON one passes both — a staff member's own face, on the
+    // closed control and in the list, the way any Owner/Assignee field does
+    // (record-picker.tsx's `shape: "round"` discriminator).
+    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round" }[],
     set: (v: string) => void
   ) => (
     <RecordPicker
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      options={options.map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -493,7 +497,7 @@ export function StoryFormDialog({
       <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
           {attached.length > 0 && (
-            <ul className="divide-border divide-y rounded-[var(--radius)] border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
               {attached.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                   {a.kind === "file" ? (
@@ -518,7 +522,7 @@ export function StoryFormDialog({
             </ul>
           )}
           {pending.length > 0 && (
-            <ul className="divide-border divide-y rounded-[var(--radius)] border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
               {pending.map((file, i) => (
                 <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
                   <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
@@ -630,7 +634,7 @@ export function StoryFormDialog({
           values.assigneeId,
           "Nobody yet",
           t("Search members…"),
-          assignable.map((m) => ({ id: m.id, label: m.name })),
+          assignable.map((m) => ({ id: m.id, label: m.name, picture: m.photo, shape: "round" as const })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}
       </Field>

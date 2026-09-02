@@ -21,8 +21,10 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { AccountRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -95,7 +97,19 @@ export function AccountRateCard({
     await refresh()
   }
 
-  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the rates.")}</p>
+  if (ratesQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the rates.") }}
+        action={
+          <Button variant="secondary" onClick={() => ratesQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const rates = ratesQ.data
 
@@ -112,7 +126,7 @@ export function AccountRateCard({
           {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] border">
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {rates.map((r) => (
             <li
               key={r.id}

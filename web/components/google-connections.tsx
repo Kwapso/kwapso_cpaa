@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Ban, Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import {
   GOOGLE_SCOPED_SERVICES,
@@ -219,7 +220,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * one button to just sync everything instead of selecting one thing" —
         * which turned out to describe the fix as well as the feature. */}
       {q.data?.ready && (
-        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] bg-surface-panel p-3">
           <Button
             onClick={() => {
               window.location.href = "/api/content/google/start?service=all"
@@ -235,7 +236,16 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       )}
 
       {q.error ? (
-        <p className="text-destructive text-sm">{t("Couldn't load your Google connections.")}</p>
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load your Google connections.") }}
+          action={
+            <Button variant="secondary" onClick={() => q.refresh()}>
+              {t("Try again")}
+            </Button>
+          }
+        />
       ) : q.data === undefined ? (
         <Skeleton variant="list" lines={4} />
       ) : !q.data.ready ? (
@@ -243,7 +253,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           {t("Google connections aren't set up on this environment yet.")}
         </p>
       ) : (
-        <div className="flex flex-col rounded-[var(--radius)] border">
+        <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
           {GOOGLE_SERVICES.map((service) => {
             const live = liveFor(service)
             const named = sources.filter((s) => s.service === service)
@@ -498,7 +508,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
        * on a not-ready environment the button works until the first token expires
        * and then fails with a message about something the person cannot fix. */}
       {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
-        <div className="flex flex-col gap-2 rounded-[var(--radius)] border p-3">
+        <div className="flex flex-col gap-2 rounded-[var(--radius)] bg-surface-panel p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">{t("Let the assistant read what you have shared")}</span>
             {/* THE SAME CONTROL THAT IS NOW ON EVERY GOOGLE SCREEN. It used to be

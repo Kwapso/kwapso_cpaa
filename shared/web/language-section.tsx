@@ -92,7 +92,7 @@ export function LanguageSection({
       <h2 className="text-muted-foreground text-micro uppercase">
         {t("Language")}
       </h2>
-      <div className="flex flex-col gap-4 rounded-[var(--radius)] border p-4">
+      <div className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">
         <p className="text-muted-foreground text-sm">
           {t("Choose the language you want kwapso in.")}{" "}
           {t("What people type stays in the language they typed it.")}

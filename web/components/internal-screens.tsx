@@ -78,8 +78,16 @@ function InternalCollection({
         secondary={onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined}
         download={{ show: (data.rows?.length ?? 0) > 0, label: t("Export CSV"), href: exportHref }}
         onCreate={onCreate}
+        useKitPanel
       >
-        <ScreenRenderer recipe={tuned} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+        <ScreenRenderer
+          recipe={tuned}
+          data={data}
+          rights={rights}
+          onAction={onAction}
+          onIntent={onIntent}
+          useKitPanel
+        />
       </SectionWithCreate>
     </div>
   )

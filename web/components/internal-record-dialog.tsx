@@ -271,13 +271,17 @@ export const deliverableFields = (kinds: string[]): InternalField[] => [
  * picker but that a handover document is written from.
  *
  * `mark` and `nameDe` are the same two enrichments a dropdown value carries, and
- * they are here for the same reason: the emoji is how a section is recognised at
+ * they are here for the same reason: the mark is how a section is recognised at
  * a glance in a list, and the German name is what a client who reads in German
- * sees. R33: these labels are translated on the way to the screen by
- * shared/web/field.tsx, which is why they are bare here. */
+ * sees. THE FIELD NO LONGER ASKS FOR AN EMOJI (client ruling, 2026-08-31: "kill
+ * all emojis, they are completely off-brand") — legacy rows that already carry
+ * one still render it (this is free text, not validated against a vocabulary),
+ * but the label and the example no longer point somebody at one. R33: these
+ * labels are translated on the way to the screen by shared/web/field.tsx, which
+ * is why they are bare here. */
 export const moduleFields = (): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Settings" },
-  { key: "mark", label: "Emoji", kind: "text", placeholder: "⚙️" },
+  { key: "mark", label: "Mark", kind: "text", placeholder: "A short word or initial" },
   { key: "nameDe", label: "German name", kind: "text", placeholder: "Einstellungen" },
   { key: "description", label: "What it does", kind: "prose", placeholder: "Where the team manages their own preferences." },
   { key: "benefit", label: "What it gives them", kind: "prose", placeholder: "Time saved, and one place to look." },
@@ -314,7 +318,8 @@ export const clientRoleFields = (): InternalField[] => [
 
 export const clientToolFields = (): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "HubSpot" },
-  { key: "mark", label: "Emoji", kind: "text", placeholder: "🧲" },
+  // No longer asks for an emoji (client ruling, 2026-08-31) — see moduleFields above.
+  { key: "mark", label: "Mark", kind: "text", placeholder: "A short word or initial" },
 ]
 
 export const clientToolPriceFields = (): InternalField[] => [

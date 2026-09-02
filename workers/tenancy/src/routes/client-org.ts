@@ -27,7 +27,7 @@ import { json } from "@shared/workers/http"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
-import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
+import { queryText, requireText, optionalMark, TEXT_LIMITS } from "@shared/workers/validate"
 import { GuardError, type MemberGuard } from "../lib/permissions"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import {
@@ -306,7 +306,10 @@ export async function postCreateTool(request: Request, env: Env): Promise<Respon
   const scope = await callerScope(cfg, guard)
   const accountId = requireText(body.accountId, "Client", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
-  const mark = optionalText(body.mark, "Icon", TEXT_LIMITS.short) ?? null
+  // R20: an "Icon" field is a mark like any other — the client's 2026-08-31
+  // ruling ("kill all emojis") applies here too, not just to the dropdown value
+  // this bug was first reported against.
+  const mark = optionalMark(body.mark, "Icon", TEXT_LIMITS.short) ?? null
   const { id } = await createTool(cfg, guard, scope, actor, { accountId, name, mark })
   await publishChange(env, guard.teamId, "client_tools", id, "add", accountId)
   return json({ id })
@@ -322,7 +325,10 @@ export async function postUpdateTool(request: Request, env: Env): Promise<Respon
   const scope = await callerScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
-  const mark = optionalText(body.mark, "Icon", TEXT_LIMITS.short) ?? null
+  // R20: an "Icon" field is a mark like any other — the client's 2026-08-31
+  // ruling ("kill all emojis") applies here too, not just to the dropdown value
+  // this bug was first reported against.
+  const mark = optionalMark(body.mark, "Icon", TEXT_LIMITS.short) ?? null
   await updateTool(cfg, guard, scope, actor, { id, name, mark })
   await publishChange(env, guard.teamId, "client_tools", id, "edit")
   return json({ ok: true })

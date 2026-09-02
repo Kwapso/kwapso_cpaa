@@ -94,6 +94,33 @@ export async function setScale(
   return { user: toSessionUser(updated as UserRow) }
 }
 
+/** WHICH SPINE THIS PERSON WANTS THE SIDEBAR PAINTED IN. The same twin shape
+ * as `setScale`, one field along: R17's predicate rides the UPDATE, so
+ * choosing the spine you already have moves zero rows and sends no ping; and
+ * the publish is the identity fan-out, so the person's OTHER devices re-pull
+ * `me` and re-paint the rail without a reload. Nobody else's screen changes,
+ * because nobody else reads it. `spine` is already proven to be one of
+ * SPINE_VALUES at the door (R20), so this writes it plainly. */
+export async function setSpine(
+  env: Env,
+  user: UserRow,
+  spine: string
+): Promise<{ user: ReturnType<typeof toSessionUser> }> {
+  const result = await env.DB.prepare(
+    "UPDATE users SET spine = ?, updated_at = ? WHERE id = ? AND COALESCE(spine, '') <> ?"
+  )
+    .bind(spine, new Date().toISOString(), user.id, spine)
+    .run()
+
+  if (result.meta.changes > 0)
+    await publishUserChange(env, user.id, "profile", user.id, "edit")
+
+  const updated = await env.DB.prepare("SELECT * FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<UserRow>()
+  return { user: toSessionUser(updated as UserRow) }
+}
+
 export async function updateProfile(
   env: Env,
   user: UserRow,

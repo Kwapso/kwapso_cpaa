@@ -167,6 +167,7 @@ export function RecordTable<T extends TableRowData>({
   actions = [],
   onRowClick,
   className,
+  useKitPanel,
 }: {
   columns: TableColumn[]
   rows: T[]
@@ -181,6 +182,11 @@ export function RecordTable<T extends TableRowData>({
   actions?: TableAction<T>[]
   onRowClick?: (row: T) => void
   className?: string
+  /** Forwarded straight to `CollectionFrame` — see its own doc. A table is a
+   * `renderItems` callback same as a list's; the toolbar/panel/create-button
+   * chrome around it is the frame's decision either way, so this component
+   * needs nothing of its own to carry the flag, only a place to pass it. */
+  useKitPanel?: boolean
 }) {
   const [own, setOwn] = React.useState<{ by: string; dir: "asc" | "desc" } | null>(null)
   const live: CollectionOrder = order ?? {
@@ -213,8 +219,9 @@ export function RecordTable<T extends TableRowData>({
       data={shown}
       searchKeys={columns.map((c) => c.key) as (keyof T)[]}
       className={className}
+      useKitPanel={useKitPanel}
       renderItems={(page) => (
-        <div className="overflow-hidden rounded-[var(--radius)] border">
+        <div className="overflow-hidden rounded-[var(--radius)] bg-surface-panel">
           <Table>
             <TableHeader>
               <TableRow>

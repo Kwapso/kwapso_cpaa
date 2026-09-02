@@ -46,9 +46,38 @@ export function describeChanges(fields: FieldDiff[]): string {
   return parts.join("; ")
 }
 
+/** The one INSERT both writers below share — THROWS on failure. Not exported:
+ * every caller wants one of the two contracts beneath it, never the raw
+ * statement, so there is exactly one way to reach this table from outside a
+ * migration. */
+async function insertActivity(
+  cfg: D1Rest,
+  databaseId: string,
+  actor: Actor,
+  entry: ActivityEntry
+): Promise<void> {
+  const now = new Date().toISOString()
+  await d1ExecScript(
+    cfg,
+    databaseId,
+    `INSERT INTO activity
+       (id, type, description, related_table, related_row_id,
+        created_at, creator_id, creator_email, creator_name)
+     VALUES (
+        ${sqlString(ulid())}, ${sqlString(entry.type)}, ${sqlString(entry.description)},
+        ${sqlString(entry.relatedTable ?? null)}, ${sqlString(entry.relatedRowId ?? null)},
+        ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
+     );`
+  )
+}
+
 /** Write one activity row into a team's own database. Best-effort by contract:
  * it swallows + logs its own failures so a logging hiccup can NEVER break the
- * action it describes — callers just `await logActivity(...)`, no `.catch` needed. */
+ * action it describes — callers just `await logActivity(...)`, no `.catch` needed.
+ * Right for every caller so far: each one logs a SIDE EFFECT of a mutation that
+ * already succeeded ("member role changed"), so losing the log line is an
+ * acceptable, silent loss. See `writeActivity` below for the caller it is wrong
+ * for. */
 export async function logActivity(
   cfg: D1Rest,
   databaseId: string,
@@ -56,20 +85,25 @@ export async function logActivity(
   entry: ActivityEntry
 ): Promise<void> {
   try {
-    const now = new Date().toISOString()
-    await d1ExecScript(
-      cfg,
-      databaseId,
-      `INSERT INTO activity
-         (id, type, description, related_table, related_row_id,
-          created_at, creator_id, creator_email, creator_name)
-       VALUES (
-          ${sqlString(ulid())}, ${sqlString(entry.type)}, ${sqlString(entry.description)},
-          ${sqlString(entry.relatedTable ?? null)}, ${sqlString(entry.relatedRowId ?? null)},
-          ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
-       );`
-    )
+    await insertActivity(cfg, databaseId, actor, entry)
   } catch (e) {
     console.error("activity log failed:", e)
   }
+}
+
+/** The same insert, but it THROWS — for the one caller where writing the row
+ * IS the point of the request, rather than a side-effect of one that already
+ * succeeded: a user-authored note (`postActivityNote`, workers/tenancy/src/
+ * routes/team.ts). `logActivity`'s swallow-and-log contract is correct for
+ * "member role changed" — losing that line costs nothing nobody can recover.
+ * It would be silently WRONG here: a note that fails to save must answer with
+ * a real error, not a 200 that tells somebody their note is there when it
+ * is not. */
+export async function writeActivity(
+  cfg: D1Rest,
+  databaseId: string,
+  actor: Actor,
+  entry: ActivityEntry
+): Promise<void> {
+  return insertActivity(cfg, databaseId, actor, entry)
 }

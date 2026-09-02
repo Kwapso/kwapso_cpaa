@@ -405,12 +405,21 @@ export function AccountFormDialog({
         />
       </Field>
 
+      {/* HIDDEN UNTIL THERE IS A REAL PICTURE — the same fix as the app form's
+          logo field, and the same reason: on a brand-new account `values.name`
+          is still empty, so `letterMark` had nothing to fall back to but "?",
+          drawing a placeholder that stood for nothing rather than for the
+          record. "hide when empty, show when populated," not removed
+          outright — the preview still confirms the file just picked before it
+          uploads. */}
       <Field config={logoField} htmlFor="account-logo" className={fieldSpacing}>
         <div className="flex items-center gap-2">
-          <Avatar className="size-12">
-            {logoPreview && <AvatarImage src={logoPreview} alt={t("Logo")} />}
-            <AvatarFallback>{letterMark(values.name)}</AvatarFallback>
-          </Avatar>
+          {logoPreview && (
+            <Avatar className="size-12">
+              <AvatarImage src={logoPreview} alt={t("Logo")} />
+              <AvatarFallback>{letterMark(values.name)}</AvatarFallback>
+            </Avatar>
+          )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("logoUrl")} />
         </div>
       </Field>

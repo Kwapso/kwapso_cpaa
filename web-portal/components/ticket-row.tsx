@@ -16,7 +16,7 @@ import { ChevronRight } from "@shared/ui/foundations/icons"
 
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** Plain words for each state, and a colour that means the same thing every time.
@@ -59,12 +59,12 @@ export const STATUS_WORDS: Record<
 }
 
 export function TicketRow({ ticket }: { ticket: HelpTicket }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const status = STATUS_WORDS[ticket.status]
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] border p-4"
+      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-surface-panel p-4"
     >
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
         <Clamp lines={2} collapsible={false}>{richTextPlain(ticket.description)}</Clamp>
@@ -91,7 +91,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
               })}
             </span>
           )}
-          <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt, t)}</span>
+          <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt, t, lang)}</span>
         </div>
       </div>
       <ChevronRight className="text-muted-foreground size-4 shrink-0" />

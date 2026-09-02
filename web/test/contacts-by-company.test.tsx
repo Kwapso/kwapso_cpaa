@@ -135,7 +135,10 @@ describe("contacts, grouped under the company each one sits at", () => {
 
   it("falls back to the collection's own empty state when there is nothing to group", () => {
     draw([])
-    expect(headings()).toEqual([])
+    // No COMPANY heading — there is nothing to group. The one heading present
+    // is the empty state's own title (`CollectionEmptyState`, composition
+    // 27.21: "a bold title-style heading"), not a stray company name.
+    expect(headings()).toEqual(["No accounts yet."])
     expect(screen.getByText("No accounts yet.")).toBeTruthy()
   })
 })

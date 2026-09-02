@@ -50,11 +50,16 @@ const MAX_TODO_FILE_BYTES = 10 * 1024 * 1024
  * is a positional allow-list check (R20) and not a cast: anything else — the
  * retired `all` included — falls back to the open pile rather than reaching SQL.
  */
-function todoFilterFrom(url: URL): { accountId?: string; view: TodoViewName } {
+function todoFilterFrom(url: URL): { accountId?: string; view: TodoViewName; q?: string } {
   const asked = queryText(url.searchParams.get("view"), "View")
   return {
     accountId: queryText(url.searchParams.get("accountId"), "Client"),
     view: (TODO_VIEWS as readonly string[]).includes(asked ?? "") ? (asked as TodoViewName) : "open",
+    // THE NESTED PANEL'S OWN SEARCH BOX (work-panels.tsx's `TodosPanel`) — a
+    // to-do has no top-level list screen of its own, but it is paged (R14) like
+    // one, and a toolbar with no way to narrow forty outstanding requests was
+    // the gap the rest of the work engine had already closed.
+    q: queryText(url.searchParams.get("q"), "Search"),
   }
 }
 
@@ -72,23 +77,34 @@ async function todoPage(
   cfg: Parameters<typeof listTodos>[0],
   guard: Parameters<typeof listTodos>[1],
   scope: AccountScope,
-  filter: { accountId?: string; view: TodoViewName },
+  filter: { accountId?: string; view: TodoViewName; q?: string },
   cursor: string | null
 ): Promise<Response> {
-  // These are independent reads — one wait, not 2.
-  const [page, counts] = await Promise.all([
+  // THREE READS, never two — a search changes what `total` means without ever
+  // being allowed to move the sidecars a tab badge reads (R16: a search box
+  // narrows what THIS answer describes, not the collection those badges count).
+  // `filteredCounts` is skipped entirely when there is nothing to search for, so
+  // the unsearched screen still pays for exactly the one extra read it always did.
+  const [page, unfiltered, filtered] = await Promise.all([
     listTodos(cfg, guard, scope, filter, cursor),
     countTodos(cfg, guard, scope, { accountId: filter.accountId }),
+    filter.q ? countTodos(cfg, guard, scope, { accountId: filter.accountId, q: filter.q }) : null,
   ])
+  const totals = filtered ?? unfiltered
   return pagedJson(
     "todos",
     {
       rows: page.rows,
-      total: filter.view === "done" ? counts.done : counts.open,
+      // THE SAME QUESTION THE ROWS ANSWER — exact, over this view AND this
+      // search, so a `<PagedFind>` toolbar's own "N match" line is never the
+      // unsearched pile wearing a search result's clothes.
+      total: filter.view === "done" ? totals.done : totals.open,
       hasMore: page.hasMore,
       nextCursor: page.nextCursor,
     },
-    { openTotal: counts.open, doneTotal: counts.done, allTotal: counts.all }
+    // THE TAB BADGES' OWN NUMBERS — always the whole pile, whatever is typed in
+    // the search box above them.
+    { openTotal: unfiltered.open, doneTotal: unfiltered.done, allTotal: unfiltered.all }
   )
 }
 

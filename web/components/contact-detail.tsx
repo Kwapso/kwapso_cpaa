@@ -49,28 +49,15 @@ import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { Label } from "@shared/ui/components/label/label"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@shared/ui/components/alert-dialog/alert-dialog"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
+import { useConfirm } from "@shared/web/use-confirm"
 import { KeyRound, Pencil, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
-import {
-  PortalAccessPanel,
-  type Confirm,
-  type PanelActions,
-} from "@/components/account-detail-panels"
+import { PortalAccessPanel, type PanelActions } from "@/components/account-detail-panels"
 import { CompaniesPanel, ContactMeetingsPanel, ContactTicketsPanel } from "@/components/contact-panels"
 import { RecordPicker } from "@/components/record-picker"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
@@ -79,12 +66,12 @@ import { OverviewList } from "@/components/overview-list"
 import { RecordMark } from "@shared/web/record-mark"
 import { RichText } from "@shared/web/rich-text-view"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
@@ -153,8 +140,6 @@ export function ContactDetailScreen({
   // back lands on the tab she was reading, and a miss lands on "overview".
   const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
-  const [confirm, setConfirm] = React.useState<Confirm | null>(null)
-  const [busy, setBusy] = React.useState(false)
 
   // WHICH COMPANY THEY WORK FOR, as the picker holds it while somebody decides.
   // `""` is the picker's own "no company" row and the door's `null`. It re-seeds
@@ -174,30 +159,16 @@ export function ContactDetailScreen({
     onSaved()
   }, [accountId, teamId, onSaved])
 
-  const run = React.useCallback(
-    // `done` may be a FUNCTION, because a few of these acts only know what
-    // happened once they have happened: the portal grant reports whether the
-    // welcome email actually went out, and a plain string would be composed
-    // before the call and therefore always say the wrong thing. A string is
-    // still a string for the dozen callers where the sentence is known up front.
-    async (what: () => Promise<unknown>, done: string | (() => string), fallback: string) => {
-      setBusy(true)
-      try {
-        await what()
-        refresh()
-        toast.success(typeof done === "function" ? done() : done)
-        return true
-      } catch (err) {
-        toast.error(err instanceof ApiFailure ? err.message : fallback)
-        return false
-      } finally {
-        setBusy(false)
-      }
-    },
-    [refresh]
-  )
+  // The one confirm dialog every red action on this record shares
+  // (shared/web/use-confirm.tsx) — `run` refreshes on success and toasts
+  // either way (its `done` may be a FUNCTION, because a few of these acts only
+  // know what happened once they have: the portal grant reports whether the
+  // welcome email actually went out, and a plain string would be composed
+  // before the call and therefore always say the wrong thing); `ask` opens the
+  // dialog with the words for this particular act.
+  const { busy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
 
-  const actions: PanelActions = { busy, ask: setConfirm, act: run }
+  const actions: PanelActions = { busy, ask, act: run }
 
   // The edit form has no MOVE half and is not getting one back: it stopped
   // offering a parent picker on either kind of account (18 Aug 2026 —
@@ -311,7 +282,7 @@ export function ContactDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // WHICH COMPANIES THEY BELONG TO — the same link table the company screen
@@ -332,7 +303,7 @@ export function ContactDetailScreen({
         ? [
             {
               value: "todos",
-              label: t("To-dos"),
+              label: t("Inputs"),
               icon: CONCEPT_ICON.todos,
               badge: formatCount(todosTotal),
               badgeVariant: "" as const,
@@ -394,7 +365,7 @@ export function ContactDetailScreen({
               disabled: busy,
               destructive: true,
               onSelect: () =>
-                setConfirm({
+                ask({
                   title: `Archive ${account.name}?`,
                   body: "They stop showing in the everyday lists. Everything they are attached to stays exactly where it is, and you can bring them back any time.",
                   action: "Archive",
@@ -431,45 +402,71 @@ export function ContactDetailScreen({
       // and a square in the list that links to it. `fit` keeps the face cropped.
       // No photo falls back to the initial.
       leading={<RecordMark picture={account.logoUrl} name={account.name} fit="cover" size="band" />}
-      collectionLabel={t("Contact")}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `contact`), client ruling 2026-08-31.
+      eyebrow={t("Contact")}
+      // THE CLIENT'S OWN RULE: "the first chip is always in black and it's
+      // always the id. if there's no id there's no black chip." A contact is
+      // an `accounts` row of type individual — the SAME table and the SAME
+      // `code` column a company's own reference lives in (account-detail.tsx
+      // wires this identically for the entity side), minted by the one
+      // `createAccount` seam regardless of type. `undefined` when a contact's
+      // name minted nothing usable (accounts.ts: "a name with no usable
+      // letters mints nothing at all"), which is exactly when no black chip
+      // should show.
+      recordNumber={account.code || undefined}
+      // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
+      // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
+      // remember. not only for meetings, but everywhere." This used to repeat
+      // `t("Contact")` a second time as a chip, directly under the eyebrow
+      // that already says it. (account-detail.tsx's own `collectionLabel`,
+      // "Company", is NOT the same mistake — that screen only ever renders
+      // for the company half of this same table, so "Company" is a real,
+      // constant subtype fact the eyebrow's bare "Account" doesn't say.)
       chips={
         <>
-          {account.active ? null : <Badge>{t("Archived")}</Badge>}
+          {account.active ? null : (
+            <Badge variant="status" dot="archived">
+              {t("Archived")}
+            </Badge>
+          )}
           {liveLogin ? <Badge>{t("Can sign in")}</Badge> : null}
         </>
       }
       title={account.name}
-      status={account.email ?? ""}
+      // THE EMAIL LINE AND THE COMPANY LINKS ARE GONE — CLIENT RULING,
+      // 2026-08-31, VERBATIM: "what is this 3rd component in the title under
+      // the chips? kill everywhere. chips is the last component of
+      // headers!" `status` (email) mapped to `RecordChrome`'s `meta`, drawn
+      // directly under the chips row inside the kit's own
+      // `data-record-region="header"` block; `headerExtra` (the company
+      // links) mapped to `hero`, drawn in the kit's own
+      // `data-record-region="hero"` block, still above the tab strip and
+      // still reading as more content under the pills. Neither fact is lost:
+      // the email is already a row in the Overview tab (`overviewItems`),
+      // and the companies are already the Companies tab.
       actions={
         <>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
-            <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
         </>
       }
-      headerExtra={
-        companies.some((c) => c.active) ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {companies
-              .filter((c) => c.active)
-              .map((c) => (
-                <Button
-                  key={c.id}
-                  variant="link"
-                  type="button"
-                  onClick={() => softNavigate(`${basePath}/${c.accountId}`)}
-                  className="hover:text-foreground"
-                >
-                  {c.relationship ? `${c.relationship} at ${c.personName}` : c.personName}
-                </Button>
-              ))}
-          </p>
-        ) : undefined
-      }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: account.createdByName,
+        createdAt: account.createdAt,
+        editedByName: account.editedByName,
+        updatedAt: account.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("accounts", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -498,7 +495,7 @@ export function ContactDetailScreen({
                     it. The remaining refusals belong to the door: a ring, and an
                     account outside the caller's fence. */}
                 {canEdit && (
-                  <div className="flex flex-col gap-3 rounded-[var(--radius)] border p-4">
+                  <div className="flex flex-col gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
                     <p className="text-muted-foreground text-micro uppercase">
                       {t("Parent account")}
                     </p>
@@ -535,7 +532,7 @@ export function ContactDetailScreen({
                   </div>
                 )}
                 {account.about && (
-                  <div className="rounded-[var(--radius)] border p-4">
+                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
                     <p className="text-muted-foreground mb-2 text-micro uppercase">
                       {t("About")}
                     </p>
@@ -562,7 +559,14 @@ export function ContactDetailScreen({
           if (tabItem.value === "meetings")
             return <ContactMeetingsPanel accountId={accountId} basePath={basePath} />
 
-          if (tabItem.value === "activity") return <ActivityPanel activity={activity} />
+          if (tabItem.value === "activity")
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("accounts", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
 
           // THE LOGIN SWITCH — a person's, and only a person's. Granting it is
           // one button here rather than a picker, because there is nobody to
@@ -629,37 +633,7 @@ export function ContactDetailScreen({
         onSubmit={save}
       />
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !busy && !o && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{confirm?.body}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={busy}
-              onClick={(e) => {
-                e.preventDefault()
-                const c = confirm
-                if (!c) return
-                void c.run().then((ok) => ok && setConfirm(null))
-              }}
-            >
-              {busy ? <Spinner /> : null}
-              {busy ? t("Working…") : confirm?.action}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    <RecordFooter
-        audit={{
-          createdByName: account.createdByName,
-          createdAt: account.createdAt,
-          editedByName: account.editedByName,
-          updatedAt: account.updatedAt,
-        }}
-      />
+      {confirmDialog}
     </RecordScreen>
   )
 }

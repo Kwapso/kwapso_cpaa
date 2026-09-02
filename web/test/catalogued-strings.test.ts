@@ -308,16 +308,16 @@ describe("R28 · what the walk can REACH", () => {
     const de = (english: string, vars?: Record<string, string | number>) =>
       translate(english, "de", vars)
 
-    expect(formatRelative(fiveDaysAgo, de)).toBe("vor 5 Tagen")
-    expect(formatRelative(new Date().toISOString(), de)).toBe("gerade eben")
-    expect(de("Created by {name} · {when}", { name: "Aurora", when: formatRelative(fiveDaysAgo, de) })).toBe(
+    expect(formatRelative(fiveDaysAgo, de, "de")).toBe("vor 5 Tagen")
+    expect(formatRelative(new Date().toISOString(), de, "de")).toBe("gerade eben")
+    expect(de("Created by {name} · {when}", { name: "Aurora", when: formatRelative(fiveDaysAgo, de, "de") })).toBe(
       "Erstellt von Aurora · vor 5 Tagen"
     )
 
     // Past a week it is an absolute date, which is `formatDate`'s job and the
     // reader's own locale — deliberately not a second time vocabulary.
     const lastYear = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString()
-    expect(formatRelative(lastYear, de)).not.toContain("vor")
+    expect(formatRelative(lastYear, de, "de")).not.toContain("vor")
   })
 })
 

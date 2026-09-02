@@ -65,7 +65,7 @@ the system app. Neither is forced by this repo; each sets `data-scale` itself.
 
 | Value | Where | Why it may not scale |
 |---|---|---|
-| `--focus-width: 2px` · `--focus-offset: 2px` | tokens.css §3 | A focus ring must stay 2px at every text scale; a ring that grew with the type would swamp a dense control. |
+| `--focus-width: 1px` · `--focus-offset: 0px` | tokens.css §3 | A focus ring must stay 1px at every text scale; a ring that grew with the type would swamp a dense control. The offset is 0 by client ruling (2026-08-31) and is on this list for the same reason — a size, and one that must not grow. Both diverge from kit ruling 24's 2 and 2; `tokens.css` §3 carries why. |
 | `--radius-pill: 999px` | tokens.css §4 | "Fully round" is not a measurement. |
 | shadow geometry | `--shadow-rest` / `-lifted` / `-overlay` | A drop shadow is not type and does not scale. |
 
@@ -360,7 +360,7 @@ reason. No `focus:ring-*`, `focus-visible:ring-*` or `ring-offset-*`.
 radius, because an outline follows border-radius for free. Keyboard shows it; a
 mouse does not, because `:focus-visible` is the browser's own judgement of
 that. Sixty-five components each writing their own ring is sixty-five chances
-for one of them to be 1px, or the wrong colour, or absent. And a single
+for one of them to be 2px, or the wrong colour, or absent. And a single
 `outline: none` — usually added to "clean up" a click — removes a control from
 keyboard use with no visible symptom for anyone using a mouse.
 
@@ -859,8 +859,7 @@ are open questions with owners.
 
 | | State | What to do |
 |---|---|---|
-| **`--chart-4` / `--chart-5`** | Placeholders repeating `--chart-1` and `--chart-2`. A five-series chart shows two indistinguishable pairs. | Do not ship a five-series chart. Bundle the fix with the new brand colours. |
-| **`--warning`** | Provisionally the **quiet chip**, pending new colours. There is no amber in the kwapso palette. | A warning badge is currently visually identical to `Badge variant="secondary"`. The word carries the whole meaning. |
+| **`--warning-strong`** | The warning **word**. Still `--ink-primary`; nothing in the kit reads it. Orange as text measures 2.23 / 2.02 on the two light papers, so it cannot take the fill `--warning` took on 2026-09-02. | Do not write a warning in orange. The day a component needs a warning word, this token needs a client ruling. |
 | **`--hair-faint`** | Role disputed — line colour or surface? Two chapters of the kit assign it differently. | It is currently used as a *surface* (disabled and read-only field fills). `Separator` deliberately offers no `faint` variant so the dispute is not frozen by accident. |
 | **Icon artwork** | All 96 are **placeholder**. Names, React API, five sizes and `currentColor` wiring are final. | Build against the names. The swap is one command. |
 | **Fonts** | Saans and SerrifCondensed are named first in `--font-sans` / `--font-serif` with real fallback stacks. The files are not shipped — a licence question. | Nothing renders blank. Expect the fallback until the licence resolves. |

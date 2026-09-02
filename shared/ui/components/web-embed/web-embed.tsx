@@ -26,12 +26,38 @@
      which is not decoration: it is the frame's accessible name and the only
      thing a screen reader has to go on.
 
-   THE SANDBOX IS DEFAULTED CLOSED
-   An embed is foreign code. The default here allows scripts and same-origin
-   and nothing else — no forms, no popups, no top-level navigation, no
-   downloads. A call site that needs more passes its own `sandbox`, which
-   replaces this wholesale, and passing `sandbox={undefined}` removes the
-   attribute entirely for the cases that genuinely need an unsandboxed frame.
+   THE SANDBOX IS DEFAULTED CLOSED, AND UNTIL 2026-09-02 IT WAS NOT
+   An embed is foreign code. The default is `allow-scripts` and NOTHING else —
+   no same-origin, no forms, no popups, no top-level navigation, no downloads.
+
+   IT USED TO BE `allow-scripts allow-same-origin`, AND THAT PAIR IS NOT A
+   SANDBOX. The HTML standard says so about this exact combination: with both
+   tokens set, framed content served from the embedder's own origin can reach
+   its own DOM through `window.parent`/`frames`, rewrite its own `sandbox`
+   attribute and reload itself out of the sandbox entirely — so the default
+   permitted the one thing the paragraph above claimed it prevented. The
+   header said "defaulted closed" and the constant said otherwise; the code
+   was the wrong half. Dropping `allow-same-origin` puts the frame in an
+   opaque origin, which is what actually walls it off from this app's cookies,
+   `localStorage` and DOM, and it costs an ordinary third-party embed nothing:
+   a video, a map or a form on somebody else's origin was already cross-origin
+   and was never reading ours.
+
+   THE ONE LEGITIMATE NEED IS AN OPT-IN PROP, NOT A DEFAULT. A first-party
+   embed — our own page, in our own frame, that has to reach its own storage —
+   passes `allowSameOrigin`. It is a named boolean rather than a hand-typed
+   `sandbox` string on purpose: the dangerous pair is then one greppable word
+   at the call site instead of a token buried in a string nobody re-reads, and
+   the call site states the trust rather than inheriting it. A call site that
+   needs something else again passes its own `sandbox`, which replaces the
+   default wholesale.
+
+   THERE IS NO WAY TO REMOVE THE ATTRIBUTE, and the header used to claim
+   there was: it said `sandbox={undefined}` dropped it. That was never true —
+   `sandbox` is a defaulted parameter, so `undefined` is exactly the value
+   that selects the default — and it is not wanted either. An unsandboxed
+   frame is not a state "defaulted closed" can have.
+
    This is a security default, not a design one; logged as GAPS-G.md EMB-3.
 
    RENDERING CONTEXT
@@ -47,10 +73,19 @@ import { imageVariants } from "../image/image";
 import { ExternalLink, Loader2, TriangleAlert } from "../../foundations/icons";
 
 /**
- * Scripts and same-origin, nothing else. Stated as a constant so a reader can
- * see what "the default" is without reading the JSX.
+ * Scripts, and nothing else. Stated as a constant so a reader can see what
+ * "the default" is without reading the JSX. `allow-same-origin` is
+ * deliberately absent — paired with `allow-scripts` it lets framed content
+ * remove its own sandbox. See the header.
  */
-const DEFAULT_SANDBOX = "allow-scripts allow-same-origin";
+const DEFAULT_SANDBOX = "allow-scripts";
+
+/**
+ * The default plus `allow-same-origin`, for a first-party embed that has said
+ * so. Composed from the constant above rather than written out again, so the
+ * two can never disagree about what "the default plus one token" is.
+ */
+const SAME_ORIGIN_SANDBOX = `${DEFAULT_SANDBOX} allow-same-origin`;
 
 export interface WebEmbedProps
   extends Omit<React.ComponentPropsWithoutRef<"iframe">, "className" | "loading"> {
@@ -90,6 +125,20 @@ export interface WebEmbedProps
   lazy?: boolean;
   /** Render nothing when there is no `src`. Default `false` — the box holds. */
   hideWhenEmpty?: boolean;
+  /**
+   * Add `allow-same-origin` to the sandbox. Default `false`, and it must stay
+   * the exception: together with the default's `allow-scripts` it lets a
+   * SAME-ORIGIN document reach `window.parent`, rewrite its own `sandbox`
+   * attribute and reload itself unsandboxed — which is no sandbox at all.
+   *
+   * Pass it only for a frame whose `src` is ours: our own page, needing its
+   * own cookies or `localStorage`. A third-party embed is already
+   * cross-origin, so this buys it nothing and gives away the wall.
+   *
+   * Ignored when the call site passes its own `sandbox`; that string replaces
+   * the default wholesale and is the call site's own business.
+   */
+  allowSameOrigin?: boolean;
   /** Classes for the <iframe> itself. The root's come from `className`. */
   mediaClassName?: string;
   /** Merged onto the frame, last, so a call site always wins. */
@@ -152,7 +201,12 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
       openLabel = "Open in a new tab",
       lazy = true,
       hideWhenEmpty = false,
-      sandbox = DEFAULT_SANDBOX,
+      allowSameOrigin = false,
+      /* NOT defaulted in the destructure. The default depends on
+         `allowSameOrigin`, and a defaulted parameter cannot see a sibling's
+         resolved value without asserting an evaluation order a reader has to
+         work out. Resolved on its own line below instead. */
+      sandbox,
       referrerPolicy = "strict-origin-when-cross-origin",
       style,
       onLoad,
@@ -165,6 +219,16 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
     React.useEffect(() => {
       setLoaded(false);
     }, [src]);
+
+    /* A call site's own `sandbox` wins outright — including an empty string,
+       which is the maximally restrictive sandbox and a real thing to ask for,
+       so the test is `!== undefined` and never a truthiness check. */
+    const frameSandbox =
+      sandbox !== undefined
+        ? sandbox
+        : allowSameOrigin
+          ? SAME_ORIGIN_SANDBOX
+          : DEFAULT_SANDBOX;
 
     const empty = src === undefined || src === null || src === "";
     const busy = !error && !empty && (loading || !loaded);
@@ -192,7 +256,7 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
             data-slot="web-embed-frame"
             src={src}
             title={title}
-            sandbox={sandbox}
+            sandbox={frameSandbox}
             referrerPolicy={referrerPolicy}
             loading={lazy ? "lazy" : "eager"}
             onLoad={(event) => {

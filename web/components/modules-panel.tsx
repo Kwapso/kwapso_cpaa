@@ -41,11 +41,14 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
 
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { InternalRecordDialog, moduleFields, type InternalRecordValues } from "@/components/internal-record-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { appModulesKey, totalKey } from "@/lib/live-resources"
@@ -68,6 +71,14 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
   const [addOpen, setAddOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<AppModule | null>(null)
   const [switching, setSwitching] = React.useState<AppModule | null>(null)
+  const [query, setQuery] = React.useState("")
+  // No status filter here — the door already excludes an archived module (the
+  // comment above), so every row in `modules` is active and a filter that can
+  // never show a second value would be a control with nothing to control.
+  const [sort, setSort] = React.useState<{ by: "name" | "ticketCount"; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
 
   // THIS APP'S, out of the team's. Archived ones are excluded by the door, so
   // what is here is what a ticket can still be filed against.
@@ -75,6 +86,23 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     () => (q.data ?? []).filter((m) => m.appId === appId),
     [q.data, appId]
   )
+
+  const shownModules = React.useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    const dirMul = sort.dir === "desc" ? -1 : 1
+    return modules
+      .filter(
+        (m) =>
+          needle === "" ||
+          m.name.toLowerCase().includes(needle) ||
+          (m.description ?? "").toLowerCase().includes(needle)
+      )
+      .sort((a, b) =>
+        sort.by === "ticketCount"
+          ? (a.ticketCount - b.ticketCount) * dirMul
+          : a.name.localeCompare(b.name) * dirMul
+      )
+  }, [modules, query, sort])
 
   // THE TAB BADGE, primed from the read this panel already makes (R16). It is an
   // exact number rather than a page length, because the read is bounded and
@@ -106,22 +134,52 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
 
   return (
     <div className="space-y-3">
-      {canCreate ? (
-        <div className="flex justify-end">
-          <AddButton onClick={() => setAddOpen(true)} label={t("Add module")} />
-        </div>
-      ) : null}
+      <ToolbarRow
+        search={
+          modules.length > 0 && (
+            <>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search modules…")}
+                className="flex-1"
+                aria-label={t("Search modules")}
+              />
+              <SortControl
+                options={[
+                  { value: "name", label: t("Name") },
+                  { value: "ticketCount", label: t("Open tickets") },
+                ]}
+                value={sort.by}
+                onValueChange={(by) => setSort({ by: by as typeof sort.by, dir: "asc" })}
+                direction={sort.dir}
+                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
+                label={t("Sort by")}
+                hideLabel
+              />
+            </>
+          )
+        }
+        actions={canCreate && <AddButton onClick={() => setAddOpen(true)} label={t("Add module")} />}
+      />
 
       {modules.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">
-          {t("No modules yet. Add the sections this app is divided into, so tickets can say which one they are about.")}
-        </p>
+        // No `app_modules` import target — a module names a section of a
+        // system somebody already knows, not a list somebody holds in a
+        // spreadsheet.
+        <CollectionEmptyState
+          title={t("No modules yet.")}
+          description={t("Add the sections this app is divided into, so tickets can say which one they are about.")}
+          onCreate={canCreate ? () => setAddOpen(true) : undefined}
+        />
+      ) : shownModules.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
       ) : (
         <ul className="space-y-2">
-          {modules.map((m) => (
+          {shownModules.map((m) => (
             <li
               key={m.id}
-              className="bg-card flex flex-wrap items-center gap-3 rounded-[var(--radius)] border p-3"
+              className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3"
             >
               {/* THE EMOJI IS THE RECORD'S FACE (R35) — one glyph, and a quiet
                   dot where nobody has chosen one, so the names still line up. */}
@@ -139,10 +197,11 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                   {m.ticketCount} {m.ticketCount === 1 ? t("open ticket") : t("open tickets")}
                 </Badge>
               ) : null}
+              {/* ICON-ONLY, on every width now (client ruling, 2026-08-31: "edit,
+                  only the pencil icon") — no more `sm:not-sr-only` reveal. */}
               {canEdit ? (
-                <Button variant="ghost" size="sm" onClick={() => setEditing(m)} className="gap-1">
-                  <Pencil className="size-3.5" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">{t("Edit")}</span>
+                <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
+                  <Pencil className="size-3.5" />
                 </Button>
               ) : null}
               {canSwitchOff ? (

@@ -22,6 +22,14 @@
      defaulting to mango put it on most rows of a list and broke the
      one-mango-per-view rule that the same kit states.
    · Radius is `--radius-pill`.
+   · Separation is a FILL, never a border or a shadow — GAPS-RULINGS.md R-4c.
+     `secondary`'s quiet fill is a rebindable custom property precisely so the
+     one case where `--surface-quiet` reads too close to its ground (an
+     ambient `--muted` field, not a card) has a real escape hatch: a caller
+     rebinds `--badge-quiet-fill` to a darker quiet tone. It never reaches for
+     an edge instead — this file draws no `border` anywhere but `outline`'s
+     inset hairline, and that carve-out is `outline`'s alone (GAPS-REVIEW1A
+     Q4), not a pattern to extend to `secondary`.
    · A count renders EMPTY, never "0" (kit `.kw-badge:empty { display:none }`).
      That is this component's empty state and its loading state both.
    · CH11 draws THREE pill geometries and this file now carries two of them:
@@ -77,8 +85,23 @@ const badgeVariants = cva(
       variant: {
         /** `.kw-badge--accent` — the brand fill, charcoal label. */
         default: "bg-primary text-primary-foreground",
-        /** `.kw-badge` base — the quiet counter. */
-        secondary: "bg-surface-quiet text-ink-secondary",
+        /**
+         * `.kw-badge` base — the quiet counter.
+         *
+         * THE FILL IS A CUSTOM PROPERTY WITH A FALLBACK, NOT A BARE TOKEN —
+         * see GAPS-RULINGS.md R-4c. `--surface-quiet` reads fine everywhere
+         * this badge ships today (panel, card, page); the one case it does
+         * NOT — measured, not assumed — is a quiet badge sitting on `--muted`
+         * (tokens.css's own "inactive tabs, idle wells", an ambient field
+         * rather than a card): 1.175 in dark, worse than the panel case
+         * already logged in GAPS-CONTRAST.md Tier C. A caller who KNOWS a
+         * badge sits on that ground rebinds `--badge-quiet-fill` locally to a
+         * darker quiet tone — a FILL shift, same mechanism `tabs.tsx` TAB-C1
+         * uses for the folder tab's two papers — never a border or a shadow.
+         * Every existing call site is unaffected: with nothing rebound, this
+         * resolves to exactly `--surface-quiet`, unchanged.
+         */
+        secondary: "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-ink-secondary",
         /* The one uncoloured variant, and so the one that carries an edge.
            No `border` property — review 1A · fix 2 — so the edge is the
            artifact's own inset hairline. ch02's carve-out names fields,
@@ -92,9 +115,17 @@ const badgeVariants = cva(
         /** `.kw-tag--forest` — forest fill, charcoal label. Lifts on dark. */
         success: "bg-success text-success-foreground",
         /**
-         * The kwapso palette holds no amber. `--warning` resolves to poppy by
-         * decision in tokens.css §3 — a warning badge is a danger badge until a
-         * kit ruling admits a distinct tone. Logged as GAPS.md BDG-1.
+         * RULED 2026-09-02. `--warning` is the client's new orange
+         * (`--kw-orange`, admitted the same day) and `--warning-foreground`
+         * is charcoal on it, at 7.79:1 — the accent law, in both palettes,
+         * with no dark half because the fill has none.
+         *
+         * Until that ruling this pair resolved to `--surface-quiet` /
+         * `--ink-secondary`, which is EXACTLY what `secondary` above draws:
+         * a warning chip and a quiet chip were the same pixels in both
+         * palettes, in one component offering them as two variants. Poppy is
+         * not involved and has not been since ruling 3B — `destructive`
+         * means blocked, and it means only that. Closes GAPS.md BDG-1.
          */
         warning: "bg-warning text-warning-foreground",
 

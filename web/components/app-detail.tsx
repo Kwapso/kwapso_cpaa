@@ -16,10 +16,12 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { useRemembered } from "@shared/web/remembered"
 import { ModulesPanel } from "@/components/modules-panel"
 import { Pencil, Power } from "@shared/ui/foundations/icons"
@@ -46,12 +48,13 @@ import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
-  RecordFooter,
+  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
+  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
@@ -65,8 +68,7 @@ import {
   totalKey,
   impactKey,
 } from "@/lib/live-resources"
-import { softNavigate } from "@/lib/nav"
-import { appStageMark } from "@shared/app-stages"
+import { appStageDotTone, appStageMark } from "@shared/app-stages"
 import { AppMark } from "@/components/app-tiles"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -78,6 +80,7 @@ import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { StakeholdersPanel } from "@/components/stakeholders-panel"
+import { useConfirm } from "@shared/web/use-confirm"
 
 export function AppDetailScreen({
   teamId,
@@ -164,6 +167,12 @@ export function AppDetailScreen({
     canRaiseTicket ? `selectable:${teamId}` : null,
     () => tenancy.selectable().then((r) => r.values)
   )
+  // THE TEAM'S OWN `Ticket type` WORDS — one derivation, read by the create
+  // dialog below AND by the Tickets tab's own Kind facet, so the two can never
+  // offer two different lists of the same vocabulary.
+  const helpTypeOptions = (selectableQ.data ?? [])
+    .filter((v) => v.type === "Ticket type" && v.active)
+    .map((v) => v.value)
 
   // The open tab is remembered per record for as long as this document
   // lives (web/lib/nav-memory.ts) — leaving to another section and coming
@@ -175,7 +184,6 @@ export function AppDetailScreen({
   const [storyOpen, setStoryOpen] = React.useState(false)
   const [ticketOpen, setTicketOpen] = React.useState(false)
   const [meetingOpen, setMeetingOpen] = React.useState(false)
-  const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
 
   // The URL PREFIX we are standing in — "" at the top level, "/t/<teamId>" inside
@@ -194,6 +202,11 @@ export function AppDetailScreen({
     invalidate(impactKey(teamId))
     invalidate(`activity:record:apps:${appId}`)
   }, [appId, teamId])
+
+  // The one confirm dialog this record's red action shares
+  // (shared/web/use-confirm.tsx) — `run` refreshes on success and toasts
+  // either way; `ask` opens the dialog with the words for archiving.
+  const { busy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
 
   async function save(values: AppFormValues) {
     await tenancy.updateApp({
@@ -220,19 +233,6 @@ export function AppDetailScreen({
     })
     refresh()
     toast.success(t("App updated."))
-  }
-
-  async function setActive(active: boolean) {
-    setBusy(true)
-    try {
-      await tenancy.setAppActive(appId, active)
-      refresh()
-      toast.success(active ? t("App restored.") : t("App archived."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that app."))
-    } finally {
-      setBusy(false)
-    }
   }
 
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
@@ -262,8 +262,32 @@ export function AppDetailScreen({
       />
     )
 
-  const account = app.accountId ? (accountsQ.data ?? []).find((a) => a.id === app.accountId) : null
-  const accountName = account?.name ?? (app.accountId ? "A client" : null)
+  function archiveApp() {
+    ask({
+      title: t("Archive {name}?", { name: app!.name }),
+      body: t("It stops showing in the everyday lists. Everything on it, its work and its history, stays exactly where it is, and you can bring it back any time."),
+      action: t("Archive"),
+      run: () => run(() => tenancy.setAppActive(appId, false), t("App archived."), t("Couldn't archive that app.")),
+    })
+  }
+
+  async function restoreApp() {
+    await run(() => tenancy.setAppActive(appId, true), t("App restored."), t("Couldn't restore that app."))
+  }
+
+  // THE REAL NAME, NEVER "A CLIENT" WHILE A REAL ACCOUNT IS LINKED — client
+  // bug, 2026-08-31: ETZI's own account chip read "A client" instead of
+  // "Etzi Haus" even though `app.accountId` pointed at a real, active
+  // account. Root cause was the SAME shape the comment below (THE CONTACT
+  // NAMES) already names for a sibling field: `accountsQ.data` is the accounts
+  // list, and accounts are a GROWING collection that PAGES (R14) — page one is
+  // newest-first, so an older or otherwise-unlucky account silently missed the
+  // page and `.find()` came back empty forever, not just on the first paint.
+  // `contactsQ` already reads THIS exact account by id, off the single-record
+  // door (`tenancy.accountDetail`, below), for the stakeholder names two
+  // sections down — its own `.account` is the same record, read the way R38
+  // asks a detail screen to read one: by id, never by scanning a loaded page.
+  const accountName = app.accountId ? (contactsQ.data?.account.name ?? "A client") : null
 
   // ONLY THE STAFF ON IT AND AN ADMIN OPEN THIS PAGE (CHECKLIST 8.11, Aurora's
   // ap1 over the narrower reading). The refusal is the DOOR's — the app row
@@ -273,7 +297,18 @@ export function AppDetailScreen({
   if (!app.canOpen)
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-medium">{app.name}</h1>
+        {/* h1 (44/500) — RECHECKED 2026-08-31 as part of the client's main-vs-
+            detail correction. This bare title is NOT a main-screen heading —
+            it is this same App RECORD's own detail title, drawn without
+            RecordChrome only because the reader cannot open the record (see
+            this branch's own comment above). Every other path through this
+            file renders the same record's title through RecordScreen, which
+            now takes the "Record heading" step via record-chrome.tsx's own
+            app-side override; this fallback carries the identical step
+            directly so the one record shows one title size regardless of
+            which branch draws it — the earlier pass had this at h2 (32),
+            grouping it with the MAIN-screen sweep by mistake. */}
+        <Headline as="h1" size="h1">{app.name}</Headline>
         <p className="text-muted-foreground text-sm">
           {t(
             "You're not on this app, so its page is closed. Ask an admin to add you to the team on it."
@@ -312,7 +347,10 @@ export function AppDetailScreen({
   // than shown empty (UI-RULEBOOK W2 — `hideEmpty` is the default).
   const overviewItems = [
     { label: t("Client"), value: accountName ?? "Ours, no client" },
-    { label: t("Stage"), value: app.stage ? `${appStageMark(app.stage)} ${app.stage}`.trim() : "—" },
+    // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
+    // sits where an icon sits and never inside a sentence") — it already draws
+    // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
+    { label: t("Stage"), value: app.stage || "—" },
     { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
     {
       label: t("Client context"),
@@ -325,7 +363,7 @@ export function AppDetailScreen({
   ]
 
   const tabsConfig = {
-    ...defaultTabsConfig,
+    ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
@@ -453,7 +491,7 @@ export function AppDetailScreen({
 
   /* B1 / CHECKLIST 11.2 — an app has no lifecycle button, so its one visible
    * action is Edit and everything else is in the menu. Archive keeps its red and
-   * its confirm by moving. */
+   * its confirm (shared/web/use-confirm.tsx) by moving. */
   const overflow: RecordAction[] = canArchive
     ? [
         app.active
@@ -463,14 +501,14 @@ export function AppDetailScreen({
               icon: <Power className="size-3.5" />,
               disabled: busy,
               destructive: true,
-              onSelect: () => void setActive(false),
+              onSelect: archiveApp,
             }
           : {
               key: "restore",
               label: t("Restore"),
               icon: <Power className="size-3.5" />,
               disabled: busy,
-              onSelect: () => void setActive(true),
+              onSelect: () => void restoreApp(),
             },
       ]
     : []
@@ -485,38 +523,74 @@ export function AppDetailScreen({
       // disagree about which picture an app has.
       mark={appStageMark(app.stage)}
       leading={<AppMark app={app} size="band" />}
-      collectionLabel={t("App")}
+      // The bare record-type word, glossary's own term (shared/glossary.ts
+      // `app`), client ruling 2026-08-31.
+      eyebrow={t("App")}
+      // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. An
+      // app gained one the same day this rule split off the account-code
+      // prefix (shared/workers/refs.ts) — `AppRow.ref` didn't exist before
+      // that, which is why this used to be the record that had none.
+      recordNumber={app.ref || undefined}
+      // THE THREE PILLS, sharpened by a second client ruling the same day,
+      // reading their own screenshot of THIS exact screen back: "1 id, 2
+      // status, 3 the most relevant container parent". They live in `chips`
+      // rather than `collectionLabel`, because `collectionLabel` is always
+      // wrapped in the kit's own plain `Badge` — nesting a coloured
+      // `variant="status"` Badge inside it would double-wrap the pill;
+      // `chips` renders bare, so each one is exactly the Badge it should be,
+      // in the order the client read off the screenshot.
+      chips={
+        <>
+          {app.stage && (
+            <Badge variant="status" dot={appStageDotTone(app.stage)}>
+              {app.stage}
+            </Badge>
+          )}
+          {app.accountId && (
+            <RecordChipLink href={`${host.base}/accounts/${app.accountId}`}>
+              {accountName}
+            </RecordChipLink>
+          )}
+          {app.active ? null : (
+            <Badge variant="status" dot="archived">
+              {t("Archived")}
+            </Badge>
+          )}
+        </>
+      }
       title={app.name}
-      status={[app.stage, accountName || t("Ours, no client"), app.active ? undefined : t("Archived")]
-        .filter(Boolean)
-        .join(" · ")}
+      // NO STATUS LINE, NO "BUILT FOR" SUBTITLE — client feedback, 2026-08-31,
+      // reading the live ETZI screen back, verbatim: "in the title, still
+      // wrong. only components: image (sometimes), eyebrow, title, pills.
+      // remove the rest joder." Both used to duplicate the three chips above,
+      // word for word (stage, account, archived) — `status` as a dot-joined
+      // plain-text line and `headerExtra` as a second "Built for {account}"
+      // line, neither carrying a fact the chips didn't already say. They
+      // predate this file's chip work (override 73 / the 2026-08-31 status-
+      // colour ruling) and were never removed once the chips took over saying
+      // the same thing.
       actions={
         <>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
-            <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
+            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <Pencil className="size-3.5" />
-              {t("Edit")}
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
         </>
       }
-      headerExtra={
-        /* THE CROSS-LINK UP THE TREE — an app belongs to one account, always, so
-           its account is one tap away from every screen it appears on. */
-        app.accountId ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Button
-              variant="link"
-              type="button"
-              onClick={() => softNavigate(`${host.base}/accounts/${app.accountId}`)}
-              className="hover:text-foreground"
-            >
-              {t("Built for")} {accountName}
-            </Button>
-          </p>
-        ) : undefined
-      }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: app.createdByName,
+        createdAt: app.createdAt,
+        editedByName: app.editedByName,
+        updatedAt: app.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("processes", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}
@@ -569,6 +643,11 @@ export function AppDetailScreen({
             return (
               <AppTicketsPanel
                 marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
+                // The same vocabulary the create dialog below already fetches
+                // (gated the same way, on `canRaiseTicket`) — a reader who may
+                // only READ tickets here simply gets no Kind facet, rather than
+                // this panel paying for a second fetch nothing else needed.
+                helpTypeOptions={helpTypeOptions}
                 appId={appId}
                 host={host}
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
@@ -600,7 +679,13 @@ export function AppDetailScreen({
               />
             )
           if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
+            return (
+              <ActivityPanel
+                activity={activity}
+                onAddNote={can("processes", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+              />
+            )
           return <OverviewList items={overviewItems} />
         }}
       />
@@ -650,9 +735,7 @@ export function AppDetailScreen({
         open={ticketOpen}
         onOpenChange={setTicketOpen}
         teamId={teamId}
-        helpTypeOptions={(selectableQ.data ?? [])
-          .filter((v) => v.type === "Ticket type" && v.active)
-          .map((v) => v.value)}
+        helpTypeOptions={helpTypeOptions}
         fixedApp={{ id: appId, name: app.name }}
         draftKey={`help:add:app:${appId}`}
         onSubmit={async (v) => {
@@ -763,14 +846,8 @@ export function AppDetailScreen({
           return madeId
         }}
       />
-    <RecordFooter
-        audit={{
-          createdByName: app.createdByName,
-          createdAt: app.createdAt,
-          editedByName: app.editedByName,
-          updatedAt: app.updatedAt,
-        }}
-      />
+
+      {confirmDialog}
     </RecordScreen>
   )
 }

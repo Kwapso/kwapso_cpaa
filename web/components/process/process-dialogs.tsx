@@ -11,6 +11,7 @@
 // one place a split can be proved by the type checker alone.
 
 import * as React from "react"
+import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Input } from "@shared/ui/components/input/input"
 import { Field } from "@shared/web/field"
@@ -19,7 +20,8 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure } from "@/lib/api"
-import { useT } from "@shared/web/language"
+import { dateFromYMD, ymdFromDate } from "@shared/web/format"
+import { useLanguage, useT } from "@shared/web/language"
 
 /** MOVE THE DAY THE SAVING IS MEASURED FROM.
  *
@@ -44,7 +46,7 @@ export function AuditDateDialog({
   stops: string[]
   onSubmit: (day: string) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [day, setDay] = React.useState(current)
   const [busy, setBusy] = React.useState(false)
   React.useEffect(() => {
@@ -81,11 +83,12 @@ export function AuditDateDialog({
         htmlFor="audit-date"
         className={fieldSpacing}
       >
-        <Input
+        <DatePicker
           id="audit-date"
-          type="date"
-          value={day}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDay(e.target.value)}
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(day)}
+          onValueChange={(d) => setDay(ymdFromDate(d))}
           disabled={busy}
         />
       </Field>

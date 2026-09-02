@@ -229,7 +229,7 @@ export function ReviewDialog({
           ) : shown.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nothing attached yet.")}</p>
           ) : (
-            <ul className="divide-border divide-y rounded-[var(--radius)] border">
+            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
               {shown.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                   {a.kind === "file" ? (
