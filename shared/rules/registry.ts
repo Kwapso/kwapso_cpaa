@@ -591,10 +591,14 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // RAISED AGAIN, SAME DAY, 140 → 141: the filter row's own "Filter" chip
 // gained a count ("Filter (3)") once it carries active facets and the row
 // is closed — one new interpolated string, same blocked translation path.
+//
+// RAISED AGAIN, SAME DAY, 141 → 142: ThemeSection's card press gained a
+// success toast ("Theme changed.") to match SpineSection and ScaleSection,
+// which already confirm their own presses this way.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 141,
-  es: 141,
-  ca: 141,
+  de: 142,
+  es: 142,
+  ca: 142,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

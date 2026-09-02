@@ -35,6 +35,7 @@
 
 import * as React from "react"
 
+import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   AppearanceOptionGroup,
   ThemePicture,
@@ -138,6 +139,11 @@ export function ThemeSection({ className }: { className?: string }) {
         // itself makes, and swallows the same way.
       }
     }
+    // There is no save round trip to wait on (see the header — this is
+    // device-local), but SpineSection and ScaleSection both confirm their
+    // own card presses with a toast, and a card that applies instantly with
+    // no feedback at all reads as broken next to those two.
+    toast.success(t("Theme changed."))
   }
 
   return (
