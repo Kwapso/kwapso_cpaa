@@ -2143,8 +2143,30 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
           ) : null}
 
           {/* THE CARD — the one floating thing. Square on its leading corner
-              ONLY where the trail actually attaches; see `CARD_JOINED`. */}
-          <div
+              ONLY where the trail actually attaches; see `CARD_JOINED`.
+
+              `<main>`, NOT `<div>` — THE ONLY LANDMARK CHANGE IN THIS BLOCK,
+              AND IT IS LOAD-BEARING. Grepping the agency app's `layout.tsx`,
+              `app-shell.tsx` and this file finds no `<main>` and no
+              `role="main"` anywhere in its authenticated shell — every
+              routed screen sits in plain `<div>`s, so a screen-reader user's
+              landmark list has no entry for "the page" at all, only
+              whatever this file already labels (the rail's `<nav>`, and now
+              the aside's `role="complementary"`, above). `ScreenShell` is
+              THE screen since the 2026-09-02 collapse — every route in the
+              agency app renders exactly one of these per document — so
+              fixing it here, once, is one correct answer both doors inherit
+              instead of each hand-rolling its own. THE CLIENT PORTAL DOES
+              NOT DOUBLE UP: `web-portal/components/portal-shell.tsx` draws
+              its own `<main>` directly and never imports `ScreenShell`, so
+              this element and that one are never on the same page — checked
+              before this landed, not assumed. THE HEADER BAND AND THE BODY
+              ARE BOTH INSIDE IT, THE BREADCRUMB IS NOT: the trail above is
+              navigation chrome (and `BreadcrumbFolders` already carries its
+              own `<nav>`), but the title, the actions and everything the
+              route actually renders are the page's main content, which is
+              exactly what this element wraps. */}
+          <main
             data-slot="screen-shell-content"
             data-level="card"
             data-joined={breadcrumb ? "" : undefined}
@@ -2195,7 +2217,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 </div>
               )}
             </div>
-          </div>
+          </main>
         </div>
 
         {/* THE ASIDE DOCK — the gutter BEFORE the column, mirroring the rail
@@ -2271,9 +2293,32 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               <div
                 data-slot="screen-shell-aside"
                 data-level="aside"
+                role="complementary"
                 aria-label={asideLabel}
                 className="flex w-[23.75rem] min-h-0 max-w-[40vw] flex-none flex-col overflow-y-auto"
               >
+                {/* `role="complementary"` IS THE FIX, NOT DECORATION. A `<div>`
+                    computes to the `generic` role no matter what `aria-label`
+                    it carries, and a labelled generic is not a landmark — the
+                    accessible-name-and-description spec attaches the name to
+                    the element's own role, and `generic` has no landmark
+                    mapping for that name to land on. So `asideLabel` was
+                    always readable AT the assistant, never as an entry in a
+                    screen reader's "jump to region" list; a reader had to tab
+                    linearly through the rail, the breadcrumb and the card to
+                    reach it. `RAIL` (above) does not share this defect even
+                    though `screen-shell-rail`'s own wrapper is the identical
+                    role-less-div shape — its landmark comes from the real
+                    `<nav aria-label>` `Rail`'s own root draws one level in,
+                    not from this shell's wrapper. The aside has no such inner
+                    node — `BreadcrumbFolders` renders a `<nav>` of its own for
+                    the tab, but that nav names the TAB ("Clients"), not the
+                    panel — so the wrapper has to carry the role itself.
+                    `complementary` over `<aside>`: this file's other levels
+                    (`rail`, `card`, `body`) are all plain `<div>`s keyed by
+                    `data-level`, and swapping element types for one of five
+                    would make the shape read as an exception rather than a
+                    role attribute doing its one job. */}
                 {/* THE TAB — `asideLabel` drawn as ONE folder tab, through the
                     same component the content trail uses rather than a second
                     drawing of the shape: a single, non-interactive crumb is

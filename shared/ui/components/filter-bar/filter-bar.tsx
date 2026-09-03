@@ -495,6 +495,29 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
    * variant="default" />` (or nothing) and this file only places it. Optional
    * and additive — omitted, the slot is byte-identical to before. */
   addFilterBadge?: React.ReactNode;
+  /**
+   * ANNOUNCE-ONLY. Wires `aria-expanded` on the "+ filter" trigger; it does
+   * NOT open or close anything and this file renders no panel of its own.
+   *
+   * THE CONSUMING APP OWNS THE OPEN/CLOSED STATE, ON PURPOSE, NOT BY
+   * OVERSIGHT. `showAdd`'s picker used to be this component's to draw, and
+   * the app pulled that state out so the pill and its panel could merge
+   * into one container — a client ruling — leaving `onAddFilter` as a bare
+   * "something happened" callback with nowhere for the state to come back
+   * in. Without this prop the trigger had a state (open or closed, held by
+   * the app) with no way to say so, which is a closed-loop toggle that
+   * never announces its own loop closing: `aria-expanded` MUST reflect the
+   * true state of the thing it controls, and there was no true state on
+   * this side of the boundary to read.
+   *
+   * OPTIONAL, AND IT DOES NOT TOUCH RENDERING. Omitted, `aria-expanded` is
+   * not written at all — not `"false"`, absent — so a call site that has
+   * not wired this yet gets a button byte-identical to today's. This is
+   * the same shape `onAddFilter` itself already uses: a prop that only
+   * changes what is announced, layered onto a slot an app may or may not
+   * have adopted yet.
+   */
+  addFilterExpanded?: boolean;
   /** The generic remove label, combined with each chip's own text. */
   removeLabel?: string;
   /**
@@ -569,6 +592,7 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
       onAddFilter,
       addFilterLabel = "+ filter",
       addFilterBadge,
+      addFilterExpanded,
       removeLabel = "Remove filter",
       formatRemoveLabel,
       label = "Filters",
@@ -675,6 +699,7 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
                 type="button"
                 data-slot="filter-bar-add"
                 onClick={onAddFilter}
+                aria-expanded={addFilterExpanded}
                 className={cn(CHIP_ADD)}
               >
                 {addFilterLabel}

@@ -762,8 +762,12 @@ export interface TabsCountProps extends React.ComponentPropsWithoutRef<"span"> {
  * `TABS_COUNT_SKIN` describes, keyed off the SAME `data-state` the strip's
  * indicator reads, so the two can never disagree about which tab is active.
  *
- * RTL — safe. The pill is a fixed square (`size-*`), and the text inside it
- * is centred both axes; nothing here is positioned by side.
+ * RTL — safe. The pill is `h-5 min-w-5 px-2` — a round-ended shape that grows
+ * on its inline axis past a 20-tall/20-wide minimum, NOT a fixed square
+ * (`size-*`, until 2026-09-03: a two-digit count clipped inside it — the
+ * client reported it, "Tickets 96"). Growing on the inline axis is exactly
+ * why this is still RTL-safe: the text stays centred both axes, and the pill
+ * widens symmetrically off that centre rather than being positioned by side.
  */
 const TabsCount = React.forwardRef<HTMLSpanElement, TabsCountProps>(
   ({ count, className, ...props }, ref) => {

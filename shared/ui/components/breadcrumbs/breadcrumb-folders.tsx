@@ -420,6 +420,77 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
     },
     ref,
   ) => {
+    /* THE STRIP'S OWN NODE, KEPT SEPARATELY FROM `ref`. `ref` above is the
+       forwarded `<nav>` — `Breadcrumb`'s own root — and the thing that needs
+       scrolling is the `<ol>` one level in, the same node `STRIP`'s
+       `overflow-x-auto` lives on. `BreadcrumbList` already forwards a ref to
+       it, so this costs the component nothing it did not already have
+       wired.
+
+       WHY THIS EXISTS AT ALL. `STRIP`'s own comment above already argues the
+       strip scrolls instead of wrapping BECAUSE the crumb that must never be
+       lost — the current location — is the LAST one, and "an inline scroller
+       keeps it in view when the strip is scrolled to its end." That sentence
+       described a scroller that was ALREADY at its end. It never was: a
+       freshly mounted `overflow-x-auto` box starts at its leading edge, full
+       stop, with no browser behaviour that moves it anywhere else on its
+       own. So a trail past four or five levels, or a single long client
+       name at a narrow width — `TAB`'s own `shrink-0` guarantees a tab never
+       gives up room to fit, which is correct and is also why this bites —
+       loaded with exactly the one crumb that answers "where am I" sitting
+       off-screen until the reader scrolled it into view by hand. */
+    const listRef = React.useRef<HTMLOListElement>(null);
+
+    React.useEffect(() => {
+      if (items.length === 0) return;
+      const strip = listRef.current;
+      const lastTab = strip?.lastElementChild;
+      if (!lastTab) return;
+
+      /* `inline: "end"`, NOT A COMPUTED `scrollLeft`. A hand-rolled "scroll
+         to the trailing edge" is `el.scrollLeft = el.scrollWidth -
+         el.clientWidth` in LTR, but that expression is wrong or
+         browser-dependent in RTL — Chrome reports a negative `scrollLeft` at
+         the trailing edge, Firefox a positive one measured from the other
+         side, and old WebKit a positive one that counts the other direction
+         again — three different sign conventions for the one idea of "all
+         the way to the end". `Element.scrollIntoView`'s `inline` axis is
+         defined in terms of the box's own writing direction, so `"end"`
+         already means the trailing edge in whichever direction `dir` makes
+         that, on every engine, with nothing here reading `dir` itself. This
+         file's own header calls the SILHOUETTE "LTR only, inherited [from
+         `FolderShape`]" — the glyph has no mirroring ruling yet — but "every-
+         thing this file writes is logical anyway", and this line is what
+         that sentence promises made good: the strip's OWN layout follows
+         `dir` for free, same as its `ps-`/`pe-` padding already does.
+
+         `block: "nearest"` keeps this to the strip's own axis. Without it,
+         bringing an element "into view" is free to nudge an ancestor's
+         vertical scroll too if the browser judges that helpful; the strip is
+         the only thing here with horizontal overflow, so `nearest` on the
+         block axis means every vertical scroller up the tree reports "already
+         visible" and does nothing, and only the strip's `overflow-x-auto`
+         actually moves.
+
+         `behavior` IS LEFT UNSET, WHICH IS INSTANT HERE, AND THAT IS THE
+         REDUCED-MOTION ANSWER RATHER THAN A `matchMedia` CHECK BESIDE IT. The
+         default resolves to the scrolling box's own `scroll-behavior` CSS
+         property, which is `auto` (instant) unless something sets `smooth`
+         — nothing in `tokens.css`, `motion.css` or `STRIP` above does, so
+         there is no motion to suppress under `prefers-reduced-motion` and no
+         duration or curve for this file to invent in place of one. A trail
+         that jumps straight to its end on load reads as "this is where the
+         page already was", which is the correct read for the very first
+         paint. */
+      lastTab.scrollIntoView({ inline: "end", block: "nearest" });
+      // Depends on `items` itself (not `rendered` or `foldAfter`) because the
+      // LAST tab is always `items[items.length - 1]` — the fold only ever
+      // hides the MIDDLE of the trail, so the one thing this effect cares
+      // about changes exactly when the trail itself does, and never
+      // rescrolls a screen whose depth crossed `foldAfter` with the same
+      // destination.
+    }, [items]);
+
     if (items.length === 0) return null;
 
     const rendered = fold(items, foldAfter);
@@ -517,7 +588,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         )}
         {...props}
       >
-        <BreadcrumbList className={cn(STRIP, listClassName)}>
+        <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
           {rendered.map((entry) => {
             if (entry.kind === "gap") {
               return (

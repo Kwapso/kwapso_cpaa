@@ -104,8 +104,11 @@
 // the shape to exactly ONE element, the caller's own merged container, and
 // having THAT element's shape read off `Boolean(panel)` rather than off any
 // box's measured height. `ToolbarRow` (screen-bits.tsx) does this now: one
-// `bg-background` div, `rounded-pill` with no panel and
-// `rounded-[var(--radius)]` the moment one exists, the track and this panel
+// `bg-[var(--surface-raised)]` div (fixed off `bg-background` since this pass
+// landed — see the same correction below, and check screen-bits.tsx directly
+// before trusting a token name in a comment about another file), `rounded-
+// pill` with no panel and `rounded-[var(--radius)]` the moment one exists,
+// the track and this panel
 // both painting nothing of their own. This panel's own div lost its
 // `bg-background`/`rounded-[var(--radius)]` for the same reason — see its
 // own comment, below. `web/test/filter-row-is-the-kits.test.tsx`'s "the panel
@@ -437,8 +440,11 @@ function useFilterBar<T>({
     // reads as exactly the second card she is naming. The surface (fill +
     // shape) is now painted ONCE, by whichever container places this panel:
     // `ToolbarRow` (screen-bits.tsx) merges it with its own track into one
-    // `bg-background` box that switches from `rounded-pill` to
-    // `rounded-[var(--radius)]` the moment this panel exists; the kit's own
+    // `bg-[var(--surface-raised)]` box (fixed off `bg-background` since this
+    // note was written — check screen-bits.tsx before trusting the name of a
+    // token in a comment about another file) that switches from
+    // `rounded-pill` to `rounded-[var(--radius)]` the moment this panel
+    // exists; the kit's own
     // `CollectionFrame` places it inside its already-painted
     // `bg-surface-panel` panel via `toolbarPanel`, where a second fill
     // nested one level in would be the identical double-box CLAUDE.md's
@@ -554,6 +560,17 @@ function useFilterBar<T>({
         label={t("Filters")}
         addFilterLabel={addFilterLabel}
         addFilterBadge={<Badge count={activeCount} variant="default" />}
+        // THE PILL SAYS WHETHER IT IS OPEN, OUT LOUD — kit v1.2.42's own
+        // `addFilterExpanded`, announce-only. This file deliberately holds
+        // `open` ITSELF rather than letting the kit's bar own it (that is
+        // what let the pill and the panel merge into one container, the
+        // client's 2026-09-03 ruling), and the cost was that the trigger had
+        // no state left to reflect: a screen reader heard "Filter, button"
+        // with no way to know it expands anything, or whether it already
+        // had. Handing the same boolean back closes that without giving the
+        // kit control of the rendering — it sets `aria-expanded` and nothing
+        // else.
+        addFilterExpanded={open}
         onAddFilter={() => setOpen((o) => !o)}
       />
       <span aria-live="polite" className="sr-only">

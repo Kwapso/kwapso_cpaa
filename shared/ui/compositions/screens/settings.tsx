@@ -272,11 +272,11 @@ const THUMB =
 const ThumbBars = ({ strong, faint }: { strong: string; faint: string }) => (
   <span className="flex min-w-0 flex-1 flex-col gap-1.5 p-[0.6875rem] min-[45rem]:gap-2 min-[45rem]:p-[0.8125rem]">
     <span
-      className="h-[0.4375rem] w-[64%] rounded-full min-[45rem]:h-2 min-[45rem]:w-[66%]"
+      className="h-[0.4375rem] w-[64%] rounded-pill min-[45rem]:h-2 min-[45rem]:w-[66%]"
       style={{ background: strong }}
     />
     <span
-      className="h-[0.3125rem] w-[88%] rounded-full min-[45rem]:h-1.5"
+      className="h-[0.3125rem] w-[88%] rounded-pill min-[45rem]:h-1.5"
       style={{ background: faint }}
     />
   </span>

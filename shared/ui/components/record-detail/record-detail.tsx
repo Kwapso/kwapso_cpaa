@@ -179,9 +179,18 @@
      placeholder, no lock, no dimmed panel. `actions`, `hero`, `panel` and
      `footer` each take a `visible` flag and absence is the whole treatment.
    · The tab strip is STICKY, and a sticky strip must be opaque or the panel
-     reads straight through it. It takes `--background`, the page tone the
-     band already sits on, so the strip and the band are the same paper. THE
-     OPACITY AND THE STICKY POSITIONING SIT ON A WRAPPER AROUND `TabsList`,
+     reads straight through it. It takes `--surface-raised`, the PANEL's own
+     paper (`--card`) — not `--background`, the page tone the band sits on.
+     A pinned strip's whole job is to occlude rows scrolling under it, and in
+     three spines × two themes `--background` and `--card` are identical in
+     light but a visible step apart in dark, so painting the page tone read
+     as a hole punched in the card the instant the strip went opaque over
+     dark content — the exact failure `--card` over `--background` already
+     ruled out for a field's own fill (GAPS-KIT-BC.md FLD-B5) and for a table
+     row's ground elsewhere in this kit. THIS FILE'S OWN GAPS.md REC-2 ONCE
+     ARGUED THE OPPOSITE ("the strip and the band read as the same paper");
+     that reasoning is superseded, not merely the class name. THE OPACITY AND
+     THE STICKY POSITIONING SIT ON A WRAPPER AROUND `TabsList`,
      NOT ON `TabsList` ITSELF — CHANGED 2026-09-03, alongside moving
      `TABS_STRIP_GAP` off the `<Tabs>` root's flex `gap` and onto that SAME
      wrapper as trailing padding, so the client's "space between tabs and
@@ -235,6 +244,17 @@ export interface RecordDetailTab {
   value: string;
   /** What the tab says. */
   label: React.ReactNode;
+  /**
+   * A glyph before the label. Absent by default — this strip has shipped
+   * without one since CH27 — but every OTHER tab strip in the product draws
+   * one, and the client's ruling was that this was an oversight, not a
+   * deliberate variation ("yes, they should have icons ... We will only have
+   * one variation of tabs with icons"). `TabsTrigger` already sizes and
+   * spaces any svg child at the button icon size via `gap-2` (`tabs.tsx`'s
+   * `TRIGGER_BASE`), so this is a pass-through, not a new shape: a call site
+   * that never sets it renders exactly as before.
+   */
+  icon?: React.ReactNode;
   /** A live count beside the label, drawn by `TabsCount`. Zero renders
    *  nothing — `Badge`'s zero law, without reaching for `Badge` itself. */
   count?: number;
@@ -692,9 +712,20 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       visibleTabs.length > 0 ? (
         /* THE WRAPPER, NOT `TabsList` ITSELF, CARRIES STICKY + OPACITY + THE
            TRAILING GAP — CHANGED 2026-09-03. A sticky strip must be OPAQUE or
-           the panel reads through it: `bg-background` takes the page tone the
-           band already sits on, so the strip and the band are the same
-           paper. `TABS_STRIP_GAP` (`tabs.tsx`) is padding, not a flex `gap`,
+           the panel reads through it, and opaque means the PANEL's own paper:
+           `bg-surface-raised` (`--card`) — NOT `bg-background`, which was
+           this wrapper's fill until today. `--background` and `--card` are
+           the same #FFFEF9 in light, so the mistake was invisible there, but
+           in dark `--background` is `--kw-unlit-page` #141310 against
+           `--card`'s `--kw-unlit-raised` #26241F — a visible step apart — so
+           a strip painted the page tone read as a hole punched in the card
+           the moment it went opaque over rows scrolling under it. This is
+           the fourth kit-and-app implementation of this exact strip to carry
+           that mistake (`record-chrome.tsx`'s `STICKY_TABS`, `tabs-view.tsx`'s
+           `STICKY_FOLDER_TABS`, and the toolbar rows already fixed it on the
+           app side); this file is the one the app's recipe-driven screens —
+           including its own landing screen — reach directly, so it was still
+           live there until now. `TABS_STRIP_GAP` (`tabs.tsx`) is padding, not a flex `gap`,
            for the reason its own comment gives — a `gap` between this wrapper
            and the panel below would stop meaning anything the instant this
            box goes sticky, and the client asked for the space to survive
@@ -705,11 +736,12 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
            tabs. */
         <div
           data-slot="record-detail-strip"
-          className={cn(sticky && "sticky top-0 z-10 bg-background", TABS_STRIP_GAP)}
+          className={cn(sticky && "sticky top-0 z-10 bg-surface-raised", TABS_STRIP_GAP)}
         >
           <TabsList aria-label={tabsLabel}>
             {visibleTabs.map((item) => (
               <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
+                {item.icon}
                 {item.label}
                 {/* `line`'s asymmetric count — quiet text at rest, a small
                     mango circle with primary-ink text on the active tab only —
