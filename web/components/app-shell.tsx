@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avata
 // The rail's own brand artwork, reached directly (R39: kit supplies the UI) —
 // see the note above `NavBrandHeader` for why this file draws the mark itself
 // instead of leaving it to Rail's own default.
-import { Isotype, Logotype } from "@shared/ui/components/brand/brand"
+import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/brand"
 // THE TRAIL, AS FOLDER TABS (kit v1.2.28). It used to be `Breadcrumbs` — a line
 // of text inside the card's header band. The reshaped `ScreenShell` gives the
 // trail its own slot ON THE GROUND, directly above the card, and the strip's
@@ -107,7 +107,7 @@ import {
 } from "@shared/ui/components/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
-import { toSpine } from "@shared/spine"
+import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
@@ -195,12 +195,27 @@ function StandaloneNavItem({
       : "h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]",
     active
       ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] font-[var(--font-weight-medium)] hover:bg-[var(--spine-active-hover)]"
-      // `--ink-secondary`, not `--spine-ink-quiet` — the same darker-chip
-      // tier the kit-drawn rows get via the descendant-selector override on
-      // `railContent`'s own root, below. House is a "chip" too (Standalone
-      // Nav Item's whole point is to draw the same row Rail draws), so it
-      // reads the token directly here instead of needing a selector of its own.
-      : "text-[var(--ink-secondary)] hover:text-[var(--spine-ink)]",
+      // TRANSCRIBED FROM THE KIT'S OWN `ROW_IDLE` (rail.tsx), the same way the
+      // shape above is transcribed from `ROW_EXPANDED` and for the same reason:
+      // House is the one destination outside any group, so it is drawn here
+      // rather than by the rail composition, and Standalone Nav Item's whole
+      // point is to draw the row Rail draws.
+      //
+      // This used to rest in the theme's secondary ink and hover up to the
+      // spine's full ink — described and not spelled, because Tailwind scans
+      // this file and would compile a quoted utility straight back into the
+      // stylesheet (see the longer note on `railContent`'s own root below, and
+      // web/app/globals.css, which carries the same warning). It matched the
+      // descendant-selector override that used to sit on that root. Both are
+      // gone for the reason spelled
+      // out in full there: `--ink-secondary` is THEME-scoped and this ground is
+      // SPINE-scoped, so it measured 1.95:1 on ink-in-light and 1.05:1 on
+      // mango-in-dark, and kit v1.2.18 had already moved the kit's own rows to
+      // `--spine-ink` on a later client ruling ("nav text should ALWAYS be
+      // either pure black or pure white — never gray"). The hover went with it:
+      // once a row RESTS at `--spine-ink` a hover step to `--spine-ink` is a
+      // no-op, and v1.2.18 replaced that colour step with a WEIGHT step.
+      : "font-[var(--font-weight-light)] text-[var(--spine-ink)] hover:font-[var(--font-weight-medium)]",
   ].join(" ")
 
   const control = (
@@ -261,10 +276,33 @@ function StandaloneNavItem({
 function NavBrandHeader({
   collapsed,
   homeLabel,
+  spine,
 }: {
   collapsed: boolean
   homeLabel: string
+  spine: Spine
 }) {
+  /* THE CUT COMES FROM THE SPINE, NOT FROM THE THEME — the kit's own law,
+     stated at rail.tsx §"THE SAME LOGIC IS WHY `markField` PICKS THE CUT FROM
+     THE SPINE AND NOT FROM THE MEDIA QUERY", and this line is that file's own
+     `markField` expression, transcribed for the same reason the row shape
+     below it is: this file draws the mark itself (`mark={null}` to Rail) and
+     the kit exports the mapping as a local, not as a helper.
+
+     It used to pass `on="paper"` unconditionally. `paper` is the THEME-driven
+     field — the kit hides one cut and shows the other on `prefers-color-
+     scheme` / `[data-theme]` — which is correct only for the spine whose own
+     ground follows the theme. The other two paint a ground that does NOT:
+     ink is dark in both palettes and mango is #FED069 in both. So a light
+     theme on the ink spine drew the DARK cut on ink's dark ground, and a dark
+     theme on mango drew the LIGHT cut on mango's bright one. Reported by the
+     client, 2026-09-03, on the ink half: the wordmark reads white and correct
+     in dark and is unreadable in light.
+
+     Same fault, same day, one layer up from the idle nav label — see the long
+     note on `railContent`'s own root below. A rail that paints its own ground
+     must own its own foregrounds; inheriting them from the theme is the bug. */
+  const markField: BrandField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper"
   // THE MARK IS THE WAY HOME (client, 31 Aug 2026): "remove home from navbar,
   // make that when we click the icon kwapso on top of sidebar it takes us
   // there" — Welcome (the old "House") has no rail row of its own any more
@@ -279,9 +317,9 @@ function NavBrandHeader({
         aria-label={homeLabel}
       >
         {collapsed ? (
-          <Isotype className="[--brand-step:var(--icon-24)]" on="paper" />
+          <Isotype className="[--brand-step:var(--icon-24)]" on={markField} />
         ) : (
-          <Logotype className="[--brand-step:var(--icon-24)]" on="paper" />
+          <Logotype className="[--brand-step:var(--icon-24)]" on={markField} />
         )}
       </button>
     </div>
@@ -741,26 +779,64 @@ export function AppShell({
   // pinned; a hand-edit there fails web/test/vendored-kit.test.ts): reached
   // from OUTSIDE the kit, on an ancestor this file owns.
   //
-  // (1) DARKER CHIP TEXT (client, 31 Aug 2026: "i want more visual
-  // differentiation between what's a section and what's a chip. maybe chips
-  // texts darker? keep section text as they are"). A "chip" is a nav ROW
-  // (Tasks, Meetings, …) as opposed to a SECTION HEADER (My work / Build /
-  // …) — both currently read `--spine-ink-quiet` at rest (`ROW_IDLE` and the
-  // group heading's own idle class in rail.tsx), which is exactly why they
-  // looked like one tone with two sizes rather than two tiers. The section
-  // heading is untouched — the client said keep it — so the fix is scoped to
-  // `[data-slot=rail-item]` only, never `[data-slot=rail-group-heading]`.
-  // `--ink-secondary` (tokens.css) is the real, already-named tier between
-  // `--spine-ink-quiet` (muted-foreground) and full `--spine-ink`
-  // (foreground) — "the charcoal-on-paper tier", used elsewhere for exactly
-  // this kind of readable-but-secondary ink — so this reaches for an
-  // existing token rather than inventing a colour (R32). `:not(:hover)`
-  // keeps the kit's own `hover:text-[var(--spine-ink)]` rule untouched: the
-  // override never matches while hovering, so there is no specificity race
-  // with the hover rule, only with the resting one (which the extra
-  // attribute selectors win outright).
+  // THERE IS NO LONGER A CHIP-TEXT OVERRIDE HERE, AND THE 31 AUG RULING IS
+  // STILL HONOURED — BY THE KIT, NOT BY THIS FILE. This slot used to hold a
+  // descendant-selector entry aimed at a rail row that is neither active nor
+  // hovered, colouring it with the theme's own secondary-ink token. (Described
+  // rather than spelled, and that is not fussiness: `@import "tailwindcss"`
+  // scans THIS FILE, so a comment quoting the utility compiles it back into
+  // the shipped stylesheet — web/app/globals.css carries the same warning over
+  // the same class of bug, and this comment's own first draft reproduced it.)
   //
-  // (2) THE SECTION CHEVRON, RE-ALIGNED (client, 31 Aug 2026: "on sections,
+  // It was added for the client's 31 Aug 2026 ruling ("i want more visual differentiation
+  // between what's a section and what's a chip. maybe chips texts darker?
+  // keep section text as they are"). At the time a nav ROW and a SECTION
+  // HEADING both rested at `--spine-ink-quiet`, so they read as one tone in
+  // two sizes, and `--ink-secondary` was the already-named tier between quiet
+  // and full ink. THE PREMISE EXPIRED TWO DAYS LATER. Kit v1.2.18
+  // (2026-09-02) moved `rail.tsx`'s `ROW_IDLE` off `--spine-ink-quiet` and
+  // onto `--spine-ink` outright, on a LATER client ruling given live against
+  // all six spine x theme combinations, verbatim: "nav text should ALWAYS be
+  // either pure black or pure white — never gray — depending on what it sits
+  // on." The heading was deliberately left on `--spine-ink-quiet` (a heading
+  // is not nav text), so the kit's own default now draws the 31 Aug
+  // separation MORE strongly than this override ever did — measured, not
+  // assumed, as ink on each spine's own `--spine-fill` ground:
+  //
+  //                 this override   kit ROW_IDLE   the heading it must beat
+  //   paper/light        8.08          15.76              5.90
+  //   ink/light          1.95  ✘       17.39             11.53
+  //   mango/light        6.19          12.07             12.07
+  //   paper/dark         9.03          13.62              7.03
+  //   ink/dark          11.31          17.06              8.81
+  //   mango/dark         1.05  ✘       12.07             12.07
+  //
+  // AND IT WAS BREAKING TWO OF THE SIX. `--ink-secondary` is THEME-scoped
+  // (#4a4946 light / #d5d1c9 dark) and knows nothing about spine, while two
+  // of the three spines have a ground that does NOT follow the theme: ink's
+  // is dark in both palettes, mango's is #FED069 in both. So light-theme
+  // ink put a dark grey on a dark ground at 1.95:1, and dark-theme mango put
+  // a light grey on a bright ground at 1.05:1 — both far under AA for
+  // primary navigation text, and neither reachable in the 2026-09-02 →
+  // 2026-09-03 window when `ink` was retired and mango was not yet paired
+  // with a dark palette in review. The kit's per-spine `--spine-ink` is
+  // correct on all six by construction (12.07 – 17.39) because it is
+  // SPINE-scoped, which is the axis this ground actually moves on.
+  //
+  // ON MANGO THE OVERRIDE WAS ALSO BACKWARDS: tokens.css states that spine
+  // has NO quiet tier on purpose (`--spine-ink-quiet` IS `--ink-on-accent`),
+  // so its rows and headings are one charcoal by design and the chip/section
+  // distinction there is carried by weight and size. Forcing `--ink-secondary`
+  // made a mango chip LIGHTER than the section above it — the opposite of what
+  // the client asked for on 31 Aug.
+  //
+  // Deleted rather than made spine-aware: a spine-aware rewrite would land on
+  // `--spine-ink` for every spine, which is exactly what `ROW_IDLE` already
+  // says. The not-hovered clause went with it — it was pairing with a kit hover
+  // rule that lifted the row to `--spine-ink`, and v1.2.18 removed that rule, so
+  // all the clause did was make a resting row jump colour under the pointer.
+  //
+  // (1) THE SECTION CHEVRON, RE-ALIGNED (client, 31 Aug 2026: "on sections,
   // move the arrow that collapse/expands to the right, so it aligns with the
   // icons"). Checked against the row geometry rather than guessed: a row's
   // icon slot and a heading's label both start at the same x (`--rail-inset
@@ -775,7 +851,7 @@ export function AppShell({
   // siblings in a flex row) puts the glyph at that same fixed x with no
   // accessibility cost: both chevrons are `aria-hidden`, so a screen
   // reader's order is unaffected and only the sighted layout moves.
-  // (3) A HAIRLINE BETWEEN NAMED SECTIONS (client, 31 Aug 2026: wants the
+  // (2) A HAIRLINE BETWEEN NAMED SECTIONS (client, 31 Aug 2026: wants the
   // same thin rule the profile menu already draws between its own blocks —
   // that menu's `DropdownMenuSeparator` is a filled `h-px bg-border` block,
   // the SAME token this file's own `Separator` import already draws with
@@ -814,7 +890,6 @@ export function AppShell({
   // item above the line does: 20px on both sides, measured and matched, not
   // assumed even.
   const RAIL_CONTENT_OVERRIDES = [
-    "[&_[data-slot=rail-item]:not([data-active]):not(:hover)]:text-[var(--ink-secondary)]",
     "[&_[data-slot=rail-group-heading]>span]:order-last",
     "[&_[data-slot=rail-group-heading]>svg]:order-first",
     "[&_[data-slot=rail-group]:not(:first-child)]:pt-[var(--space-5)]",
@@ -836,7 +911,7 @@ export function AppShell({
           purpose, because the client asked for air under the mark
           specifically and not for the whole rail to breathe more. */}
       <div className="pb-6">
-        <NavBrandHeader collapsed={collapsed} homeLabel={t("Go to Welcome")} />
+        <NavBrandHeader collapsed={collapsed} homeLabel={t("Go to Welcome")} spine={spine} />
       </div>
       {homeStandalone.map((item) => (
         <div key={item.slug} className="pb-3">
