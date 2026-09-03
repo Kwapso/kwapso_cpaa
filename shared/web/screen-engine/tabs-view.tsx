@@ -514,19 +514,27 @@ export function TabsView({
               // shape retired (v1.2.28) there is only the one strip left, and
               // it takes the treatment the ruling was actually about.
               shown === t.value ? (
-                // A TRUE CIRCLE, NOT AN OVAL — `size-[1.125rem]` (18px, the
-                // kit's own fixed square for this exact dot, TABS_COUNT_SKIN's
-                // `line` entry in shared/ui/components/tabs/tabs.tsx) rather
-                // than `h-4 min-w-4 px-1`: a height plus a MINIMUM width plus
-                // horizontal padding sizes the box to its CONTENT, so "9" drew
-                // a circle by accident and "96" stretched it into a stadium —
-                // exactly the "rounded rectangle, not a circle" the client
-                // flagged, since a fixed height with a floor-only width still
-                // grows wider than tall the moment the label needs two digits.
-                // Fixed on both axes, it stays round for any label this dot
-                // has ever carried.
+                // A GROWING PILL, NOT A FORCED CIRCLE — REVERSED 2026-09-03,
+                // the same correction made the same day to the kit's own
+                // `TabsCount` (`shared/ui/components/tabs/tabs.tsx`), which
+                // this file's own comment used to cite as its reason for the
+                // circle it drew here. The client's words apply exactly:
+                // "you were right that the circle is not correct, but rather
+                // a round shape like you have on the title when they have a
+                // count. It was a mistake to change it." That reference shape
+                // is `Badge`'s own counter geometry — `h-5 min-w-5 px-2`, a
+                // height plus a MINIMUM width plus padding, so it sizes to
+                // its CONTENT and grows for a two-digit count instead of
+                // clipping or ovalling it. This is a SEPARATE hand-drawn copy
+                // of that shape (not the kit's `TabsCount` — this strip is
+                // the app's own `FolderTabStrip`/`renderFolderTabs` engine,
+                // a different tab-rendering path), so the kit's own fix never
+                // reached it; restated literally here for the same reason
+                // `TabsCount` restates `Badge`'s geometry rather than
+                // importing it — Tailwind cannot resolve a class string
+                // assembled at runtime.
                 <span
-                  className="inline-flex size-[1.125rem] items-center justify-center rounded-pill bg-primary text-micro leading-none tabular-nums text-primary-foreground"
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-pill bg-primary px-2 text-micro leading-none tabular-nums text-primary-foreground"
                 >
                   {t.badge}
                 </span>
