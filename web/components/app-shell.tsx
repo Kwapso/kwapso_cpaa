@@ -42,7 +42,7 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, SealCheck, Buildings, Chat, CalendarDots, Hammer, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
 // `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
 import { Waves } from "@shared/ui/foundations/icons"
@@ -130,7 +130,7 @@ const NAV_ICONS = { home: House, settings: Gear, kwapso: SealCheck } as const
 // web/test/nav.test.ts now derives the required keys from TEAM_SECTIONS and
 // insists every icon is distinct, so a silent fallback cannot ship again.
 const SECTION_ICONS: Record<string, typeof House> = {
-  accounts: Buildings,
+  accounts: Briefcase,
   // The same glyph `CONCEPT_ICON.contacts` ("contact") resolves to everywhere
   // else it is drawn (the alias chain in shared/web/screen-engine/icon-names.ts
   // — "contact" → "profile-circle" → AddressBook) — one concept, one icon,
@@ -139,7 +139,7 @@ const SECTION_ICONS: Record<string, typeof House> = {
   tickets: Tray,
   knowledge: HardDrives,
   processes: GitFork,
-  stories: Hammer,
+  stories: PuzzlePiece,
   sprints: CalendarDots,
   // The package a client bought — several sprints arriving together.
   waves: Waves,
