@@ -33,6 +33,7 @@ import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { CollectionHeading } from "@/components/collection-heading"
+import { ErrorPanel } from "@/components/error-panel"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
@@ -40,7 +41,7 @@ import { useT } from "@shared/web/language"
 
 export function TicketsScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
-  const { tickets, total, loading, hasMore, loadingMore, loadMore } = useTickets()
+  const { tickets, total, loading, error, refresh, hasMore, loadingMore, loadMore } = useTickets()
   const [raising, setRaising] = React.useState(false)
 
   async function raise(input: { description: string; appId?: string; moduleId?: string }) {
@@ -78,7 +79,13 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         }
       />
 
-      {loading && !tickets ? (
+      {error && !tickets ? (
+        <ErrorPanel
+          title={t("We couldn't load your tickets.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
+      ) : loading && !tickets ? (
         <div className="flex flex-col gap-4">
           <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
           <Skeleton className="h-20 w-full rounded-[var(--radius)]" />

@@ -12,10 +12,12 @@
 // from the only screen that had ever shown it. The last time they saw the
 // contract they had just sent us was the moment before they sent it.
 //
-// It renders NOTHING when the pile is empty, exactly as "Awaiting your input"
-// above it does, and for the same reason: most people will land here with
-// nothing in it, and a card congratulating them on that is a card they learn to
-// scroll past.
+// It renders NOTHING when the pile is genuinely empty, exactly as "Awaiting your
+// input" above it does, and for the same reason: most people will land here
+// with nothing in it, and a card congratulating them on that is a card they
+// learn to scroll past. Loading and error are answered FIRST, though — a
+// screen that checked emptiness before either read "nothing sent" while the
+// fetch was still in flight, and forever if it failed.
 //
 // THE FILE IS THEIRS AND THE FENCE ALREADY PERMITS IT. `postCompleteTodo` writes
 // to `env.MEDIA` — the shared bucket this gateway binds and serves at `/media/*`
@@ -24,18 +26,42 @@
 // a hole being opened.
 
 import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { CollectionHeading } from "@/components/collection-heading"
+import { ErrorPanel } from "@/components/error-panel"
 import { usePortalTodos } from "@/lib/todos"
 import { useLanguage } from "@shared/web/language"
 
 export function SentToUs() {
   const { t, lang } = useLanguage()
-  const { todos, total, hasMore, loadingMore, loadMore } = usePortalTodos("done")
+  const { todos, loading, error, refresh, total, hasMore, loadingMore, loadMore } = usePortalTodos("done")
+
+  // LOADING AND ERROR, BEFORE EMPTINESS — see the identical note in
+  // waiting-on-you.tsx, the section this one trades rows with.
+  if (error && !todos)
+    return (
+      <section className="flex flex-col gap-4">
+        <CollectionHeading label={t("What you've sent us")} total={total} />
+        <ErrorPanel
+          title={t("We couldn't load what you've sent us.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
+      </section>
+    )
+  if (loading && !todos)
+    return (
+      <section className="flex flex-col gap-4">
+        <CollectionHeading label={t("What you've sent us")} total={total} />
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+      </section>
+    )
+
   const rows = todos ?? []
   if (rows.length === 0) return null
 

@@ -9,14 +9,22 @@
 // because that is the one they can do something about in the next minute. Their
 // own tickets are the second question: those are waiting on us.
 //
-// When there is nothing, it renders NOTHING — not an empty card saying "no
-// outstanding items". Most people will land here with nothing outstanding, and a
-// panel congratulating them on it is a panel they learn to scroll past, which is
-// how the day it DOES have something in it gets missed.
+// WHEN THE LIST IS GENUINELY EMPTY, it renders NOTHING — not an empty card
+// saying "no outstanding items". Most people will land here with nothing
+// outstanding, and a panel congratulating them on it is a panel they learn to
+// scroll past, which is how the day it DOES have something in it gets missed.
+//
+// BUT THAT IS ONLY TRUE ONCE THE ANSWER IS IN. This used to check emptiness
+// before loading or error at all, so a client with real outstanding items saw
+// nothing for the length of the request — indistinguishable from "you're all
+// caught up" — and forever if the fetch failed. Loading and error are handled
+// first now, and each says its own honest thing before the empty case ever
+// gets asked.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Check, Paperclip } from "@shared/ui/foundations/icons"
@@ -27,6 +35,7 @@ import { invalidate } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { usePortalTodos } from "@/lib/todos"
+import { ErrorPanel } from "@/components/error-panel"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 
@@ -41,9 +50,33 @@ export function WaitingOnYou() {
   // which was honest while the door handed back every row it had. The list PAGES
   // now (R14), so a filter here would be a filter over page one — quietly
   // answering "nothing outstanding" about everything past the cursor.
-  const { todos, hasMore, loadingMore, loadMore } = usePortalTodos("open")
+  const { todos, loading, error, refresh, hasMore, loadingMore, loadMore } = usePortalTodos("open")
   const [busy, setBusy] = React.useState<string | null>(null)
   const pickers = React.useRef<Record<string, HTMLInputElement | null>>({})
+
+  // LOADING AND ERROR, BEFORE EMPTINESS. This used to check `open.length === 0`
+  // first and return nothing at all — which reads as "you're all caught up"
+  // whether that's true, still loading, or the read just failed. A client with
+  // real outstanding items deserves to see that something is coming (or that it
+  // didn't), not the same silence as having nothing outstanding.
+  if (error && !todos)
+    return (
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium">{t("Awaiting your input")}</h2>
+        <ErrorPanel
+          title={t("We couldn't check what's waiting on you.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
+      </section>
+    )
+  if (loading && !todos)
+    return (
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium">{t("Awaiting your input")}</h2>
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+      </section>
+    )
 
   const open = todos ?? []
   if (open.length === 0) return null

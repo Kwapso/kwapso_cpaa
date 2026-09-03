@@ -27,7 +27,6 @@ import * as React from "react"
 
 import type { SessionUser } from "@shared/types"
 import { useCached } from "@shared/web/store"
-import { reportError } from "@shared/web/log"
 import { ApiFailure, auth, portal, type PortalContext } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
@@ -118,13 +117,13 @@ export function usePortalSession(): {
     // into an ANSWER (signed-out / no-access) — so anything still throwing here is
     // a 500 or a dropped connection. Reading that as "signed out" sent a client to
     // the login screen mid-session and told them nothing, on a day when the only
-    // thing wrong was ours. It also reported nothing: the file's own comment said
-    // the error would reach the boundary, and it cannot — useCached catches it
-    // into state and never rethrows during render.
-    if (!data && error) {
-      reportError("portal-session.resolve", error)
-      return { state: "unavailable" }
-    }
+    // thing wrong was ours.
+    //
+    // NOT reported here any more (was, until `useCached` reported for itself):
+    // its own catch now calls `reportError` for exactly this failure, so a
+    // second call here would double-log the same row. This branch is left
+    // purely to read the state, same as every other one below it.
+    if (!data && error) return { state: "unavailable" }
     if (!data) return { state: "loading" }
     if (data.kind === "signed-out") return { state: "signed-out" }
     if (data.kind === "needs-name") return { state: "needs-name", user: data.user }

@@ -39,6 +39,7 @@ import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import type { ClientDeliverable } from "@shared/types"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { ErrorPanel } from "@/components/error-panel"
 import { handover } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
@@ -80,7 +81,7 @@ function byApp(rows: ClientDeliverable[]): { app: string | null; rows: ClientDel
 
 export function DeliverablesScreen() {
   const { t, lang } = useLanguage()
-  const { data, loading } = useCached<ClientDeliverable[]>(cacheKeys.deliverables, () =>
+  const { data, loading, error, refresh } = useCached<ClientDeliverable[]>(cacheKeys.deliverables, () =>
     handover.deliverables().then((r) => {
       // R16: the badge is the DOOR's exact count, parked in its own key beside
       // the rows so the live listener can refresh both together. Never
@@ -98,6 +99,21 @@ export function DeliverablesScreen() {
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
+      </div>
+    )
+
+  // A failed read used to fall straight through to `data ?? []` and say
+  // "Nothing here yet." — word for word what a genuinely empty shelf says.
+  // Told apart now, before the rows are ever computed.
+  if (error && !data)
+    return (
+      <div className="flex flex-col gap-4">
+        <CollectionHeading label={t("What we handed over")} total={total} />
+        <ErrorPanel
+          title={t("We couldn't load what we handed over.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
       </div>
     )
 

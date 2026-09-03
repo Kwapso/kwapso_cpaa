@@ -97,6 +97,7 @@ import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import { TicketAttachments } from "@/components/ticket-attachments"
+import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -228,16 +229,28 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
     </Link>
   )
 
-  if (!ticket)
+  if (!ticket) {
+    // NOT FOUND AND FAILED TO LOAD ARE DIFFERENT SENTENCES. `ticket` collapses
+    // to null both when the by-id read genuinely resolved with nothing (outside
+    // the fence a real id and a made-up one are the same sentence — the door
+    // answers null either way, and so do we) AND when the read never resolved
+    // at all — a dropped connection, a 500. This used to print "We can't find
+    // that ticket." for both, which tells a client on a flaky connection that
+    // their real ticket is gone. Only reachable when `fromList` is absent, so
+    // `oneQ` is the read that ran.
+    const failed = !!oneQ.error && oneQ.data === undefined
     return (
       <div className="flex flex-col gap-6">
         {back}
         {oneQ.loading || threadQ.loading ? (
           <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
+        ) : failed ? (
+          <ErrorPanel
+            title={t("We couldn't load that ticket.")}
+            description={t("Check your connection and try again.")}
+            onRetry={oneQ.refresh}
+          />
         ) : (
-          // Outside the fence a real id and a made-up one are the same sentence —
-          // the door answers null either way, and so do we.
-          //
           // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
           // impact-screen.tsx's own note on this box for the full reasoning.
           <p className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
@@ -246,6 +259,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         )}
       </div>
     )
+  }
 
   const status = STATUS_WORDS[ticket.status]
 
@@ -304,7 +318,21 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         messages={messages}
         composer={false}
         audience={null}
-        state={threadQ.data === undefined ? "loading" : messages.length === 0 ? "empty" : "ready"}
+        // NEVER SWALLOW (ERROR-HANDLING.md): this used to read
+        // `data === undefined ? "loading" : …`, so a thread whose fetch FAILED
+        // looked identical to one still in flight — spinning forever, and the
+        // errorTitle/errorDescription below were dead copy no branch could
+        // ever select. `error` is checked first now, the same order every
+        // other read in this file uses.
+        state={
+          threadQ.error && threadQ.data === undefined
+            ? "error"
+            : threadQ.data === undefined
+              ? "loading"
+              : messages.length === 0
+                ? "empty"
+                : "ready"
+        }
         label={t("Conversation")}
         loadingLabel={t("Loading…")}
         copy={{

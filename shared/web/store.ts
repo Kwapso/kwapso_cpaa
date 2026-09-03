@@ -12,6 +12,8 @@
 import * as React from "react"
 
 import { teamLiveSince } from "@shared/web/realtime"
+import { reportError } from "@shared/web/log"
+import { ApiFailure } from "@shared/web/api"
 
 // ── THE CACHE IS BOUNDED, AND IT HAS A MAXIMUM AGE ───────────────────────────
 // This was a plain `Map` that only ever grew. Nothing evicted, nothing expired,
@@ -482,6 +484,25 @@ export function useCached<T>(
         setError(null)
       } catch (e) {
         if (aliveRef.current) setError(e)
+        // NEVER SWALLOW (ERROR-HANDLING.md). This used to stop at `setError` —
+        // a failed read became local state and nothing else, so a screen that
+        // forgot to render `error` (most of the client portal did) lost the
+        // failure completely: no card, no log, no trace. Reported HERE, once,
+        // so every caller of `useCached` — both front doors — reaches the
+        // central log without depending on each screen's diligence.
+        //
+        // SKIPPED for `ApiFailure`: `shared/web/api.ts`'s `api()` already
+        // reports the two shapes of "this should never happen" (an opaque
+        // refusal with no body, a 2xx that isn't JSON) at the fetch itself,
+        // and deliberately leaves an ORDINARY refusal silent — a 404 or a
+        // validation refusal is an answer, not an incident, and an unexpected
+        // 5xx is already recorded server-side by the worker's own central
+        // catch (`recordWorkerError`). Reporting every `ApiFailure` again here
+        // would turn each of those into a second, redundant row, and it would
+        // make an expected "not found" or "not signed in" answer count as a
+        // crash. What was never reported anywhere — a dropped connection, a
+        // thrown bug, a fetcher that isn't `api()` at all — is reported now.
+        if (!(e instanceof ApiFailure)) reportError(`useCached:${key}`, e)
       } finally {
         if (aliveRef.current) setLoading(false)
       }

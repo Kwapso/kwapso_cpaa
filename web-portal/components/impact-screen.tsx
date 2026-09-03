@@ -49,8 +49,10 @@ import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, impact as impactApi, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
-import { useT } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
+import { formatDate } from "@shared/web/format"
 
 // Money comes from `shared/web/money.ts`, and hours and minutes from
 // `shared/workers/savings.ts` beside the rounding they spell — imported at the
@@ -141,7 +143,7 @@ function StepLine({ step }: { step: StepSaving }) {
 export function ImpactScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
   void ready // the account is decided by the server from the caller's own stamp
-  const { data, loading } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
+  const { data, loading, refresh } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
   // The chart's rows, built above the early returns so the hook order is fixed
   // whatever the read is doing. Hours to one decimal, from the SAME rounding the
@@ -159,7 +161,20 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
         <Skeleton className="h-40 w-full rounded-[var(--radius)]" />
       </div>
     )
-  if (!data) return null
+  // `PortalImpact` is never legitimately falsy once the read resolves — `!data`
+  // past the loading check above means the fetch failed, not that there is
+  // nothing to show yet (that is `data.apps.length === 0`, just below).
+  if (!data)
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="text-3xl font-medium">{t("What this has been worth")}</h1>
+        <ErrorPanel
+          title={t("We couldn't load what this has been worth.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
+      </div>
+    )
 
   if (data.apps.length === 0)
     return (
@@ -313,7 +328,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
  * never which staff member is doing it); the server withholds it, and this
  * screen renders what it was given. */
 function ProcessConversation({ processId, open }: { processId: string; open: boolean }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const { data } = useCached<{ comments: ProcessComment[]; total: number }>(
     open ? cacheKeys.processComments(processId) : null,
     () => impactApi.comments(processId)
@@ -339,9 +354,19 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
       <Comments
         items={(data?.comments ?? []).map((c) => ({
           id: c.id,
-          author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-          body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
-          timestamp: new Date(c.createdAt).toLocaleDateString(),
+          // THE SAME THREE SENTENCES AND THE SAME RAW DATE the agency app's
+          // own copy of this map carried (web/components/process-detail.tsx) —
+          // the two are a three-line clone, and both shipped these in English
+          // to every reader regardless of the language they chose. The date
+          // read `toLocaleDateString()` with no locale, so it rendered in the
+          // BROWSER's locale beside dates that follow the app's own; it goes
+          // through the one shared formatter now. The "why" line takes a named
+          // hole rather than gluing a translated fragment onto `c.body`.
+          author: c.createdByName ?? (c.fromStaff ? t("Your team") : t("A colleague")),
+          body: c.explainsStepKey
+            ? t("Why a step takes longer, {reason}", { reason: c.body })
+            : c.body,
+          timestamp: formatDate(c.createdAt, lang),
         }))}
         composer="inline"
         onSend={busy ? undefined : (body: string) => void add(body)}
