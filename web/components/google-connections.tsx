@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Ban, Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { Prohibit, PencilSimple, Plus, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import {
@@ -303,7 +303,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         className="gap-1"
                         title={t("Choose what kwapso may read")}
                       >
-                        <Pencil className="size-3.5" aria-hidden />
+                        <PencilSimple className="size-3.5" aria-hidden />
                         <span className="hidden sm:inline">{t("What it may read")}</span>
                       </Button>
                     )}
@@ -482,7 +482,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               }
                             }}
                           >
-                            <Ban className="size-3" aria-hidden /> {removeLabel(service, t)}
+                            <Prohibit className="size-3" aria-hidden /> {removeLabel(service, t)}
                           </Button>
                         </div>
                       ))

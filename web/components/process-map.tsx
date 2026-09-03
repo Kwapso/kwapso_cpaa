@@ -106,7 +106,11 @@ const TONE_CLASS: Record<Tone, string> = {
   faster: "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--success)_50%,transparent)] bg-success/5",
   slower: "shadow-[var(--hairline-error)] bg-destructive/5",
   gone: "shadow-[var(--hairline)] opacity-60",
-  new: "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--chart-1)_50%,transparent)] bg-chart-1/5",
+  // `--info`, not `--chart-1` — this is a STATUS mark ("this step is new"),
+  // not a chart series, even though the two happen to resolve to the same
+  // `--kw-sky` today. `--chart-1` is free to move on a future chart re-tune
+  // (tokens.css flags that as likely); `--info` means what this box means.
+  new: "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--info)_50%,transparent)] bg-info/5",
 }
 
 /** The OLDER side's one look: the quiet past. Never a change tone — the change

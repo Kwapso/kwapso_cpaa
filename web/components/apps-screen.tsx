@@ -47,10 +47,11 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
+import { List, SquaresFour } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
 import {
   ScreenRenderer,
@@ -253,21 +254,6 @@ export function AppsScreen({
   // vocabulary"). Don't reorder `views` below to match the kit's default.
   const [view, setView] = useRemembered<"tiles" | "list">("view", "tiles")
 
-  if (appsQ.error)
-    return (
-      <ShapeStateBody
-        shape="collectionScreen"
-        state="error"
-        copy={{ errorTitle: t("Couldn't load the apps.") }}
-        action={
-          <Button variant="secondary" onClick={() => appsQ.refresh()}>
-            {t("Try again")}
-          </Button>
-        }
-      />
-    )
-  if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
   // WHO AN APP MAY BE FILED UNDER, and WHICH STAGE — both derived from the
   // WHOLE collection (never `matching`/`shown`), so a facet's own options never
   // vanish as another control narrows the list (the same rule FilterBar's own
@@ -275,12 +261,20 @@ export function AppsScreen({
   // options … so choices don't vanish as you filter"). "Ours" (no account) has
   // no facet value of its own — an empty facet value already means "off" — the
   // same limit WaveFinder's client facet accepts for the same field.
+  //
+  // COMPUTED AHEAD OF THE TWO EARLY RETURNS BELOW (`appsQ.data ?? []`), so
+  // `useFilterBar` — a HOOK — can be called unconditionally alongside every
+  // other hook here, same discipline `shared/web/screen-engine/
+  // collection-frame.tsx` keeps for its own `useFilterBar` call. A `<FilterBar>`
+  // COMPONENT could mount and unmount freely with the loading state; a hook
+  // cannot skip renders the same way.
+  const loadedApps = appsQ.data ?? []
   const clientOptions = Array.from(
-    new Set(appsQ.data.filter((a): a is AppRow & { accountId: string } => Boolean(a.accountId)).map((a) => a.accountId))
+    new Set(loadedApps.filter((a): a is AppRow & { accountId: string } => Boolean(a.accountId)).map((a) => a.accountId))
   )
     .map((id) => ({ value: id, label: accountNames.get(id) ?? t("A client") }))
     .sort((a, b) => a.label.localeCompare(b.label))
-  const usedStages = new Set(appsQ.data.map((a) => a.stage).filter((s): s is string => Boolean(s)))
+  const usedStages = new Set(loadedApps.map((a) => a.stage).filter((s): s is string => Boolean(s)))
   const stageOptions = APP_STAGES.filter((s) => usedStages.has(s.name)).map((s) => ({
     value: s.name,
     label: t(s.name),
@@ -296,8 +290,8 @@ export function AppsScreen({
   // this split is counted in the browser does not excuse it from being honest.
   const needle = query.trim().toLowerCase()
   let matching = needle
-    ? appsQ.data.filter((a) => a.name.toLowerCase().includes(needle))
-    : appsQ.data
+    ? loadedApps.filter((a) => a.name.toLowerCase().includes(needle))
+    : loadedApps
   // …THEN THE FACETS, same reason: the badges below must count what a facet
   // left too, not just what the search box left.
   if (facetValues.accountId) matching = matching.filter((a) => a.accountId === facetValues.accountId)
@@ -310,6 +304,49 @@ export function AppsScreen({
   // has no business in the counts above. groupByStage still decides which
   // heading each tile lands under; this decides the order INSIDE one.
   const shown = [...preSort].sort((a, b) => compareApps(a, b, sort.by, accountNames, sort.dir))
+
+  // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
+  // (v1.2.27), used below only once the data has actually loaded.
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: facetValues,
+    data: loadedApps,
+    onChange: (field, value) =>
+      setFacetValues((prev) => {
+        const next = { ...prev }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setFacetValues({}),
+    resultCount: matching.length,
+  })
+
+  if (appsQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the apps.") }}
+        action={
+          <Button variant="secondary" onClick={() => appsQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): `if (appsQ.data === undefined)
+  // return <Skeleton .../>` unmounted the heading, the tab strip, the
+  // search/sort/view row and the create button along with the rows, so all
+  // four popped into existence at once the moment the read resolved, over a
+  // generic 3-line skeleton even on this, the one tile-wall screen in the
+  // app. `loadedApps` above already defaults to `[]` before that happens (it
+  // has to, for the hooks beneath it to run unconditionally), so the fix is
+  // to keep drawing the real chrome throughout and swap only the ROWS region
+  // below — the same "body swap, frame stays" law the kit's own
+  // `CollectionFrame` already follows internally.
+  const appsLoading = appsQ.data === undefined
 
   // THE LIST VIEW'S ROWS — the SAME `shown` array Tiles renders below, shaped
   // once for `appsListRecipe` ("apps.list", web/lib/screens.ts). No second
@@ -357,7 +394,6 @@ export function AppsScreen({
   const inactiveBadge = formatCount(inactive.length)
   const tabsConfig = {
     ...defaultTabsConfig,
-    variant: "folder" as const,
     tabs: [
       { value: "active", label: t("Active"), icon: "app-window", badge: activeBadge, badgeVariant: "" as const },
       { value: "inactive", label: t("Inactive"), icon: "archive", badge: inactiveBadge, badgeVariant: "" as const },
@@ -401,42 +437,31 @@ export function AppsScreen({
             this row's own sibling below it — the client's screenshot of
             exactly this screen ("Search apps… / Sort by / Name" on one row, a
             stranded dashed "Filter" chip under it) — so it is a slot of the
-            row now instead of a second row beside it. Options come from the
-            WHOLE collection (see above), so narrowing by one facet never
-            hides the other's choices. */}
+            row now instead of a second row beside it; its open panel is the
+            separate `toolbarPanel` slot (v1.2.27's `useFilterBar` split).
+            Options come from the WHOLE collection (see above), so narrowing
+            by one facet never hides the other's choices. */}
         <ToolbarRow
-          className="mb-4"
+          // `!appsLoading &&` — never the RAW `loadedApps.length === 0` alone:
+          // that array defaults to `[]` before the read resolves, which reads
+          // exactly like a genuinely empty collection unless the loading state
+          // is folded into the same expression (2026-09-03 audit).
+          empty={!appsLoading && loadedApps.length === 0}
           search={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <SearchInput
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onClear={() => setQuery("")}
                 placeholder={t("Search apps…")}
                 className="w-full"
               />
             )
           }
-          filters={
-            appsQ.data.length > 0 && (
-              <FilterBar
-                facets={facets}
-                values={facetValues}
-                data={appsQ.data}
-                onChange={(field, value) =>
-                  setFacetValues((prev) => {
-                    const next = { ...prev }
-                    if (value === "") delete next[field]
-                    else next[field] = value
-                    return next
-                  })
-                }
-                onClearFacets={() => setFacetValues({})}
-                resultCount={matching.length}
-              />
-            )
-          }
+          filters={(appsLoading || loadedApps.length > 0) && filterPill}
+          toolbarPanel={(appsLoading || loadedApps.length > 0) && filterPanel}
           sort={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <SortControl
                 options={sortOptions}
                 value={sort.by}
@@ -452,14 +477,14 @@ export function AppsScreen({
             )
           }
           view={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <ViewSwitch
                 // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
                 // generic table-first default (see the state declaration
                 // above and the file's header comment).
                 views={[
-                  { value: "tiles", label: t("Tiles") },
-                  { value: "list", label: t("List") },
+                  { value: "tiles", label: t("Tiles"), icon: <SquaresFour size={16} /> },
+                  { value: "list", label: t("List"), icon: <List size={16} /> },
                 ]}
                 value={view}
                 onValueChange={(next) => setView(next as "tiles" | "list")}
@@ -469,7 +494,12 @@ export function AppsScreen({
           }
           actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
         />
-        {shown.length === 0 ? (
+        {appsLoading ? (
+          // THE ROWS REGION ONLY — the chrome above (tabs, search, sort, view,
+          // the create button) is already drawn; this is the one thing that
+          // was worth a skeleton in the first place.
+          <Skeleton variant="list" lines={4} />
+        ) : shown.length === 0 ? (
           narrowed ? (
             <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
           ) : tab === "inactive" ? (

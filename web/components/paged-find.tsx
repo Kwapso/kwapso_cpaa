@@ -68,7 +68,8 @@
 
 import * as React from "react"
 
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { cn } from "@shared/ui/lib/utils"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
@@ -80,6 +81,7 @@ import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRemembered } from "@shared/web/remembered"
+import { useT } from "@shared/web/language"
 
 /** One page of an answer from a list door: the rows, and where the next page
  * starts (null = that was the last one). `total` is the door's exact COUNT(*)
@@ -155,6 +157,8 @@ export function PagedFind<T>({
   tabs,
   wrap,
   actions,
+  restingEmpty,
+  restingLoading = false,
   children,
 }: {
   /** the collection's OWN cache key (accountsKey(teamId), …) */
@@ -213,25 +217,30 @@ export function PagedFind<T>({
   fixed?: FindQuery
   /**
    * Rendered BEFORE the toolbar row, OUTSIDE whatever `wrap` boxes the toolbar
-   * and the rendered rows in — a folder tab strip that must sit OUTSIDE that
-   * box with no gap, the way a folder tab's own negative-margin overlap needs
-   * a real, adjacent sibling to melt into (tabs-view.tsx: "any gap here would
-   * pull them apart"). A `FolderTabStrip` (config/value/onValueChange), never
-   * a `ReactNode` — see this file's header comment for why the shape changed:
-   * the slot renders `<TabsView>` from it, so a caller cannot fold an action
-   * button in beside the tabs the way `renderAbove`'s old render-prop shape
-   * once let one in for a few hours (client ruling, 2026-08-31: the toolbar's
-   * own action buttons live in `actions` below, never beside the tab strip).
-   * `undefined` where a collection has no tab strip at all (Knowledge).
+   * and the rendered rows in, with no gap between this and that box. Before
+   * v1.2.28 that zero gap was load-bearing — a folder tab's own negative-margin
+   * overlap needed a real, adjacent sibling to melt into (tabs-view.tsx: "any
+   * gap here would pull them apart") — the folder shape is gone now
+   * (tabs-view.tsx's own header has the client's 2026-09-02 ruling that killed
+   * it) and the flush look is kept on its own merits, the way `screen-bits.tsx`'s
+   * twin `folderTabs` slot documents. A `FolderTabStrip` (config/value/
+   * onValueChange), never a `ReactNode` — see this file's header comment for
+   * why the shape changed: the slot renders `<TabsView>` from it, so a caller
+   * cannot fold an action button in beside the tabs the way `renderAbove`'s old
+   * render-prop shape once let one in for a few hours (client ruling,
+   * 2026-08-31: the toolbar's own action buttons live in `actions` below,
+   * never beside the tab strip). `undefined` where a collection has no tab
+   * strip at all (Knowledge).
    */
   tabs?: FolderTabStrip
   /**
    * Boxes the toolbar row(s) and the rendered rows together. Identity (no box)
    * by default — every existing call site keeps its current, naked toolbar.
    * Pass a `CollectionCard`-shaped wrapper to read the toolbar and the list as
-   * ONE panel, e.g. when a folder tab strip above (`tabs`) needs a real,
-   * zero-gap card to attach to (screen-bits.tsx's own `CollectionCard`,
-   * `attached`).
+   * ONE panel, e.g. when a tab strip above (`tabs`) wants a zero-gap card
+   * directly beneath it (screen-bits.tsx's own `CollectionCard`; its `attached`
+   * prop that used to matter here was retired the same day as the folder
+   * shape it was reaching over — see that file's own doc).
    */
   wrap?: (toolbarAndRows: React.ReactNode) => React.ReactNode
   /**
@@ -247,8 +256,40 @@ export function PagedFind<T>({
    * default, which is every existing call site's markup, unchanged.
    */
   actions?: (ctx: { queryString: string }) => React.ReactNode
+  /** R50 — "never toolbar on empty collection", the same rule `ToolbarRow`
+   * (screen-bits.tsx) enforces for the app's other, bounded toolbar, now
+   * required here too. This file drew its own search/filters/sort/actions
+   * UNCONDITIONALLY, with no concept of "the collection is empty" at all —
+   * a genuinely empty app-detail Stories/Processes/Meetings/Tickets/Todos
+   * panel (`work-panels.tsx`'s `PagedPanelBody`, the generic seam every one
+   * of those five hangs off) drew a full search+sort+filter+create toolbar
+   * above a lone "Add the first" body, the exact shape the client's Time
+   * screenshot named. Pass the RESTING (unsearched) list's own row count
+   * being zero — `restingData.length === 0`, the same value `children`
+   * already tests to choose between its own no-results sentence and
+   * `CollectionEmptyState` — never a filtered/found count. Combined with
+   * `active` (is anything currently being asked) computed below: a genuinely
+   * empty collection that is NOT being searched loses the whole toolbar; one
+   * mid-search keeps it, so a person can still change or clear the question
+   * that found nothing. Required, not optional, for the reason `ToolbarRow`'s
+   * own `empty` prop is: an optional prop a caller can forget is exactly how
+   * this toolbar went undocked from "is the collection empty" for as long as
+   * it has existed. */
+  restingEmpty: boolean
+  /** THE RESTING READ IS STILL ON ITS WAY — never a search's own `found.loading`
+   * (that already keeps the chrome up on its own, see `genuinelyEmpty` below),
+   * this is the call site's OWN top-level query, the one every screen used to
+   * gate its WHOLE return on (2026-09-03 audit: "nine screens blank their
+   * entire toolbar while loading"). `restingEmpty` cannot answer "is this
+   * empty" honestly before the read resolves — a call site defaulting to `[]`
+   * while its own query is still in flight would otherwise read as a
+   * genuinely empty collection and suppress the whole toolbar for exactly as
+   * long as the flicker this prop exists to remove. `undefined`/`false` is
+   * every existing call site's behaviour, unchanged. */
+  restingLoading?: boolean
   children: (found: Found<T>) => React.ReactNode
 }) {
+  const t = useT()
   // ── WHAT SHE WAS ASKING THIS DOOR, WHEN SHE LEFT ───────────────────────────
   //
   // The same sentence CollectionFrame's header carries, one layer down: the
@@ -359,10 +400,36 @@ export function PagedFind<T>({
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
 
+  // R50 — GENUINELY EMPTY, READ THE SAME WAY `collection-frame.tsx`'s
+  // `isEmptyState` IS: the resting list has nothing in it AND nothing is
+  // currently being asked. `active` (not `asked`) is deliberate — a sort with
+  // nothing typed still asks the door a different question, and the toolbar
+  // that changed it has to stay on screen for the same reason a search does.
+  //
+  // …AND NEVER WHILE THE RESTING READ ITSELF IS STILL LOADING (`restingLoading`,
+  // 2026-09-03 audit). A call site removing its own top-level early return
+  // defaults its resting array to `[]` before the fetch resolves, which reads
+  // exactly like a genuinely empty collection unless it is told otherwise —
+  // this is that telling, so the chrome (search, tabs, sort, actions) stays
+  // mounted through the load and only the ROWS region swaps to a skeleton
+  // (the call site's own `children`, checking `rows === null`).
+  const genuinelyEmpty = restingEmpty && !active && !restingLoading
+
   // NOTHING FOUND is a sentence, not a blank. "No accounts yet." is the
   // collection's empty state and it is simply untrue mid-search — but an empty
   // TAB is not a failed search either, so the sentence follows what was asked.
-  const emptyText = asked ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
+  //
+  // WRAPPED HERE, NOT LEFT AS A RAW TEMPLATE LITERAL (2026-09-03 audit,
+  // robustness fix — not user-visible). This sentence does not currently ship
+  // in English: the catalogue looks strings up by CONTENT, and the identical
+  // sentence happens to be correctly `t(...)`-wrapped elsewhere in the app, so
+  // every language's translation already exists and resolves here too. But
+  // that is a coincidence between two unrelated files, not a contract R28's
+  // extractor can see — it only finds text inside a real `t(...)` call, so if
+  // the other file's wording ever changes by one word this reverts to English
+  // everywhere with no test to catch it. Declaring it at its own call site
+  // makes the catalogue entry this file's own rather than borrowed.
+  const emptyText = asked ? t("Nothing matched. Try fewer words, or clear the filters.") : undefined
 
   // Computed once, ahead of the toolbar and the `children` call below, so
   // `actions` and the CSV export href (inside `children`) narrow by the exact
@@ -370,115 +437,154 @@ export function PagedFind<T>({
   // itself, never a narrowing that would need this.
   const queryString = active ? `?${new URLSearchParams(query).toString()}` : ""
 
+  // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
+  // (v1.2.27), used below only when `showFilters` is true.
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values,
+    // Empty on purpose: every facet above carries its own options, so there
+    // is nothing for the bar to derive from the rows on screen.
+    data: [],
+    onChange: (field, value) => {
+      const next = { ...values }
+      if (value === "") delete next[field]
+      else next[field] = value
+      setValues(next)
+    },
+    onClearFacets: () => setValues({}),
+    resultCount: total,
+  })
+
+  // ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, MIRRORING THE FIX
+  // `ToolbarRow` (screen-bits.tsx) ALREADY CARRIES. Verbatim: "what this is
+  // doing is creating a new card underneath... it kind of creates a second
+  // toolbar. This is not the behaviour I want. I want it to look together, so
+  // merge this with the main toolbar so that it's one single background or
+  // container, more like expand behaviour rather than open-a-new-one
+  // behaviour." This file's own track used to carry its own
+  // `rounded-pill bg-background`, unconditionally, with the panel rendered as
+  // a sibling one `gap-2` below it — two same-toned boxes with air between
+  // them, exactly the "second toolbar" she is naming, and the same shape
+  // `ToolbarRow` was fixed out of the same day. The fix is identical: the fill
+  // and the radius move to this OUTER column, chosen by `Boolean(filterPanel)`
+  // rather than measured from anything (R31 — two radii, never a third, never
+  // both at once), and the track keeps only its own padding/gap. No `gap-*`
+  // between the track and the panel either — a gap is the seam she is naming.
+  const filterPanelOpen = showFilters && Boolean(filterPanel)
+  // R50 — NEVER TOOLBAR ON EMPTY COLLECTION. `genuinelyEmpty` (computed above,
+  // above the toolbar and the `children` call, same discipline as every other
+  // value here) suppresses the WHOLE column: no search, no filters, no sort,
+  // no match count and no `actions` — leaving `children` to draw whatever
+  // empty register it uses (`CollectionEmptyState`'s "Add the first", most of
+  // the time) with nothing else on the card above it.
+  const toolbar = genuinelyEmpty ? null : (
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND — the
+        // identical fix `ToolbarRow` (screen-bits.tsx) carries, for the
+        // identical reason: `bg-background` and `bg-[var(--surface-raised)]`
+        // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
+        // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
+        // from that file inherited the same latent mismatch.
+        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
+        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
+      )}
+    >
+      <div
+        data-slot="toolbar-row-track"
+        className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+      >
+          {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
+              control sits in one visibly distinct row. No fill and no radius of
+              its own any more — both now belong to the merged container above. */}
+          {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
+              the filter row's "Clear all" — one control quietly owning two
+              questions — and the kit's bar says "Clear filters" and now means
+              only that. */}
+          {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+              like in your atifact": the reference artifact's search element is
+              `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+              chips/sort/count/actions after it to the track's far edge instead
+              of sitting immediately after a narrow box. Wrapped, the same
+              technique this file's own comment below already argues for a
+              `w-full` child: a `flex-1` box here claims the row's remaining
+              width, and only then does the plain `w-full` `SearchInput` inside
+              fill exactly that box. */}
+          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+            <SearchInput
+              value={text}
+              onChange={(e) => setText(e.currentTarget.value)}
+              onClear={() => setText("")}
+              placeholder={placeholder}
+              className="w-full"
+            />
+          </div>
+          {/* THE FILTER PILL, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
+              ruling, 2026-09-01, the toolbar spec Aurora approved that night
+              against a real Tickets mockup: search, then filters, then sort,
+              then create, pinned right). It says a COUNT and never the filters
+              themselves — client, 2026-09-02: "when activce filters, do not
+              display them in the toolbar. only a count niside the filter pill".
+
+              NO WRAPPING BOX AROUND THE PILL (client ruling, 2026-09-02,
+              superseding the wrapper this slot used to carry): `filterPill`
+              wraps itself in a non-growing box internally, the same "wrap a
+              `w-full` root" trick this comment used to explain (CSS Sizing
+              §5.3). Its open PANEL is the SEPARATE `filterPanel` value below,
+              never folded into this row — the split `useFilterBar` itself
+              returns (v1.2.27), replacing the single component whose OWN
+              markup this row and the column below it used to share through a
+              portal. */}
+          {showFilters && filterPill}
+          {/* THE ORDER, after search and the facet chips because the three are
+              asked with the same gesture — you type, you narrow, then you say
+              what order. What it changes is what the DOOR is asked, so the
+              answer spans the whole collection rather than the page in front
+              of you. */}
+          {showSort && (
+            <SortControl
+              options={sorts}
+              value={sortBy}
+              onValueChange={(by) => setSortBy(by)}
+              direction={sortDir ?? landsOn}
+              onDirectionChange={(dir) => setSortDir(dir)}
+              hideLabel
+            />
+          )}
+          {/* THE FILTERED TOTAL — the exact server count of the question being
+              asked, through the one seam allowed to end in a "+" (the collection's
+              own count above is exact and never does). It appears only while
+              something IS being asked, so an unfiltered screen looks exactly as it
+              did before. */}
+          {asked && !found.loading && (
+            <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+              {!total
+                ? matches.none
+                : total === 1
+                  ? matches.one
+                  : fill(matches.many, { count: formatSearchTotal(total) })}
+            </span>
+          )}
+          {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
+              correcting the `ml-auto` this slot carried until then. Her
+              reference artifact never stretches the track open to park the
+              button at its far edge; it is just the last chip in the same
+              left-packed cluster as search/filters/sort/the match count
+              (still rightmost of what's showing, part of the toolbar, never
+              beside the tab strip — the 2026-08-31 ruling — just not pushed
+              there by a growing gap). */}
+          {actions && (
+            <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
+          )}
+        </div>
+        {showFilters && filterPanel}
+    </div>
+  )
+
   const toolbarAndRows = (
     <div className="flex w-full flex-col gap-4">
-      <div className="relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
-        {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
-            control sits inside one pill, `bg-background` against the card's
-            own `bg-surface-panel`, not floating loose on the panel's bare
-            paper (client, 1 Sep 2026, pointing at her own reference artifact).
-            `relative` — `filter-bar.tsx`'s open panel anchors to THIS box via
-            `position: absolute`/`top-full`, so its own tall height (several
-            facets deep) never feeds this pill's `rounded-pill` (2 Sep 2026,
-            second pass: it did, once, and drew a giant oval). */}
-        {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
-            the filter row's "Clear all" — one control quietly owning two
-            questions — and the kit's bar says "Clear filters" and now means
-            only that. */}
-        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-            like in your atifact": the reference artifact's search element is
-            `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
-            chips/sort/count/actions after it to the track's far edge instead
-            of sitting immediately after a narrow box. Wrapped, the same
-            technique this file's own comment below already argues for a
-            `w-full` child: a `flex-1` box here claims the row's remaining
-            width, and only then does the plain `w-full` `SearchInput` inside
-            fill exactly that box. */}
-        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
-          <SearchInput
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-            onClear={() => setText("")}
-            placeholder={placeholder}
-            className="w-full"
-          />
-        </div>
-        {/* THE FACET CHIPS, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
-            ruling, 2026-09-01, the toolbar spec Aurora approved that night
-            against a real Tickets mockup: search, then the facet chips, then
-            "+ Filter", then sort, then create, pinned right).
-
-            NO WRAPPING BOX AROUND `<FilterBar>` (client ruling, 2026-09-02,
-            superseding the wrapper this slot used to carry): `FilterBar`
-            (`shared/web/screen-engine/filter-bar.tsx`) renders its chip
-            cluster inline as a normal flex child — it wraps itself in a
-            non-growing box internally, the same "wrap a `w-full` root" trick
-            this comment used to explain (CSS Sizing §5.3) — and its own OPEN
-            panel out of flow entirely, `position: absolute` against this
-            div's own `relative` two lines up, so the panel is never part of
-            THIS flexbox's layout math at all and cannot feed the pill's
-            height. `<FilterBar>` bare is correct either way: in flow for the
-            chips, out of it for the panel. See `filter-bar.tsx`'s own header
-            for the full account, including the second pass that got here. */}
-        {showFilters && (
-          <FilterBar
-            facets={facets}
-            values={values}
-            // Empty on purpose: every facet above carries its own options, so
-            // there is nothing for the bar to derive from the rows on screen.
-            data={[]}
-            onChange={(field, value) => {
-              const next = { ...values }
-              if (value === "") delete next[field]
-              else next[field] = value
-              setValues(next)
-            }}
-            onClearFacets={() => setValues({})}
-            resultCount={total}
-          />
-        )}
-        {/* THE ORDER, after search and the facet chips because the three are
-            asked with the same gesture — you type, you narrow, then you say
-            what order. What it changes is what the DOOR is asked, so the
-            answer spans the whole collection rather than the page in front
-            of you. */}
-        {showSort && (
-          <SortControl
-            options={sorts}
-            value={sortBy}
-            onValueChange={(by) => setSortBy(by)}
-            direction={sortDir ?? landsOn}
-            onDirectionChange={(dir) => setSortDir(dir)}
-            hideLabel
-          />
-        )}
-        {/* THE FILTERED TOTAL — the exact server count of the question being
-            asked, through the one seam allowed to end in a "+" (the collection's
-            own count above is exact and never does). It appears only while
-            something IS being asked, so an unfiltered screen looks exactly as it
-            did before. */}
-        {asked && !found.loading && (
-          <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-            {!total
-              ? matches.none
-              : total === 1
-                ? matches.one
-                : fill(matches.many, { count: formatSearchTotal(total) })}
-          </span>
-        )}
-        {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
-            correcting the `ml-auto` this slot carried until then. Her
-            reference artifact never stretches the track open to park the
-            button at its far edge; it is just the last chip in the same
-            left-packed cluster as search/filters/sort/the match count
-            (still rightmost of what's showing, part of the toolbar, never
-            beside the tab strip — the 2026-08-31 ruling — just not pushed
-            there by a growing gap). */}
-        {actions && (
-          <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
-        )}
-      </div>
-
+      {toolbar}
       {children({
         active,
         rows: active ? (found.data ?? null) : null,
@@ -502,13 +608,21 @@ export function PagedFind<T>({
     </div>
   )
 
-  // ZERO GAP, on purpose — the same reason `screen-bits.tsx`'s own `folderTabs`
-  // slot draws its column with no `gap-4`: a folder tab strip pulled down by
-  // `--folder-tab-overlap` needs its ACTUAL next sibling to be the panel it
-  // melts into, and a `gap` here (even the outer column's) would put daylight
-  // back between them. A caller with no `tabs` gets one more `<div>` around
-  // exactly the markup this returned before — no gap to apply with a single
-  // child, so nothing moves.
+  // NO `gap-*` ON THIS COLUMN, AND THAT IS NO LONGER A DECISION ABOUT SPACE.
+  // It used to be: "ZERO GAP, on purpose", the same zero `screen-bits.tsx`'s
+  // `folderTabs` slot and `tickets-collection.tsx` each wrote out separately,
+  // back when a folder tab pulled itself down into its own panel by
+  // `--folder-tab-overlap` and any gap here would have left its cut feet
+  // showing. The folder shape is gone (tabs-view.tsx's header carries the
+  // 2026-09-02 ruling), so all that zero did was remove real space — the
+  // client's 2026-09-03 note, "the spacing between the tabs and the beginning
+  // of the content is incorrect on main screens". The gap now belongs to the
+  // STRIP, once, in `renderFolderTabs` (`STICKY_FOLDER_TABS`'s
+  // `--tab-content-gap`, the same value a detail screen's `--record-tab-gap`
+  // reads), so this column has nothing to say about it either way and must
+  // not grow a `gap-*` of its own — that would be a second opinion about one
+  // number, which is exactly what she asked to end. A caller with no `tabs`
+  // gets one more `<div>` around exactly the markup this returned before.
   return (
     <div className="flex w-full flex-col">
       {renderFolderTabs(tabs)}

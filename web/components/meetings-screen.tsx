@@ -354,6 +354,8 @@ export function MeetingsScreen({
         }}
         sorts={translatedSorts("meetings", t)}
         defaultSort={COLLECTION_SORTS.meetings.defaultSort}
+        // R50 — the resting (unfiltered, `view: "all"`) read's own row count.
+        restingEmpty={loaded.length === 0}
         // THE MEETINGS LIST'S FILTERS, asked of the door. They were the frame's until
         // 18 Aug 2026 — so "who we met" narrowed the fifty most recent meetings
         // and said nothing about the two years behind them, which is the exact
@@ -389,21 +391,23 @@ export function MeetingsScreen({
         // both moved to this the same day, then all three corrected the same
         // day once the action shared the tabs' row: "never align the button
         // with the tabs — that button belongs in the right of the toolbar,
-        // part of the toolbar"): a FOLDER strip, not `line` — it sits directly
-        // above the toolbar's own card (`wrap` below) with zero gap, the same
-        // join Tickets draws, so it reads as attached rather than floating
-        // above a search box on the base background. `tabs` is a
-        // `FolderTabStrip`, which carries nothing but the tabs BY SHAPE now;
-        // "New meeting" moved to `actions`, at the right of the toolbar itself.
+        // part of the toolbar"): a `FolderTabStrip`, not a bare node — it sits
+        // directly above the toolbar's own card (`wrap` below) with zero gap,
+        // the same join Tickets draws, so it reads as attached rather than
+        // floating above a search box on the base background. (The strip
+        // draws the one line shape now, v1.2.28 — see tabs-view.tsx's header —
+        // the zero-gap join is unchanged, it was never about the folder SHAPE,
+        // only about there being no button beside it.) `tabs` carries nothing
+        // but the tabs BY TYPE now; "New meeting" moved to `actions`, at the
+        // right of the toolbar itself.
         tabs={{
           config: {
             ...defaultTabsConfig,
-            variant: "folder",
             tabs: [
               {
                 value: "week",
                 label: t("This week"),
-                icon: "calendar-clock",
+                icon: "chat",
                 badge: formatCount(weekTotal),
                 badgeVariant: "" as const,
               },
@@ -434,7 +438,7 @@ export function MeetingsScreen({
         // Tickets draw (`collection-content.tsx`'s and `tickets-collection.tsx`'s
         // own `wrap`): zero gap to the tab row above, which is this file's own
         // `tabs` slot rather than a second `gap-*` here.
-        wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+        wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
       >
         {(found) => {
           // WHICH ROWS THIS TAB IS SHOWING. A find answers over the whole meetings list
@@ -478,7 +482,22 @@ export function MeetingsScreen({
             data.rows ?? [],
             found.emptyText
           )
-          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          // `listRecipe` IS ONLY EVER DRAWN FOR THE WEEK VIEW (the "calendar"
+          // and "all" branches below each draw their own renderer), so
+          // leaving its `emptyText` to `withDataDrivenCollection`'s own
+          // fallback meant a genuinely quiet week fell through to the
+          // COLLECTION's empty sentence — "Nothing in Meetings yet."
+          // (screens.ts's `meetingsListRecipe`), the whole-history claim,
+          // under a tab that only ever asks about seven days of it (2026-09-03
+          // audit). `found.emptyText` ("Nothing matched.") still wins
+          // mid-search; only the genuinely-empty week gets its own honest
+          // word, the same shape the Calendar tab's own
+          // "Nothing in Meetings this month." already has.
+          const listRecipe = withDataDrivenCollection(
+            recipe,
+            data.rows ?? [],
+            found.emptyText ?? t("Nothing in Meetings this week.")
+          )
           return (
             // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
             // `SectionWithCreate` does this identically) — the create button now

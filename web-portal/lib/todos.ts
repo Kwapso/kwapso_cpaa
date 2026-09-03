@@ -54,7 +54,7 @@ async function firstPage(view: TodoViewName): Promise<Todo[]> {
 export function usePortalTodos(view: TodoViewName) {
   const t = useT()
   const keys = keysFor(view)
-  const { data, loading, error } = useCached<Todo[]>(keys.rows, () => firstPage(view))
+  const { data, loading, error, refresh } = useCached<Todo[]>(keys.rows, () => firstPage(view))
   const total = useCachedValue<number>(keys.total)
   const cursor = useCachedValue<string | null>(keys.cursor)
   const [loadingMore, setLoadingMore] = React.useState(false)
@@ -90,6 +90,7 @@ export function usePortalTodos(view: TodoViewName) {
     total,
     loading,
     error,
+    refresh,
     /** null cursor = that was the last page; the row ceiling is the other way a
      * list stops offering more (see CLIENT_PAGE_ROWS_CAP). */
     hasMore: !!cursor && (data?.length ?? 0) < CLIENT_PAGE_ROWS_CAP,

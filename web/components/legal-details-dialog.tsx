@@ -21,7 +21,7 @@ import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil } from "@shared/ui/foundations/icons"
+import { PencilSimple } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -108,7 +108,7 @@ export function LegalDetailsDialog({
       }
       submit={{
         busy: busy,
-        icon: <Pencil className="size-4" />,
+        icon: <PencilSimple className="size-4" />,
       }}
     >
       <Field config={legalNameField} htmlFor="legal-name" className={fieldSpacing}>

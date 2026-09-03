@@ -36,6 +36,7 @@ import { support, impact as impactApi, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { CollectionHeading } from "@/components/collection-heading"
+import { ErrorPanel } from "@/components/error-panel"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import { WaitingOnYou } from "@/components/waiting-on-you"
@@ -88,7 +89,7 @@ function greeting(): string {
 
 export function HomeScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
-  const { tickets, total, loading } = useTickets()
+  const { tickets, total, loading, error, refresh } = useTickets()
   const [raising, setRaising] = React.useState(false)
   const company = ready.accounts.find((a) => a.id === ready.currentAccountId)?.name ?? ""
   const newest = (tickets ?? []).slice(0, PREVIEW)
@@ -138,7 +139,13 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
          * heading: this list holds colleagues' tickets too, now. */}
         <CollectionHeading label={t("Your company's tickets")} total={total} />
 
-        {loading && !tickets ? (
+        {error && !tickets ? (
+          <ErrorPanel
+            title={t("We couldn't load your tickets.")}
+            description={t("Check your connection and try again.")}
+            onRetry={refresh}
+          />
+        ) : loading && !tickets ? (
           <div className="flex flex-col gap-4">
             <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
             <Skeleton className="h-20 w-full rounded-[var(--radius)]" />

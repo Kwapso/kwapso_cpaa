@@ -16,81 +16,194 @@
 // three files that used to (`filter-bar` + `range-facet` + `searchable-facet`,
 // 618 lines) are one file of wiring.
 //
-// ── HER SHAPE, WHICH IS NOT THE ONE THIS ROW HAD ─────────────────────────────
-//
-// The kit's bar is two things stacked: a row of FACET CONTROLS, and under it a
-// row of CHIPS — one per facet currently on, each removable, with a dashed
-// "+ filter" slot at the end and a "Clear filters" after that. The CHIP half is
-// hers entirely (`KitFilterBar`, below); which control draws a FACET is settled
-// further down, under "a facet is a compact field".
-//
-// THE CHIPS ARE NOT MANGO, and that is the ruling this lane exists to carry.
-// The old row drew a selected facet as `Badge variant="default"` — measured
-// rgb(254,208,105), the brand fill. Her file says three separate times that a
-// selected facet is not a brand fill (kit RULES.md §2.5: mango is a brand fill,
-// never a status, never a hover, never a data colour), and draws the chip as
-// raised paper with primary ink, elevation doing the work. Her treatment wins.
-// Nothing in this file passes a colour at all, which is the only way to keep
-// that true.
-//
 // ── THE POPOVER IS GONE — CLIENT RULING, 2026-09-02 ──────────────────────────
 //
-// Until tonight the "+ filter"/count slot opened a floating, portaled Popover
-// holding every facet's own control, stacked one per line. The client, against
-// a confirmed mockup: the slot now toggles a SECOND ROW open directly under the
-// WHOLE toolbar, inside the same card/track — not a popover, not an overlay,
-// an actual sibling line. Nothing about the facet controls THEMSELVES changed
-// to do this: every facet was already rendered by mapping `facets` once, in
-// one place (`RangeFacet`/`SelectFacet`, below), so the panel already showed
-// every facet's own field at once. Moving that map from a `<PopoverContent>`
-// to a plain `<div>` changed only the toggle's mechanics. And nothing here
-// inserts an "Apply" step: a pick calls `onChange` directly (see `pick`
-// below), which is what the client asked to keep — "the moment I select sth
-// on a dropdown its applied", and, the same day, "remember we dont want apply
-// buton". CLEARING is one control and it is the kit's own "Clear filters",
-// drawn beside the chips by `KitFilterBar`; this file adds no second one,
-// because a facet with nothing on it has nothing to clear and two controls
-// for one act is the shape the app's own one-mango rule refuses.
+// Until that night the "+ filter"/count slot opened a floating, portaled
+// Popover holding every facet's own control, stacked one per line. The client,
+// against a confirmed mockup: the slot now toggles a SECOND ROW open directly
+// under the WHOLE toolbar — not a popover, not an overlay, an actual sibling
+// line. Nothing about the facet controls THEMSELVES changed to do this: every
+// facet was already rendered by mapping `facets` once, in one place
+// (`RangeFacet`/`CompactFacet`, below), so the panel already showed every
+// facet's own field at once. And nothing here inserts an "Apply" step: a pick
+// calls `onChange` directly, which is what the client asked to keep — "the
+// moment I select sth on a dropdown its applied", and, the same day, "remember
+// we dont want apply buton".
 //
-// THE PANEL IS `position: absolute`, NOT A NORMAL-FLOW SIBLING — SECOND PASS,
-// SAME DAY. The first cut made the panel a genuine flex sibling of the chip
-// cluster, both landing as direct children of the toolbar's own pill (this
-// component's root was a `<>` fragment for exactly that). It solved WIDTH —
-// the panel's `w-full` finally meant the whole pill once nothing capped it —
-// and broke HEIGHT: the panel was tall (several facets deep, each an expanded
-// list of checkbox rows), `flex-wrap` folded it onto a second line INSIDE the
-// pill's own box, and a `rounded-pill` box that tall draws a stadium wide
-// enough to read as a giant oval. Caught live on a screenshot, the client's
-// own words "what is this shit". A pill's radius is only ever right for a
-// SHORT box; keeping the panel out of normal flow entirely —
-// `position: absolute` — is what stops its height from ever reaching the
-// pill's own box model, no matter how many facets a future screen adds. The
-// facets are compact fields now (below), which makes the panel short — that
-// is a reason the oval is unlikely, never a reason it is impossible, so the
-// geometry stays the guarantee and the compactness stays a separate,
-// presentational decision. `ToolbarRow`, `PagedFind`, `WaveFinder` and the
-// engine's own `CollectionFrame` each mark the box that hosts this bar
-// `relative`, so the panel's `top-full`/`inset-x-0` (see `filter-bar-row`'s
-// own className below) has something to measure against; see each of their
-// comments at the `filters` slot for that other half. The trade this makes,
-// deliberately: an open panel now floats ABOVE whatever is below it rather
-// than pushing it down. Nothing here re-flows a page's own scroll position or
-// row count while the panel is open, which the earlier flex-sibling shape
-// could not promise either.
+// ── THE PANEL'S GEOMETRY, IN THREE PASSES. READ ALL THREE ────────────────────
 //
-// ONE COMPOSITION CANNOT MARK ITS OWN ANCHOR: the vendored kit's OWN
-// `CollectionFrame` (`shared/ui/components/collection-frame/collection-frame.tsx`,
-// R39 — hand-edits turn the build red) wraps whatever it is handed as `filters`
-// in `<div className="flex min-w-0 flex-wrap items-center gap-2">`, with no
-// `relative` of its own, and that markup is the kit's, not ours. So the app
-// wraps its OWN node in a `relative` box before handing it over
-// (`collection-frame.tsx`'s `useKitPanel` branch), which anchors the panel to
-// the filters slot rather than to the whole toolbar — a narrower containing
-// block, which is why the panel below also carries a `min-w-*`: an anchor
-// narrower than the panel's own content must not squeeze it. Marking that
-// wrapper `relative` in the kit itself is the upstream fix, logged for the
-// design-kit pipeline; nothing here fakes it with a hack that would only work
-// by accident.
+// PASS ONE — A FLEX SIBLING INSIDE THE PILL, AND THE BLOB. The first cut made
+// the panel a genuine flex child of the toolbar's own `rounded-pill` TRACK
+// (this component's root was a `<>` fragment for exactly that). It solved
+// WIDTH — the panel's `w-full` finally meant the whole pill once nothing
+// capped it — and broke HEIGHT: the panel is several facets deep, `flex-wrap`
+// folded it onto a second line INSIDE the pill's own box, and a `rounded-pill`
+// (999px) box that tall draws a stadium wide enough to read as a giant oval
+// with the controls scattered around it. Caught live on a screenshot; the
+// client's words were "lol what is this shit".
+//
+// PASS TWO — `position: absolute`, AND THE OVERLAY. The fix was to take the
+// panel out of normal flow entirely (`absolute inset-x-0 top-full` against a
+// `relative` track), so its height could never reach the pill's box model no
+// matter how many facets a screen adds. That held the pill's shape and cost
+// the other half of the behaviour: an open panel FLOATED over the collection
+// instead of moving it, which the client then ruled on — verbatim, 2026-09-02:
+// "the expanded toolbar shoudl not be an overlay, but literaly expand the
+// space".
+//
+// PASS THREE — THE COLUMN, WHICH IS NEITHER OF THE TWO. Both earlier passes
+// took the same thing for granted: that the panel's only possible parent is
+// the pill track. It is not. A column wrapping a host's toolbar in a plain
+// `flex-col`, whose children are (a) the pill track, unchanged and still
+// fixed-shape, and (b) the panel rendered as its own sibling beneath it, makes
+// the panel a NORMAL-FLOW SIBLING of the track rather than a child of it: it
+// occupies real space and pushes the collection down (the ruling), and its
+// height feeds the COLUMN's box model and never the pill's, because the pill
+// is a different box — pass one's bug is structurally impossible now rather
+// than merely unlikely. Deleting `absolute`/`top-full` and stopping there is
+// pass one again, so `web/test/filter-row-is-the-kits.test.tsx` locks the
+// difference: it renders the real `ToolbarRow`, opens the panel, and asserts
+// the pill track's own subtree is byte-identical open and closed and never
+// contains the panel.
+//
+// PASS FOUR, SUPERSEDING PASS THREE'S OWN MECHANISM — v1.2.27. Pass three's
+// column reached its outlet through a PORTAL: the "Filter" pill has to sit
+// INSIDE the track (it is a toolbar control) and the panel has to sit OUTSIDE
+// it, and a React element renders into exactly one parent, so a bespoke
+// context (`PanelSlot` + `FilterPanelProvider` + `FilterPanelOutlet` +
+// `FilterPanelColumn`, ~62 lines) published a DOM node for `createPortal` to
+// target — built because neither `ToolbarRow` (screen-bits.tsx) nor the
+// kit's own `CollectionFrame` offered a real position to hand a panel node
+// to. `CollectionFrame` gained one (`toolbarPanel`) the same release this
+// facet work landed in, which is the proof a portal was never the point —
+// a POSITION was. `useFilterBar` below returns `{ pill, panel }` as two
+// ordinary values instead of rendering both itself, so the CALLER holds both
+// pieces already and can hand each to wherever it belongs — `filters` and
+// `toolbarPanel`, on `ToolbarRow` or on the kit's `CollectionFrame` directly —
+// in one render pass, with no context and no portal. `web/test/filter-row-
+// is-the-kits.test.tsx`'s byte-identical assertion above WAS true of the
+// track's own subtree at the time and is SUPERSEDED below (pass five) — the
+// track stopped carrying its own fill/shape at all, which is a stronger
+// property than "unchanged", not a weaker one.
+//
+// PASS FIVE, SUPERSEDING PASS THREE AND FOUR'S "TWO BOXES" SHAPE — CLIENT
+// RULING, 2026-09-03. Verbatim: "what this is doing is creating a new card
+// underneath... it kind of creates a second toolbar. This is not the
+// behaviour I want. I want it to look together, so merge this with the main
+// toolbar so that it's one single background or container, more like expand
+// behaviour rather than open-a-new-one behaviour."
+//
+// Passes three and four solved OVERLAY (the panel is in normal flow and
+// pushes the collection down) and left a second fault standing: the track
+// and this panel were two `bg-background` boxes — the track `rounded-pill`,
+// this panel `rounded-[var(--radius)]` — with a `gap-2` between them. Same
+// fill, same tone, visibly separate: precisely "a second toolbar" no matter
+// how correctly the overlay question was answered. The fix is NOT pass one
+// again (the panel is still never a flex child of the pill, still never feeds
+// anything's height into a `rounded-pill` calc) — it is giving the fill and
+// the shape to exactly ONE element, the caller's own merged container, and
+// having THAT element's shape read off `Boolean(panel)` rather than off any
+// box's measured height. `ToolbarRow` (screen-bits.tsx) does this now: one
+// `bg-[var(--surface-raised)]` div (fixed off `bg-background` since this pass
+// landed — see the same correction below, and check screen-bits.tsx directly
+// before trusting a token name in a comment about another file), `rounded-
+// pill` with no panel and `rounded-[var(--radius)]` the moment one exists,
+// the track and this panel
+// both painting nothing of their own. This panel's own div lost its
+// `bg-background`/`rounded-[var(--radius)]` for the same reason — see its
+// own comment, below. `web/test/filter-row-is-the-kits.test.tsx`'s "the panel
+// expands the space" test is rewritten for this pass rather than dropped:
+// the pill-inside-the-track regression (pass one) and the floating-overlay
+// regression (pass two) are both still asserted against; what changed is
+// that the track's OWN box now legitimately carries no fill or radius in
+// either state, and the single merged container's radius is asserted to
+// switch instead of staying byte-identical.
+//
+// ── THE TOOLBAR SAYS A COUNT, NEVER THE FILTERS — CLIENT RULING, 2026-09-02 ──
+//
+// Verbatim: "when activce filters, do not display them in the toolbar. only a
+// count niside the filter pill (like in artifact)". So the kit's CHIP HALF —
+// one removable chip per active facet, which this adapter used to build out of
+// `facets` + `values` — is not rendered at all. `KitFilterBar` is still what
+// draws the row, with no `filters` and no `onRemove`: what survives is its
+// "+ filter" slot, which is the pill, reading `Filter` or `Filter (3)`.
+//
+// What went with the chips, deliberately and completely: the `said` ref that
+// remembered a picked value's WORDS so a chip could not end up naming a ULID
+// after its option left the loaded page (nothing names a value any more, so
+// there is nothing to go stale), `rangeSaid` that turned a numeric bound into
+// chip text, the per-chip remove control and its `t("Remove filter: {what}")`
+// sentence, and the wrapped-and-truncated chip label. A count cannot clip and
+// cannot go stale, which is most of what those existed to survive.
+//
+// ── WHERE "CLEAR FILTERS" WENT, AND WHY THERE IS STILL EXACTLY ONE ───────────
+//
+// It was the kit's own control at the end of the chip row, and the kit only
+// draws it when there ARE chips (`hasChips` in the kit's file), so with the
+// chips gone that control cannot appear and passing `onClear` would be dead
+// wiring. The two places it could go are beside the pill, or inside the panel.
+//
+// IT IS INSIDE THE PANEL, with the fields it clears. Three reasons, in order
+// of weight. First, the row it used to belong to is gone: beside the pill it
+// would be a second toolbar control that appears and disappears with the
+// filter state, changing the track's own contents underneath a person — and
+// the pill's count already reports that state, so the toolbar would be saying
+// the same thing twice in two shapes. Second, clearing is an edit to the
+// facets, and the facets are in the panel; a control standing where the thing
+// it acts on is visible is the whole of why the kit drew it beside the chips
+// in the first place. Third, the client's own reference artifact draws a Clear
+// inside the panel. It is also the reading that keeps the app honest about
+// "exactly one": the no-results register already offers its own "Clear
+// filters" when a narrowed collection comes back empty
+// (`collection-frame.tsx`), and a toolbar control would stand beside that one
+// permanently, where this one is on screen only while somebody has the panel
+// open.
+//
+// ── THE THREE TOOLBAR PILLS ARE ONE FAMILY — CLIENT RULING, 2026-09-02,
+// SUPERSEDED v1.2.27 ──────────────────────────────────────────────────────
+//
+// Verbatim: "the filter button-pill it's still differnet than the other 2. fix
+// and uniform it". MEASURED, not eyeballed, against the two pills standing
+// beside it — `SortControl`'s field and `ViewSwitch`, which both draw through
+// the kit's `SelectTrigger` and both override it the same way:
+//
+//                     Filter (kit `CHIP_ADD`)      Sort / View (`SelectTrigger`)
+//   height            40 (--control-height-button) 40  — already equal
+//   radius            rounded-pill                 rounded-pill — already equal
+//   resting fill      --btn-secondary-fill         --btn-secondary-fill — equal
+//   inline padding    12 (px-3)                    18 (--space-4h)
+//   type step         12 (--text-badge), leading 1 14 (--text-sm), leading 1.45
+//   weight            inherited (300)              500 (--font-weight-medium)
+//
+// So three real differences, every one of them making the pill read SMALLER,
+// plus a fourth this file was itself causing: the hover override that used to
+// live here forced `--accent` onto the add slot. That was right when the kit
+// drew that slot with `bg-transparent` (a 5% wash tinting the page behind it)
+// and is wrong now that it is an opaque `--btn-secondary-fill` pill — the wash
+// REPLACES the fill rather than tinting it, and measured against the dark
+// palette it comes out darker than resting, i.e. the pill dimming on hover
+// where the other two light up. The kit already hovers it to
+// `--btn-secondary-hover`, the same token the other two use, so the override
+// is deleted rather than corrected.
+//
+// THE UPSTREAM FIX LANDED, v1.2.27: the kit's own `CHIP_ADD` now takes
+// `SelectTrigger`'s padding, type step and weight the same way it already took
+// its height and its fill, closing the three real deltas measured above. The
+// app-side override that used to close them here (`FILTER_PILL_MATCHES_THE_OTHER_TWO`,
+// reached through the kit's stable `data-slot="filter-bar-add"` hook) is
+// therefore deleted along with its application — restating a class the kit
+// already states is three lines free to drift out of step with the very thing
+// they claim to match, and `web/test/filter-row-is-the-kits.test.tsx` rot-checks
+// that it stays gone.
+//
+// ── ONE COMPOSITION CANNOT MARK ITS OWN SLOT ─────────────────────────────────
+//
+// The vendored kit's OWN `CollectionFrame` gives `filters` a wrapping box of
+// its own and offers no slot BELOW its toolbar, so the engine's `useKitPanel`
+// branch puts the outlet at the top of the frame's BODY instead — directly
+// under the toolbar, above the rows, which is where the panel belongs and what
+// the ruling asks for. A slot of the frame's own between toolbar and body is
+// the upstream fix, logged for the design-kit pipeline.
 //
 // ── WHAT THE APP'S FACET CONTRACT IS, MEASURED RATHER THAN ASSUMED ───────────
 //
@@ -101,12 +214,10 @@
 // `onSearch`. The async option-provider, its debounce, its request-id race
 // guard and the whole chips branch were three code paths no screen reached, so
 // they are gone rather than ported. `control: "range"` STAYS, because
-// `selectRows` compiles it and the kit draws it; `control: "chips"` does not,
-// because in the kit's vocabulary a chip is an ACTIVE FILTER and keeping a
-// second meaning of the word in the same row is the drift this lane ends.
+// `selectRows` compiles it and the kit draws it.
 //
 // ── A FACET IS A COMPACT FIELD, NOT AN EXPANDED LIST — CLIENT RULING,
-// 2026-09-02, AGAINST HER OWN CONFIRMED ARTIFACT ─────────────────────────────
+// 2026-09-02, AGAINST HER OWN CONFIRMED ARTIFACT. SUPERSEDED IN PART, v1.2.27 ─
 //
 // `control: "select"` was drawn by the kit's `SearchableFacet`, which is an
 // always-expanded panel: a heading, a search pill, then every option as a
@@ -114,48 +225,66 @@
 // toolbar, and it is what the client's screenshot caught — a "Search client…"
 // box over a scrolling list of every client, where her artifact draws one
 // short labelled field reading "Any client". The declared control said
-// `select` all along; nothing was drawing one. So it does now: the kit's own
-// `Select` (`@shared/ui/components/select/select`), in the same
-// `role="group"` + caption-label frame the kit's own `RangeFacet` puts round
-// its number pair, so the two facet kinds read as one family. Not a
-// hand-rolled trigger — a hand-rolled look-alike under a kit name is the
-// exact failure `web/test/filter-row-is-the-kits.test.tsx` exists to catch,
-// and it would be no less a failure for looking right.
+// `select` all along; nothing was drawing one. So on 2026-09-02 this file
+// composed one out of the kit's own `Select` — a hand-assembled compact field,
+// not a hand-rolled trigger, but still this adapter's own composition rather
+// than a kit part with a name.
 //
-// WHAT THAT COSTS, SAID PLAINLY: `SearchableFacet` typed to narrow a long
-// option list, and a `Select` does not. Waves' own note ("an agency with 131
-// clients on staging") is the case that pays for it. A Radix select still
-// scrolls and still takes type-ahead, so a long list is reachable rather than
-// searchable, and the search BOX on the toolbar beside it is untouched. If
-// that turns out to be too little, the answer is a compact TRIGGER over a
-// searchable list — one control in the kit, not a second expanded panel here.
-// Filed for the design-kit pipeline with the `relative` gap above.
+// v1.2.27 CLOSED THE GAP UPSTREAM: the kit shipped `CompactFacet` — "one short
+// field, and the same filtered list `SearchableFacet` draws, behind it" (the
+// kit's own header, `components/filter-bar/filter-bar.tsx`) — built from the
+// SAME `selectTriggerVariants` recipe the sort and view pills stand on, so a
+// compact facet beside them cannot drift from them the way `CHIP_ADD` did.
+// This file's own hand-assembled `Select` composition is deleted in favour of
+// it: `SelectFacet` and its `ANY_VALUE` sentinel are gone, and the facet
+// branch below draws `<CompactFacet>` directly. `CompactFacet` already draws
+// its own `role="group"` + `FacetLabel` frame — matching `RangeFacet`'s, so
+// the two facet kinds still read as one family — so this file no longer wraps
+// one of its own around it either.
+//
+// AND THE FEATURE THE FIRST CUT COST COMES BACK. `CompactFacet` is optionally
+// `searchable`: the SAME filtered list `SearchableFacet` draws, now reachable
+// from behind a short trigger instead of paying for it with an
+// always-expanded panel. Waves' own note ("an agency with 131 clients on
+// staging") is exactly the case a plain `Select` could not serve — a Radix
+// select scrolls and takes type-ahead but does not search — so `wave-finder.tsx`
+// turns `searchable` on for its Company facet. The kit's own guidance
+// ("`searchable` defaults to FALSE — a facet over eight words does not need a
+// search field, and drawing one there would be a control that never earns its
+// keystroke") sets the threshold this adapter measures against: `searchable`
+// is on wherever a facet's OWN option count exceeds eight, computed per facet
+// rather than guessed at a call site, so a vocabulary that grows past the
+// threshold turns its own facet searchable without anybody revisiting it.
 //
 // ── SINGLE-SELECT, AND WHY IT IS NOT A THEMING DECISION ──────────────────────
 //
 // The doors take one value per query parameter and validate it positionally
 // (R20); a comma list would be a change to six doors, their filter parity on
-// the machine surface (R19) and their tests. A `Select` is single-valued by
-// construction, so the adapter no longer has to bind a multi-select array down
-// to one entry the way it did while `SearchableFacet` drew this — and the day
-// a door learns a list, this adapter is still the one place that changes.
-// Clearing one facet is `ANY_VALUE` below, because Radix refuses an empty
-// string as an item value; the door still receives "".
+// the machine surface (R19) and their tests. Both the old `Select` composition
+// and the kit's own `CompactFacet` are single-valued by construction — and the
+// day a door learns a list, this adapter is still the one place that changes.
+//
+// CLEARING A FACET IS `null` NOW, NOT A SENTINEL STRING. The old `Select`
+// composition needed `ANY_VALUE`, a two-underscore placeholder, because Radix
+// reserves the empty string for `SelectItem`'s own placeholder state and
+// throws if an item declares it — a workaround for a control that speaks in
+// strings only. `CompactFacet`'s own `value`/`onValueChange` speak `string |
+// null`, `null` already meaning "off" (its own contract: "`null` is the
+// facet turned off"), so there is no reserved string to dodge and nothing to
+// convert through a sentinel — only the boundary conversion every facet still
+// needs, because the app's OWN convention, shared with every door and every
+// other facet in this file, is `""` for off: `null` in, `""` out, both ways,
+// where this file calls `CompactFacet`.
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import {
+  CompactFacet,
   FilterBar as KitFilterBar,
   RangeFacet,
-  type FilterChip,
 } from "@shared/ui/components/filter-bar/filter-bar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@shared/ui/components/select/select"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 
@@ -163,131 +292,41 @@ import { facetOptions } from "./collection"
 import { type FacetOption, type FilterFacet } from "./config"
 import { formatRange, parseRange } from "./range"
 
-/** BUG FIX, 2026-08-31 — client: pill hover must move the pill's own FILL,
- * never just its text. The kit's `FilterBar` (vendored, `shared/ui/
- * components/filter-bar/filter-bar.tsx`, CLAUDE.md R39, do not hand-edit)
- * draws two chip-shaped buttons whose hover is text-only: the "+ filter"/count
- * slot (`CHIP_ADD`: `text-ink-tertiary enabled:hover:text-foreground`, no
- * background rule at all) and "Clear filters" (reuses
- * `filterChipVariants({state:"default"})`'s `bg-[var(--surface-raised)]`
- * plus that same text-only hover). The removable chip's own label button
- * already gets this right (`CHIP_LABEL_INTERACTIVE`: `enabled:hover:bg-
- * accent`) — these two just never picked up the same treatment.
- *
- * App-side override, not a kit edit — the exact `[&_[data-slot=X]]:` pattern
- * `web/components/auth-card.tsx` documents: reached from outside via the
- * kit's own stable `data-slot="filter-bar-add"` / `"filter-bar-clear"`
- * hooks, on this adapter's own wrapping `<div>`, so a design-sync re-pull
- * never has to notice this exists. A fill, never a border: the app's hover
- * law is a fill swap, and neither button's resting border (the add slot's
- * dashed one) is touched.
- *
- * TWO DIFFERENT TOKENS, NOT ONE — measured, not assumed. `--accent`
- * (`CHIP_LABEL_INTERACTIVE`'s own neutral hover, a `rgba(…, .05)` wash) is
- * right for the "+ filter" slot: its resting fill is `bg-transparent`, so
- * the wash tints the OPAQUE surface behind it (the page) and reads as a real
- * highlight. "Clear filters" is not transparent at rest — it reuses
- * `filterChipVariants({state:"default"})`'s OPAQUE `bg-[var(--surface-
- * raised)]` (`--card`) — so `bg-accent` would REPLACE that opaque fill with
- * the 5% wash rather than tint it, composite against whatever sits behind
- * the chip instead, and (measured against the dark palette's page tone) come
- * out DARKER than resting, i.e. the chip dimming on hover rather than
- * lighting up. `--btn-secondary-hover` is `Button`'s own OPAQUE hover token
- * for THE SAME resting fill (`--btn-secondary-fill` is also `--card`) — the
- * exact pairing this chip's own base state already borrows, so its hover
- * state borrows the matching one rather than reaching for the wash. Filed
- * upstream as a kit gap either way. */
-const FILTER_BAR_HOVER_FILL =
-  "[&_[data-slot=filter-bar-add]]:hover:bg-accent " +
-  "[&_[data-slot=filter-bar-clear]]:hover:bg-[var(--btn-secondary-hover)]"
+/** THE COMPACT FACET SEARCHES PAST THIS MANY OPTIONS. The kit's own threshold,
+ * stated in its `CompactFacet` header: "a facet over eight words does not need
+ * a search field, and drawing one there would be a control that never earns
+ * its keystroke." Measured per facet, off its own resolved option list —
+ * `optionsFor` below, declared or derived from the loaded rows either way — so
+ * a vocabulary that grows past eight turns searchable on its own; nobody
+ * revisits a call site to flip it. */
+const SEARCHABLE_PAST = 8
 
-/** What a `control:"range"` facet's chip says. Symbols rather than words, so a
- * bound reads the same in every language and never has to be a sentence. */
-function rangeSaid(value: string): string {
-  const { min, max } = parseRange(value)
-  if (min != null && max != null) return `${min} – ${max}`
-  if (min != null) return `≥ ${min}`
-  if (max != null) return `≤ ${max}`
-  return ""
-}
-
-/** "NOTHING PICKED", as a value a Radix item may carry. `""` is what every
- * caller and every door means by "this facet is off", and it is the one string
- * `SelectPrimitive.Item` refuses — Radix reserves the empty string for the
- * placeholder state, and an item declaring it throws. So the row that turns a
- * facet back off carries this sentinel, converted at both edges below, and the
- * value that leaves this file is still `""`. Two underscores either side so it
- * cannot collide with a door's own vocabulary (`active`, `meeting`, `all`…) or
- * with a ULID. */
-const ANY_VALUE = "__any__"
-
-/** ONE FACET AS THE ARTIFACT DRAWS IT: a caption label over one compact field
- * reading "Any client" until something is picked.
+/**
+ * THE FILTER ROW, SPLIT IN TWO — `pill` (the toolbar's own "Filter" control)
+ * and `panel` (what it opens), returned separately rather than as one
+ * component's markup.
  *
- * The frame is the kit's own `RangeFacet` frame, matched deliberately rather
- * than invented — `role="group"` + `aria-labelledby` on a `flex flex-col
- * gap-2` column, with the label at the caption step in secondary ink — so the
- * two facet kinds in this panel read as one family and a screen reader names
- * them the same way. The kit's `FacetLabel` that draws it is private to
- * `filter-bar.tsx`, so the two classes are repeated here; the CONTROL, which
- * is the part that could drift, is the kit's `Select` untouched.
- *
- * `aria-labelledby` rather than an `aria-label`: the group's own heading is
- * already on screen, and pointing the trigger at it is what stops a reader
- * hearing "Client" twice. */
-function SelectFacet({
-  label,
-  anyLabel,
-  options,
-  value,
-  onPick,
-}: {
-  label: string
-  /** What the field says while the facet is off — "Any client". */
-  anyLabel: string
-  options: FacetOption[]
-  /** `""` = off. */
-  value: string
-  /** `""` clears the facet. Called the moment a row is picked: there is no
-   * Apply step here or anywhere else in this file (client ruling, see the
-   * header). */
-  onPick: (next: string) => void
-}) {
-  const id = React.useId()
-  const labelId = `${id}-label`
-  return (
-    <div role="group" aria-labelledby={labelId} className="flex min-w-0 flex-col gap-2">
-      <span id={labelId} className="text-caption text-ink-secondary">
-        {label}
-      </span>
-      <Select
-        value={value === "" ? ANY_VALUE : value}
-        onValueChange={(next) => onPick(next === ANY_VALUE ? "" : next)}
-      >
-        {/* The dense control height, which is the height the kit's own facet
-            fields take (`facetFieldVariants`: `--control-height-dense`) — a
-            select trigger's own default is the taller form-field height, and
-            a filter panel is not a form. */}
-        <SelectTrigger aria-labelledby={labelId} className="h-[var(--control-height-dense)]">
-          <SelectValue placeholder={anyLabel} />
-        </SelectTrigger>
-        <SelectContent>
-          {/* TURNING THE FACET OFF IS A ROW, not a separate ✕. It reads the
-              same as the resting placeholder on purpose: "Any client" is the
-              state, so picking it is the reader saying that state out loud. */}
-          <SelectItem value={ANY_VALUE}>{anyLabel}</SelectItem>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
-function FilterBar<T>({
+ * SUPERSEDED MACHINERY, v1.2.27. This used to be a single component,
+ * `<FilterBar>`, that rendered the pill in place and `createPortal`'d the
+ * panel into a DOM node a bespoke context (`PanelSlot` + `FilterPanelProvider`
+ * + `FilterPanelOutlet` + `FilterPanelColumn`, ~62 lines) published from
+ * wherever the host's toolbar happened to sit — because neither `ToolbarRow`
+ * (screen-bits.tsx) nor the kit's own `CollectionFrame` offered a real
+ * position for a panel that must land BELOW the whole toolbar rather than
+ * inside the pill (the header's three-pass saga explains why one is needed at
+ * all). `CollectionFrame` gained a real `toolbarPanel` prop the same release
+ * this facet work landed in, so the host itself can now place a panel node
+ * exactly where the ruling wants it, in ONE render pass, with no cross-tree
+ * portal and no context. A HOOK returning both pieces is the app-side twin of
+ * that prop: the CALLER (a screen, or `ToolbarRow`'s own caller) holds `pill`
+ * and `panel` as two ordinary values and hands each to wherever it belongs —
+ * `filters` and `toolbarPanel` on `ToolbarRow`, or `filters` and `toolbarPanel`
+ * on the kit's own `CollectionFrame` directly. The context and its portal are
+ * therefore deleted rather than repointed at the kit's new slot: a value
+ * returned from a hook reaches two places in a parent's own render without
+ * needing either.
+ */
+function useFilterBar<T>({
   facets,
   values,
   data,
@@ -303,216 +342,244 @@ function FilterBar<T>({
    * `options` (so choices don't vanish as you filter). */
   data: T[]
   /** Empty `value` clears that facet. Called the moment a value is picked —
-   * there is no "Apply" step, on the row exactly as there was none on the
+   * there is no "Apply" step, on the panel exactly as there was none on the
    * popover it replaces. */
   onChange: (field: string, value: string) => void
-  /** Drop every facet at once. NOT the search box: the kit's control says
-   * "Clear filters" and now means exactly that. What somebody typed is cleared
-   * by the search field's own ✕ (`SearchInput onClear`), which is the kit's
-   * answer to the same question one control along — and it is why this prop was
-   * renamed from `onClearAll`, which had been clearing something it did not
-   * name. */
+  /** Drop every facet at once — the PANEL's own "Clear filters", and the only
+   * one this row has (the header says why it is not beside the pill). NOT the
+   * search box: what somebody typed is cleared by the search field's own ✕
+   * (`SearchInput onClear`), which is why this prop was renamed from
+   * `onClearAll`, which had been clearing something it did not name. */
   onClearFacets: () => void
   /** Announced politely to screen readers when results change. */
   resultCount?: number
-  /** Applied to the chip cluster's own wrapping box — NOT to the open facet
-   * row, which has to reach the toolbar's full width regardless of what a
-   * caller passes here. No call site uses this today. */
+  /** Applied to the pill's own wrapping box — NOT to the open panel, which
+   * takes its width from wherever the caller places `panel`. No call site
+   * uses this today. */
   className?: string
-}) {
+}): { pill: React.ReactNode; panel: React.ReactNode } {
   const t = useT()
-  /** Is the second row open? Replaces the old Popover's own `open` state —
-   * same idea (a facet's controls are hidden until asked for), a plain toggle
+  /** Is the panel open? Replaces the old Popover's own `open` state — same
+   * idea (a facet's controls are hidden until asked for), a plain toggle
    * instead of a floating, portaled surface. */
   const [open, setOpen] = React.useState(false)
-  /** WHAT A PICKED VALUE IS CALLED, remembered from the moment it was picked.
-   * A facet over ROWS takes its options from what the screen is holding, so an
-   * app archived — or a client that drops out of the loaded page — while its
-   * filter is on would leave the chip naming a raw id at somebody. The words
-   * are captured where they are known and never go stale, because the value
-   * they belong to cannot change under them. */
-  const said = React.useRef<Record<string, string>>({})
-  /** THE OPEN ROW ITSELF — focus lands on its first control the moment it
+  /** THE OPEN PANEL ITSELF — focus lands on its first control the moment it
    * appears, since (unlike the popover it replaces) nothing here traps focus
-   * or needs to hand it back: the "Filter" chip never unmounts, so leaving the
-   * row open or closed never moves focus anywhere the reader didn't ask for. */
-  const panel = React.useRef<HTMLDivElement>(null)
+   * or needs to hand it back: the "Filter" pill never unmounts, so leaving the
+   * panel open or closed never moves focus anywhere the reader didn't ask
+   * for. */
+  const panelRef = React.useRef<HTMLDivElement>(null)
   const wasOpen = React.useRef(false)
   React.useEffect(() => {
     if (open && !wasOpen.current) {
-      panel.current?.querySelector<HTMLElement>("input, button")?.focus()
+      panelRef.current?.querySelector<HTMLElement>("input, button")?.focus()
     }
     wasOpen.current = open
   }, [open])
 
-  if (facets.length === 0) return null
+  if (facets.length === 0) return { pill: null, panel: null }
 
-  const optionsFor = (f: FilterFacet): FacetOption[] =>
-    f.options ?? facetOptions(data, f.field)
+  const optionsFor = (f: FilterFacet): FacetOption[] => f.options ?? facetOptions(data, f.field)
 
-  const chips: FilterChip[] = []
-  for (const f of facets) {
-    const val = values[f.field] ?? ""
-    if (val === "") continue
-    const key = `${f.field}:${val}`
-    const words =
-      f.control === "range"
-        ? rangeSaid(val)
-        : (optionsFor(f).find((o) => o.value === val)?.label ??
-          said.current[key] ??
-          val)
-    chips.push({
-      id: f.field,
-      // WRAPPED, and this is the trap the kit's skin sets. The chip's label
-      // half is `inline-flex`, so a bare string child becomes an anonymous flex
-      // item and `text-overflow: ellipsis` silently stops working — the text
-      // still clips, at the identical pixel, with no "…" to say it did. These
-      // facets carry account and client names, which are exactly the strings
-      // long enough to reach it. A real element with its own measure survives.
-      label: <span className="block max-w-[14rem] truncate">{`${f.label} · ${words}`}</span>,
-      // The kit joins its own remove label off a STRING label; ours is a node,
-      // so the whole sentence is given rather than left to fall back to the
-      // generic "Remove filter" for every chip on the row.
-      removeLabel: t("Remove filter: {what}", { what: `${f.label}: ${words}` }),
-      // Re-open the row this chip belongs to, if it is not open already —
-      // every facet lives in the one row, so opening the row IS re-opening it.
-      onSelect: () => setOpen(true),
-    })
-  }
+  /** HOW MANY FACETS ARE ON. The one definition in this row — the pill's count
+   * reads it, and so does the panel's "Clear filters", which is not worth
+   * drawing over nothing. Counted off `facets` rather than off `values`, so a
+   * stale field left behind in a caller's own query object cannot inflate it. */
+  const activeCount = facets.reduce((n, f) => n + ((values[f.field] ?? "") === "" ? 0 : 1), 0)
 
-  const pick = (f: FilterFacet, chosen: string) => {
-    // Remember the WORDS before handing the value on — see `said` above for
-    // why a chip cannot look them up again later. `""` (the facet turned off)
-    // has no words and needs none.
-    if (chosen !== "")
-      said.current[`${f.field}:${chosen}`] =
-        optionsFor(f).find((o) => o.value === chosen)?.label ?? chosen
-    onChange(f.field, chosen)
-  }
+  // THE "FILTER" PILL'S OWN LABEL — CLIENT RULING, 2026-09-03, SUPERSEDING
+  // THE `!open &&` GATE THIS USED TO CARRY. Verbatim: "Even if the filter is
+  // open, I want to see the count pill at all times, like when I'm selecting
+  // and unselecting filters. When the filter toolbar modal is open, I also
+  // want the count visible." The old reasoning — "the fields are their own
+  // explanation once the panel is open, so the count would say nothing new"
+  // — was a plausible-sounding UX call that turned out to be exactly the
+  // wrong one: mid-edit is precisely when a reader wants the running total
+  // in view, not looking at it. So the count is read off `activeCount`
+  // UNCONDITIONALLY now, `open` never enters the expression, and the bare
+  // word is reserved for the one case that still deserves it — nothing is
+  // on at all. Since the chips went (client ruling, 2026-09-02) this count
+  // is still the ONLY thing the toolbar says about what is narrowing the
+  // list; what changed is WHEN it says it, not what it says. `activeCount`
+  // is computed fresh every render off `facets`/`values` (its own comment
+  // above), so the pill — in BOTH open and closed states — updates the
+  // instant a facet is ticked or cleared, never off a snapshot taken when
+  // the panel last closed.
+  //
+  // THE COUNT ITSELF MOVED OFF THIS STRING (2026-09-03) AND ONTO A REAL
+  // BADGE — see the long note beside `addFilterBadge` below for why a string
+  // ternary was a stand-in and not the shape asked for. `addFilterLabel` is
+  // back to a plain, un-numbered word because the number now has its own
+  // slot; folding it into the sentence a second time would say it twice.
+  const addFilterLabel = t("Filter")
 
-  // THE "FILTER" CHIP'S OWN LABEL. The bare word while the row is open (it is
-  // its own explanation once the fields are in front of you), and the bare
-  // word while nothing is on — a count only earns its place once BOTH "there
-  // is something to report" and "the row that would show it is shut" are
-  // true. `chips.length` is the SAME source `KitFilterBar` already reads to
-  // decide whether "Clear filters" is worth drawing at all (`hasChips` in the
-  // kit's own file) — reusing it here rather than a second tally is the
-  // point: there is exactly one definition of "how many facets are active" in
-  // this row, not one per control that cares.
-  const addFilterLabel =
-    !open && chips.length > 0 ? t("Filter ({count})", { count: chips.length }) : t("Filter")
+  const panel = open ? (
+    // NO `role="group"`/`aria-label` OF ITS OWN — the pill's own cluster
+    // already carries `role="group" aria-label="Filters"` (the kit's own
+    // `KitFilterBar` root), and each facet inside here names ITSELF
+    // (`RangeFacet`/`CompactFacet`'s own `role="group"`). A second "Filters,
+    // group" landmark wrapping both would tell a screen reader the same thing
+    // twice for no reason; this div is layout only.
+    //
+    // A NORMAL BLOCK, and every class that made it an overlay is gone:
+    // `absolute inset-x-0 top-full`, the `z-20` it needed to clear the rows it
+    // painted over, and `shadow-[var(--shadow-overlay)]`, the kit's
+    // floating-surface elevation — nothing here floats any more, so an
+    // elevation would be saying something untrue about the surface. `min-w-*`
+    // is for the one host that can only offer a narrow outlet (the engine's
+    // `useKitPanel` branch), so the panel keeps a usable measure instead of
+    // being squeezed to the width of the "Filter" pill.
+    //
+    // NO FILL AND NO RADIUS OF ITS OWN — CLIENT RULING, 2026-09-03, FOURTH
+    // PASS, SUPERSEDING THE `bg-background`/`rounded-[var(--radius)]` THIS DIV
+    // USED TO CARRY. Verbatim: "it kind of creates a second toolbar... merge
+    // this with the main toolbar so that it's one single background or
+    // container." A `bg-background` panel directly under a `bg-background`
+    // track, with a gap between the two, is not "one piece of furniture" —
+    // it is two boxes of the identical colour with air between them, which
+    // reads as exactly the second card she is naming. The surface (fill +
+    // shape) is now painted ONCE, by whichever container places this panel:
+    // `ToolbarRow` (screen-bits.tsx) merges it with its own track into one
+    // `bg-[var(--surface-raised)]` box (fixed off `bg-background` since this
+    // note was written — check screen-bits.tsx before trusting the name of a
+    // token in a comment about another file) that switches from
+    // `rounded-pill` to `rounded-[var(--radius)]` the moment this panel
+    // exists; the kit's own
+    // `CollectionFrame` places it inside its already-painted
+    // `bg-surface-panel` panel via `toolbarPanel`, where a second fill
+    // nested one level in would be the identical double-box CLAUDE.md's
+    // `useKitPanel` note calls "the broken combination". Either way this div
+    // paints nothing of its own — only layout and inset.
+    <div
+      ref={panelRef}
+      data-slot="filter-bar-row"
+      className="flex min-w-[min(26rem,calc(100vw-3rem))] flex-wrap items-start gap-4 p-4"
+    >
+      {facets.map((f) => {
+        const val = values[f.field] ?? ""
 
-  return (
-    <>
-      <div className={cn("flex min-w-0 flex-wrap items-center gap-2", FILTER_BAR_HOVER_FILL, className)}>
-        <KitFilterBar
-          label={t("Filters")}
-          filters={chips}
-          onRemove={(field) => onChange(field, "")}
-          onClear={onClearFacets}
-          clearLabel={t("Clear filters")}
-          addFilterLabel={addFilterLabel}
-          onAddFilter={() => setOpen((o) => !o)}
-        />
-      </div>
+        // A numeric min/max. Either bound may be open; "" clears it.
+        if (f.control === "range") {
+          const { min, max } = parseRange(val)
+          return (
+            <div key={f.field} className="min-w-[12rem]">
+              <RangeFacet
+                label={f.label}
+                minLabel={t("Min")}
+                maxLabel={t("Max")}
+                min={f.min}
+                max={f.max}
+                step={f.step}
+                value={{ min, max }}
+                onValueChange={(next) => onChange(f.field, formatRange(next.min, next.max))}
+                // A bound BELOW its own floor is a range that can only ever
+                // match nothing, and the kit already draws the state — the
+                // old row had no way to say it and quietly answered "none".
+                error={min != null && max != null && min > max}
+                errorLabel={t("The first number must be lower than the second.")}
+              />
+            </div>
+          )
+        }
 
-      {/* THE PANEL — every facet, all at once, in ONE short row directly under
-          the toolbar. BUG, 2 Sep 2026, caught live on a screenshot the client
-          called "what is this shit": the first cut of this made the panel a
-          normal-flow FLEX SIBLING of the pill's other children, `w-full`d to
-          reach the toolbar's width. That worked for width, and broke height —
-          the panel was TALL (several facets, each an expanded list of
-          checkbox rows), `flex-wrap` wrapped it onto a second line INSIDE the
-          pill's own box, and a `rounded-pill` (999px) box that tall draws a
-          stadium wide enough to read as a giant oval rather than a control. A
-          pill's radius is only ever right for a SHORT box; the fix is to keep
-          this panel OUT of the box whose radius that is, not to shrink the
-          radius. `position: absolute` does that: removed from normal flow
-          entirely, this panel cannot feed the pill's own height no matter how
-          tall its content gets, so the pill (`relative`, in `ToolbarRow`/
-          `PagedFind`/`WaveFinder`/the engine's own `CollectionFrame` — see
-          each of their comments at this slot) stays exactly as tall as its own
-          one-line content always was. The facets themselves are compact fields
-          now (`SelectFacet`), which makes this panel short in the first place;
-          the geometry is still what GUARANTEES the pill, because a future
-          screen's facet count is not this file's to promise. `top-full`
-          anchors it to the host box's bottom edge — that box's `relative`
-          positioning is what `full` measures against — and `inset-x-0`
-          matches its width. `min-w-*` is for the one host that can only offer
-          a narrow anchor (the kit's `CollectionFrame` wraps `filters` in a
-          non-growing box; see the header), so the panel keeps a usable measure
-          instead of being squeezed to the width of the "Filter" chip. `z-20`
-          clears anything the row below might otherwise paint over it, and
-          `shadow-[var(--shadow-overlay)]` gives it the kit's own
-          floating-surface elevation, since it visually sits ABOVE the content
-          below rather than pushing it down — a deliberate trade (see the
-          header: nothing here re-flows the page under an open panel). */}
-      {open && (
-        // NO `role="group"`/`aria-label` OF ITS OWN — the chip cluster above
-        // already carries `role="group" aria-label="Filters"` (the kit's own
-        // `KitFilterBar` root), and each facet inside here names ITSELF
-        // (`RangeFacet`/`SelectFacet`'s own `role="group"
-        // aria-labelledby=…`). A second "Filters, group" landmark wrapping
-        // both would tell a screen reader the same thing twice for no reason;
-        // this div is layout only.
-        <div
-          ref={panel}
-          data-slot="filter-bar-row"
-          className="absolute inset-x-0 top-full z-20 mt-2 flex min-w-[min(26rem,calc(100vw-3rem))] flex-wrap items-start gap-4 rounded-[var(--radius)] bg-background p-4 shadow-[var(--shadow-overlay)]"
-        >
-          {facets.map((f) => {
-            const val = values[f.field] ?? ""
+        // ONE COMPACT FIELD PER FACET, side by side (client ruling,
+        // 2026-09-02 — see the header). `flex-1` between a floor and a
+        // ceiling so two facets share a wide panel evenly and neither
+        // grows into a field wider than the words it holds; below the
+        // floor the row wraps, which is the only second line this panel
+        // ever draws.
+        const facetOptionList = optionsFor(f)
+        return (
+          <div key={f.field} className="min-w-[11rem] max-w-[15rem] flex-1">
+            <CompactFacet
+              label={f.label}
+              placeholder={t("Any {what}", { what: f.label.toLowerCase() })}
+              options={facetOptionList}
+              // `null` in, `""` out — the boundary conversion the header
+              // explains: the kit's own `null` means off, the app's own `""`
+              // does.
+              value={val === "" ? null : val}
+              onValueChange={(next) => onChange(f.field, next ?? "")}
+              // The dense control height, the height the kit's own facet
+              // fields take when they stand in a panel rather than a form
+              // (`CompactFacet`'s own `size` doc).
+              size="dense"
+              searchable={facetOptionList.length > SEARCHABLE_PAST}
+            />
+          </div>
+        )
+      })}
 
-            // A numeric min/max. Either bound may be open; "" clears it.
-            if (f.control === "range") {
-              const { min, max } = parseRange(val)
-              return (
-                <div key={f.field} className="min-w-[12rem]">
-                  <RangeFacet
-                    label={f.label}
-                    minLabel={t("Min")}
-                    maxLabel={t("Max")}
-                    min={f.min}
-                    max={f.max}
-                    step={f.step}
-                    value={{ min, max }}
-                    onValueChange={(next) => onChange(f.field, formatRange(next.min, next.max))}
-                    // A bound BELOW its own floor is a range that can only ever
-                    // match nothing, and the kit already draws the state — the
-                    // old row had no way to say it and quietly answered "none".
-                    error={min != null && max != null && min > max}
-                    errorLabel={t("The first number must be lower than the second.")}
-                  />
-                </div>
-              )
-            }
-
-            // ONE COMPACT FIELD PER FACET, side by side (client ruling,
-            // 2026-09-02 — see the header). `flex-1` between a floor and a
-            // ceiling so two facets share a wide panel evenly and neither
-            // grows into a field wider than the words it holds; below the
-            // floor the row wraps, which is the only second line this panel
-            // ever draws.
-            return (
-              <div key={f.field} className="min-w-[11rem] max-w-[15rem] flex-1">
-                <SelectFacet
-                  label={f.label}
-                  anyLabel={t("Any {what}", { what: f.label.toLowerCase() })}
-                  options={optionsFor(f)}
-                  value={val}
-                  onPick={(next) => pick(f, next)}
-                />
-              </div>
-            )
-          })}
-        </div>
+      {/* THE ONE "CLEAR FILTERS" — the header says why it is here and not
+          beside the pill. Drawn only when something is on, which is the kit's
+          own rule for the control it replaces ("a control that does nothing is
+          worse than no control"). `secondary` is the neutral paper pill every
+          other control in this row stands on, and the one Button variant that
+          carries no brand fill; `sm` is the dense height the facet fields
+          take, and `self-end` lines it up with the fields rather than with
+          their captions. */}
+      {activeCount > 0 && (
+        <Button variant="secondary" size="sm" className="self-end" onClick={onClearFacets}>
+          {t("Clear filters")}
+        </Button>
       )}
+    </div>
+  ) : null
 
+  // A REAL BADGE, NOT A NUMBER FOLDED INTO THE SENTENCE — CLIENT RULING,
+  // 2026-09-03: "The count design should replicate the count design that we
+  // have on the top lines, like this Mango round background with no border
+  // behind the number." That reference shape is `Badge`'s own counter
+  // geometry (`size="counter"`: `h-5 min-w-5 px-2`, `rounded-pill`,
+  // `variant="default"` for the mango fill) — the same shape `TabsCount`'s
+  // active state and `CollectionFrame`'s heading count already wear
+  // (GAPS-RULINGS.md R-4a). `TabsCount` itself does not fit here: its
+  // mango-vs-quiet switch is `group-data-[state=active]/tab:` CSS read off a
+  // Radix `Tabs`-internal ancestor this filter row has no reason to
+  // construct, so an unwrapped `<TabsCount>` would draw only its OFF state.
+  // `Badge` needs none of that — it is already a standalone export
+  // (`CollectionFrame`'s own heading count is a bare `<Badge count={…} />`)
+  // — so this reaches for `Badge` directly rather than restyling a clone of
+  // it.
+  //
+  // What stood between this pill and that badge was `KitFilterBar`'s own
+  // "+ filter" button: its `addFilterLabel` prop is typed `string`, rendered
+  // as bare text with no slot for a node. `addFilterBadge` (kit v1.2.33) is
+  // the fix — an ADDITIVE sibling prop beside `addFilterLabel`, so every
+  // other call site of `KitFilterBar` is byte-identical with it omitted.
+  // `Badge` already renders nothing at zero (the kit's own zero law), which
+  // is why `addFilterLabel` stays the plain, un-numbered "Filter" rather
+  // than folding the count into the sentence a second time.
+  const pill = (
+    <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
+      {/* NO `filters`, NO `onRemove`, NO `onClear` — client ruling,
+          2026-09-02: the toolbar shows a count and nothing else (see the
+          header). What is left of the kit's bar is its "+ filter" slot,
+          which is the pill this row is. */}
+      <KitFilterBar
+        label={t("Filters")}
+        addFilterLabel={addFilterLabel}
+        addFilterBadge={<Badge count={activeCount} variant="default" />}
+        // THE PILL SAYS WHETHER IT IS OPEN, OUT LOUD — kit v1.2.42's own
+        // `addFilterExpanded`, announce-only. This file deliberately holds
+        // `open` ITSELF rather than letting the kit's bar own it (that is
+        // what let the pill and the panel merge into one container, the
+        // client's 2026-09-03 ruling), and the cost was that the trigger had
+        // no state left to reflect: a screen reader heard "Filter, button"
+        // with no way to know it expands anything, or whether it already
+        // had. Handing the same boolean back closes that without giving the
+        // kit control of the rendering — it sets `aria-expanded` and nothing
+        // else.
+        addFilterExpanded={open}
+        onAddFilter={() => setOpen((o) => !o)}
+      />
       <span aria-live="polite" className="sr-only">
         {resultCount != null ? t("{count} results", { count: resultCount }) : ""}
       </span>
-    </>
+    </div>
   )
+
+  return { pill, panel }
 }
 
-export { FilterBar }
+export { useFilterBar }

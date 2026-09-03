@@ -43,7 +43,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { ExternalLink, FileText, Pencil, Power, Video } from "@shared/ui/foundations/icons"
+import { ArrowSquareOut, FileText, PencilSimple, Power, Video } from "@shared/ui/foundations/icons"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -320,7 +320,7 @@ export function MeetingDetailScreen({
   const tabsConfig = {
     ...RECORD_TABS_CONFIG,
     tabs: [
-      { value: "notes", label: t("Agenda & notes"), icon: "notebook-pen", badge: "", badgeVariant: "" as const },
+      { value: "notes", label: t("Agenda & notes"), icon: "note-pencil", badge: "", badgeVariant: "" as const },
       // ONLY WHEN THERE IS ONE. A meeting nobody put in a calendar has nothing
       // to show here, and an empty tab is a promise the record cannot keep.
       ...(item.googleEventId
@@ -358,7 +358,7 @@ export function MeetingDetailScreen({
       {
         value: "activity",
         label: t("Activity"),
-        icon: "history",
+        icon: "clock-counter-clockwise",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
@@ -440,9 +440,12 @@ export function MeetingDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={item.title} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `meeting`), client ruling 2026-08-31.
-      eyebrow={t("Meeting")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       recordNumber={item.ref || undefined}
       // NO `collectionLabel` — client correction, 2026-08-31, verbatim: "now
       // it also show 'meeting' as a tag! thats not a tg but the eyebrow
@@ -504,7 +507,7 @@ export function MeetingDetailScreen({
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
             <Button size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
@@ -665,7 +668,7 @@ export function MeetingDetailScreen({
                           rel="noreferrer noopener"
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                         >
-                          <ExternalLink className="size-3" aria-hidden /> {t("Open the document")}
+                          <ArrowSquareOut className="size-3" aria-hidden /> {t("Open the document")}
                         </a>
                       )}
                     </div>
@@ -800,7 +803,7 @@ function CalendarPanel({
             rel="noreferrer noopener"
             className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-1")}
           >
-            <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
+            <ArrowSquareOut className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
           </a>
         )}
       </div>
@@ -882,7 +885,7 @@ function CalendarPanel({
                   <img src={safeSrc(a.iconUrl)} alt="" width={16} height={16} className="shrink-0" />
                 )}
                 <span className="min-w-0 flex-1 truncate">{a.title || a.fileId}</span>
-                <ExternalLink className="text-muted-foreground size-3 shrink-0" aria-hidden />
+                <ArrowSquareOut className="text-muted-foreground size-3 shrink-0" aria-hidden />
               </a>
             ))}
           </div>

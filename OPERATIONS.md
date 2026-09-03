@@ -130,7 +130,7 @@ obviously fictional client world so there is something to click around.
 ## The design system (a pinned dependency)
 
 The UI lives in `shared/ui/` and is the kwapso design system, vendored from
-`github.com/Kwapso/design` at a tag by `scripts/sync-design.mjs`. It is a
+`github.com/Kwapso/kwapso-ui-ux` at a tag by `scripts/sync-design.mjs`. It is a
 DEPENDENCY: `web/test/vendored-kit.test.ts` recomputes a content hash on every
 check, so a hand-edit under `shared/ui/` turns the build red — kit changes are
 made upstream and pulled. When Aurora ships a new tag:
@@ -488,7 +488,7 @@ growing, because a very large number would read as a measurement. Bounded at
 `CRON_GROWTH_CAP` (200) readings a night, biggest first.
 
 **AND IT IS DELIVERED** (decided with the owner 14 Aug 2026). The nightly cron emails
-`ALERT_TO` on the tenancy worker, `alaap@swiftstruck.com,alaap@kwapso.com`, staging and
+`ALERT_TO` on the tenancy worker, `alaap@kwapso.com`, staging and
 production both, with one mail per TICK listing every database that crossed 80% and how
 many days each has left at its current rate.
 
@@ -541,7 +541,7 @@ both environments, 600 requests per caller per worker per minute
 ## Notes
 
 - The UI component library is **in this repo**, at `shared/ui/`, since 2026-08-22 — and
-  since 2026-08-25 it is a PINNED dependency: `github.com/Kwapso/design` at the tag in
+  since 2026-08-25 it is a PINNED dependency: `github.com/Kwapso/kwapso-ui-ux` at the tag in
   `shared/ui/VERSION.json`, pulled by `scripts/sync-design.mjs`, with a hand-edit under
   `shared/ui/` turning the build red (`web/test/vendored-kit.test.ts` recomputes the
   content hash — see "The design system" above). There is
@@ -565,7 +565,7 @@ both environments, 600 requests per caller per worker per minute
   vendoring's `shared/ui/styles.css` + `@source "./registry"`, and neither is true
   since the kit swap of 2026-08-25.)
 - Missing UI components are still placeholdered in `web/components/temp/` and tracked in
-  UI-GAPS.md. Closing one is a kit change: built upstream in `Kwapso/design`, tagged,
+  UI-GAPS.md. Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
   pulled with `scripts/sync-design.mjs`, then the import is swapped and the placeholder
   deleted here — never built by hand under `shared/ui/`, which turns the build red.
 

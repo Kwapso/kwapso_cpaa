@@ -139,9 +139,12 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
       // one (it is the glyph this very screen sets), and the initial stands in
       // where it has none, which is the same square in the same slot either way.
       leading={<RecordMark name={value.value} mark={value.mark} size="band" />}
-      // The bare record-type word, client ruling 2026-08-31 — the same string
-      // this screen already used for its loading/empty title.
-      eyebrow={t("Dropdown value")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
       // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
       // remember. not only for meetings, but everywhere." This used to repeat

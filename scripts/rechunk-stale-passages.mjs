@@ -143,7 +143,7 @@ async function proveTeamDatabase(db, name) {
     )
   ).map((r) => r.name)
   if (found.length !== FINGERPRINT.length)
-    throw new Error(`REFUSING to touch ${name} (${db}): not a Brimba team schema.`)
+    throw new Error(`REFUSING to touch ${name} (${db}): not a kwapso team schema.`)
 }
 
 console.log(

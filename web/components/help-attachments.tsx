@@ -43,7 +43,8 @@ import { Button } from "@shared/ui/components/button/button"
 import { Input } from "@shared/ui/components/input/input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Link2, Paperclip, Plus, Trash2, Upload } from "@shared/ui/foundations/icons"
+import { LinkSimple, Plus, Trash, UploadSimple } from "@shared/ui/foundations/icons"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import type { HelpAttachment } from "@shared/types"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -74,11 +75,19 @@ function isFollowable(url: string): boolean {
   return safeHref(url) !== undefined
 }
 
-/** Bytes, said the way a person says them. */
+/** Bytes, said the way a person says them. BINARY (1024), because that is the
+ * base `TICKET_FILE_MAX_BYTES` itself is defined in — so a file's listed size
+ * and the number the refusal below quotes, both read off this one function,
+ * can never disagree the way a decimal KB and a binary "10MB" typed into copy
+ * once did. */
 function spellSize(bytes: number | null): string {
   if (!bytes) return ""
   return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+/** The cap itself, said the same way — `TICKET_FILE_MAX_BYTES` is an exact
+ * binary multiple, so this is always a whole number ("10 MB"), never "10.0". */
+const MAX_SIZE_LABEL = `${Math.round(TICKET_FILE_MAX_BYTES / 1024 / 1024)} MB`
 
 export function HelpAttachmentsPanel({
   ticketId,
@@ -144,7 +153,7 @@ export function HelpAttachmentsPanel({
     // Checked here as well as at the door: a 30MB upload that fails after the
     // whole file has been read and base64'd is a minute of somebody's morning.
     if (file.size > TICKET_FILE_MAX_BYTES) {
-      toast.error(t("That file is too big. The limit is 10MB."))
+      toast.error(t("That file is too big. The limit is {limit}.", { limit: MAX_SIZE_LABEL }))
       return
     }
     // THE READ IS INSIDE THE TRY, not outside it. `run` has a perfectly good
@@ -196,13 +205,11 @@ export function HelpAttachmentsPanel({
         <p className="text-muted-foreground text-sm">{t("Nothing attached to this ticket yet.")}</p>
       ) : (
         <ul className="divide-border divide-y">
-          {listQ.data.map((a) => (
+          {listQ.data.map((a) => {
+            const FileGlyph = a.kind === "file" ? fileTypeIcon(a.label) : LinkSimple
+            return (
             <li key={a.id} className="flex flex-wrap items-center gap-2 py-3">
-              {a.kind === "file" ? (
-                <Paperclip className="text-muted-foreground size-4 shrink-0" />
-              ) : (
-                <Link2 className="text-muted-foreground size-4 shrink-0" />
-              )}
+              <FileGlyph className="text-muted-foreground size-4 shrink-0" />
               {isFollowable(a.url) ? (
                 <a
                   href={safeHref(a.url)}
@@ -240,7 +247,7 @@ export function HelpAttachmentsPanel({
                   className="text-destructive hover:text-destructive shrink-0 gap-1"
                   aria-label={t("Take it off")}
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash className="size-3.5" />
                 </Button>
               )}
               {/* A SCREENSHOT LOOKS LIKE A SCREENSHOT. Half of what lands on a
@@ -259,7 +266,8 @@ export function HelpAttachmentsPanel({
                 </div>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
 
@@ -273,7 +281,7 @@ export function HelpAttachmentsPanel({
             onClick={() => fileRef.current?.click()}
             className="gap-1"
           >
-            <Upload className="size-3.5" />
+            <UploadSimple className="size-3.5" />
             {t("Add a file")}
           </Button>
           {addingLink ? (
@@ -305,7 +313,7 @@ export function HelpAttachmentsPanel({
               onClick={() => setAddingLink(true)}
               className="gap-1"
             >
-              <Link2 className="size-3.5" />
+              <LinkSimple className="size-3.5" />
               {t("Add a link")}
             </Button>
           )}

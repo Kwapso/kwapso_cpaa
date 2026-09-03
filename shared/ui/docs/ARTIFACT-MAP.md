@@ -59,8 +59,8 @@ renamed.
 | ch | the artifact's name | where it lives | what it is |
 |---|---|---|---|
 | 13 | **Cards & containers** | `components/card|sheet|dialog/` | Card · Sheet · Dialog |
-| 14 | **Folder shapes** | `components/folder/` | FolderShape · FolderPanel, and Tabs variant="folder" |
-| 15 | **Navigation** | `components/tabs|breadcrumb|pagination/` | Tabs · Breadcrumb · Pagination |
+| 14 | **Folder shapes** | `components/folder/` | FolderShape · FolderPanel, and `BreadcrumbFolders` — the tab crop's one consumer since the folder tab variant was retired, 2026-09-02 |
+| 15 | **Navigation** | `components/tabs|breadcrumb|breadcrumbs|pagination/` | Tabs (underline only) · Breadcrumb · Breadcrumbs · BreadcrumbFolders · Pagination |
 | 16 | **Filters, search, upload** | `components/filter-bar|search-input|file-upload/` | FilterBar · SearchInput · FileUpload |
 
 ### Part D · Data

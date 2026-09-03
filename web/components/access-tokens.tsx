@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Ban, ClipboardCopy, Copy } from "@shared/ui/foundations/icons"
+import { Prohibit, Copy } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { McpTokenSummary } from "@shared/types"
@@ -211,7 +211,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                       className="gap-1"
                       title={t("Copy setup instructions for any AI")}
                     >
-                      <ClipboardCopy className="size-3.5" aria-hidden />
+                      <Copy className="size-3.5" aria-hidden />
                       <span className="hidden sm:inline">{t("Instructions")}</span>
                     </Button>
                   )}
@@ -221,7 +221,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                     onClick={() => setRevoking(token)}
                     className="text-destructive hover:text-destructive gap-1"
                   >
-                    <Ban className="size-3.5" aria-hidden />
+                    <Prohibit className="size-3.5" aria-hidden />
                     <span className="hidden sm:inline">{t("Revoke")}</span>
                   </Button>
                 </div>
@@ -277,7 +277,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 className="gap-1 self-start"
                 onClick={() => copyInstructions(secret, t)}
               >
-                <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
+                <Copy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
               </Button>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button

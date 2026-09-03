@@ -24,7 +24,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
+import { Prohibit, CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AppMark } from "@/components/app-tiles"
@@ -131,7 +131,7 @@ function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
 
 /** THE ARROW AT THE END OF A ROW, AND IT DOES SOMETHING.
  *
- * It was a bare `<ChevronRight>` — no click target, no label, not inside a
+ * It was a bare `<CaretRight>` — no click target, no label, not inside a
  * button. The owner reported the Processes row as "unable to expand", which is
  * exactly right and exactly the fault: a chevron is the universal "this opens"
  * glyph, so a decorative one is a promise the row does not keep. Only the NAME
@@ -159,7 +159,7 @@ function OpenChevron({ label, onOpen }: { label: string; onOpen: () => void }) {
       // 15x15 on both sides of the swap.
       className="-m-2 size-auto shrink-0 p-2"
     >
-      <ChevronRight className="size-4" />
+      <CaretRight className="size-4" />
     </Button>
   )
 }
@@ -260,6 +260,11 @@ function PagedPanelBody<T>({
       facets={facets}
       fixed={fixed}
       actions={() => (onNew ? <AddButton label={newLabel} onClick={onNew} /> : null)}
+      // R50 — this ONE seam is every nested panel's own toolbar (Stories,
+      // Processes, App meetings, App tickets, To-dos): the resting read
+      // above is this panel's whole answer to "does it have any rows yet",
+      // computed once and forwarded rather than re-derived per panel.
+      restingEmpty={restingData.length === 0}
       fetchPage={fetchPage}
     >
       {(found) => {
@@ -1107,19 +1112,18 @@ export function TodosPanel({
   }
 
   // The two piles, as the library's own strip (R3 — never a hand-rolled toggle).
-  // `line` rather than the folder shape, for the reason tickets-collection.tsx
-  // gives at its own: the kit's folder tab is drawn to be attached to the card
-  // below it, and this panel's list has no card of its own.
+  // No override needed any more — `defaultTabsConfig` draws the one line shape
+  // itself since v1.2.28 retired the folder variant this used to opt out of
+  // (tabs-view.tsx's header has the ruling).
   const tabs = (
     <TabsView
       config={{
         ...defaultTabsConfig,
-        variant: "line",
         tabs: [
           {
             value: "open",
             label: t("Open"),
-            icon: "inbox",
+            icon: "clipboard-text",
             badge: formatCount(openTotal),
             badgeVariant: "" as const,
           },
@@ -1267,7 +1271,7 @@ export function TodosPanel({
                 aria-label={t("Withdraw this input")}
                 onClick={() => void cancel(todo.id)}
               >
-                <Ban className="size-3.5" />
+                <Prohibit className="size-3.5" />
               </Button>
             )}
           </Row>

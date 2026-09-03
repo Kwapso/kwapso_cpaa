@@ -78,7 +78,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Check } from "../../foundations/icons";
+import { CheckFat } from "../../foundations/icons";
 
 /** Where a stage sits relative to the present. */
 export type StatusStageState = "done" | "current" | "later";
@@ -360,7 +360,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   {isDone ? (
                     <>
                       <span className="sr-only">{doneLabel}</span>
-                      <Check size={16} aria-hidden="true" />
+                      <CheckFat size={16} aria-hidden="true" />
                     </>
                   ) : (
                     formatNumber(index + 1)
@@ -460,7 +460,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                 {isDone ? (
                   <>
                     <span className="sr-only">{doneLabel}</span>
-                    <Check size={16} aria-hidden="true" />
+                    <CheckFat size={16} aria-hidden="true" />
                   </>
                 ) : (
                   formatNumber(index + 1)

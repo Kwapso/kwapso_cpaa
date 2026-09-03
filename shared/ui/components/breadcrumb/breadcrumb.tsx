@@ -54,7 +54,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 
-import { MoreHorizontal } from "../../foundations/icons";
+import { DotsThree } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 
 /* ============================================================================
@@ -358,7 +358,7 @@ export interface BreadcrumbEllipsisProps extends React.ComponentPropsWithoutRef<
    * sees is still a string somebody hears.
    */
   label?: string;
-  /** Replace the glyph. Undefined draws `MoreHorizontal`. */
+  /** Replace the glyph. Undefined draws `DotsThree`. */
   icon?: React.ReactNode;
 }
 
@@ -382,7 +382,7 @@ export interface BreadcrumbEllipsisProps extends React.ComponentPropsWithoutRef<
  *  mobile / tablet / desktop — UNCHANGED, and it matters most at mobile: a
  *  four-level trail on a phone becomes one line instead of three.
  *
- * RTL — safe. `MoreHorizontal` is symmetrical.
+ * RTL — safe. `DotsThree` is symmetrical.
  */
 const BreadcrumbEllipsis = React.forwardRef<HTMLSpanElement, BreadcrumbEllipsisProps>(
   ({ className, label = "More", icon, ...props }, ref) => (
@@ -396,7 +396,7 @@ const BreadcrumbEllipsis = React.forwardRef<HTMLSpanElement, BreadcrumbEllipsisP
       {...props}
     >
       <span aria-hidden="true" className="inline-flex">
-        {icon === undefined ? <MoreHorizontal /> : icon}
+        {icon === undefined ? <DotsThree /> : icon}
       </span>
       <span className="sr-only">{label}</span>
     </span>

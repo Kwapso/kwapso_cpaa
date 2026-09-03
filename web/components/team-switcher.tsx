@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Check, ChevronsUpDown, Inbox, Plus } from "@shared/ui/foundations/icons"
+import { Check, CaretUpDown, ClipboardText, Plus } from "@shared/ui/foundations/icons"
 
 import { useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"
@@ -93,7 +93,20 @@ export function TeamSwitcher({
             </Avatar>
           </Button>
         ) : (
-          <Button variant="ghost" className="h-auto w-full justify-start gap-2 px-2 py-1.5">
+          <Button
+            variant="ghost"
+            // `ghost`'s own root ink (`text-ink-tertiary` idle / `text-foreground`
+            // hover) is THEME-scoped; this trigger paints inside `railContent`,
+            // which is SPINE-scoped (`bg-[var(--spine-fill)]`). That measured
+            // 2.67:1 on ink/light and 1.34:1 on mango/dark — both under the 3:1
+            // UI-boundary floor. Overridden to the spine's own ink (idle and
+            // hover alike, same as `StandaloneNavItem`'s identical fix in
+            // app-shell.tsx: once a row rests at full `--spine-ink`, a hover
+            // step to the same value is a no-op, so both states are named here
+            // to beat the variant's hover class outright rather than leave it
+            // to win on `:hover` specificity).
+            className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-[var(--spine-ink)] enabled:hover:text-[var(--spine-ink)]"
+          >
             <Avatar className="size-7">
               {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
               <AvatarFallback className="text-xs">{letterMark(ctx?.team?.name)}</AvatarFallback>
@@ -101,7 +114,9 @@ export function TeamSwitcher({
             <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
               {name}
             </span>
-            <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
+            {/* No colour of its own any more — inherits the button's own
+                `--spine-ink` above (same fix, same reason). */}
+            <CaretUpDown className="size-4 shrink-0" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -111,7 +126,7 @@ export function TeamSwitcher({
         {pendingInvites > 0 && (
           <>
             <DropdownMenuItem onSelect={() => softNavigate("/invitations")} className="gap-2">
-              <Inbox className="size-4" />
+              <ClipboardText className="size-4" />
               <span className="min-w-0 flex-1">{t("Invites")}</span>
               <Badge variant="secondary" className="text-badge">
                 {pendingInvites}

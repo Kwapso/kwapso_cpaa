@@ -29,7 +29,7 @@ import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
-import { Pencil, X, Check, Upload, Download, Power, Shield, ShieldOff } from "@shared/ui/foundations/icons"
+import { PencilSimple, X, Check, UploadSimple, Download, Power, Shield, ShieldSlash } from "@shared/ui/foundations/icons"
 
 import type { SortOption } from "@shared/web/screen-engine/config"
 import type { SelectableValue } from "@shared/types"
@@ -40,6 +40,7 @@ import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
 import { useConfirm } from "@shared/web/use-confirm"
 import { CollectionHeading } from "@/components/collection-heading"
@@ -208,7 +209,7 @@ function ValueRow({
                     {
                       key: "rename",
                       label: t("Rename"),
-                      icon: <Pencil className="size-3.5" />,
+                      icon: <PencilSimple className="size-3.5" />,
                       onSelect: () => {
                         setEditingId(v.id)
                         setEditValue(v.value)
@@ -223,7 +224,7 @@ function ValueRow({
                       ? {
                           key: "undefault",
                           label: t("Stop treating as a default"),
-                          icon: <ShieldOff className="size-3.5" />,
+                          icon: <ShieldSlash className="size-3.5" />,
                           onSelect: () => void setDefault(v, false),
                         }
                       : {
@@ -482,7 +483,12 @@ export function SelectableScreen({
         }
       />
     )
-  if (valuesQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the card, the toolbar
+  // (search/status/sort/New value) along with the rows. `values` above
+  // already defaults to `[]` for the same reason every sibling screen's does
+  // — the fix is to keep the chrome drawn and swap only the ROWS region.
+  const valuesLoading = valuesQ.data === undefined
 
   // Bundled once so `GroupValues`/`ValueRow` take one prop instead of
   // fourteen — every group reads the SAME state and handlers, never its own.
@@ -530,15 +536,26 @@ export function SelectableScreen({
           floating ABOVE the card with the actions and one below it with the
           search — so the button cannot drift back onto its own row. */}
       <CollectionCard>
-        {(values.length > 0 || canCreate) && (
           <ToolbarRow
-            className="mb-4"
+            // R50 — never toolbar on an empty collection. This row USED TO
+            // draw regardless of `values.length` whenever `canCreate` was
+            // true — a lone "New value" (plus Import CSV, for an import-
+            // target screen) pill above "No values yet. Add your first
+            // above" pointing at a button that had just been removed from
+            // above it. `CollectionEmptyState` below now carries "Add the
+            // first" alone.
+            // `!valuesLoading &&` — `values` defaults to `[]` before the read
+            // resolves (2026-09-03 audit), which reads exactly like a
+            // genuinely empty collection unless the loading state is folded
+            // into the same expression.
+            empty={!valuesLoading && values.length === 0}
             search={
-              values.length > 0 && (
+              (valuesLoading || values.length > 0) && (
                 <>
                   <SearchInput
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onClear={() => setQuery("")}
                     placeholder={t("Search values…")}
                     className="flex-1"
                     aria-label={t("Search dropdown values")}
@@ -577,21 +594,29 @@ export function SelectableScreen({
                 )}
                 {canCreate && onImport && (
                   <Button variant="secondary" onClick={onImport} className="gap-1">
-                    <Upload className="size-4" aria-hidden /> {t("Import CSV")}
+                    <UploadSimple className="size-4" aria-hidden /> {t("Import CSV")}
                   </Button>
                 )}
                 {canCreate && <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />}
               </>
             }
           />
-        )}
 
-        {grouped.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {values.length === 0
-              ? t("No values yet. Add your first above.")
-              : t("No values match your search or filter.")}
-          </p>
+        {valuesLoading ? (
+          // ROWS ONLY — the toolbar above is already real.
+          <Skeleton variant="list" lines={5} />
+        ) : grouped.length === 0 ? (
+          values.length === 0 ? (
+            // GENUINELY EMPTY — the toolbar above is gone, so this is the
+            // only "New value" (and "Import CSV") left on screen.
+            <CollectionEmptyState
+              title={t("No values yet.")}
+              onCreate={canCreate ? () => setAddOpen(true) : undefined}
+              onImport={canCreate && onImport ? onImport : undefined}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("No values match your search or filter.")}</p>
+          )
         ) : (
           <div className="flex flex-col gap-6">
             {grouped.map((g) => (

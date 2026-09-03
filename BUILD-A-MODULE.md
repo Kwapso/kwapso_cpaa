@@ -1,4 +1,4 @@
-# BUILD-A-MODULE.md, how to add a module to Brimba, end to end
+# BUILD-A-MODULE.md, how to add a module to the Kwapso System, end to end
 
 A **module** is one team-scoped thing users work with: a collection of records
 that live in the team's own database, are gated by the role matrix, publish live

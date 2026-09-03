@@ -52,7 +52,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
-import { KeyRound, Pencil, Power } from "@shared/ui/foundations/icons"
+import { Key, PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
@@ -104,6 +104,14 @@ export function ContactDetailScreen({
   const t = useT()
   const { account, parent, companies, portalUsers } = detail
   const accountId = account.id
+
+  // THIS RECORD'S OWN ADDRESS, not the section it was reached through — see
+  // app-detail.tsx's identical `host` for why: a ticket or a meeting opened
+  // from a tab on this contact must nest UNDER them (`.../accounts/<id>/
+  // tickets/<id>`), never bounce out to the flat top-level form. Handed to
+  // both tab panels below instead of the raw `basePath` they used to rebuild
+  // a flat base from.
+  const host = { base: `${basePath}/${accountId}` }
 
   const activity = useRecordActivity("accounts", accountId)
   // A READ OF PAGE ONE STOOD HERE, for the parent picker and the statuses in
@@ -402,9 +410,12 @@ export function ContactDetailScreen({
       // and a square in the list that links to it. `fit` keeps the face cropped.
       // No photo falls back to the initial.
       leading={<RecordMark picture={account.logoUrl} name={account.name} fit="cover" size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `contact`), client ruling 2026-08-31.
-      eyebrow={t("Contact")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // THE CLIENT'S OWN RULE: "the first chip is always in black and it's
       // always the id. if there's no id there's no black chip." A contact is
       // an `accounts` row of type individual — the SAME table and the SAME
@@ -450,7 +461,7 @@ export function ContactDetailScreen({
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
@@ -520,7 +531,7 @@ export function ContactDetailScreen({
                         onClick={() => void moveToCompany()}
                         className="gap-1 self-start sm:self-auto"
                       >
-                        {busy ? <Spinner /> : <Pencil className="size-3.5" />}
+                        {busy ? <Spinner /> : <PencilSimple className="size-3.5" />}
                         {t("Save")}
                       </Button>
                     </div>
@@ -554,10 +565,10 @@ export function ContactDetailScreen({
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
 
           if (tabItem.value === "tickets")
-            return <ContactTicketsPanel accountId={accountId} basePath={basePath} />
+            return <ContactTicketsPanel accountId={accountId} host={host} />
 
           if (tabItem.value === "meetings")
-            return <ContactMeetingsPanel accountId={accountId} basePath={basePath} />
+            return <ContactMeetingsPanel accountId={accountId} host={host} />
 
           if (tabItem.value === "activity")
             return (
@@ -591,7 +602,7 @@ export function ContactDetailScreen({
                     </Label>
                   </div>
                   <Button size="sm" disabled={busy} onClick={() => void giveAccess()} className="gap-1">
-                    {busy ? <Spinner /> : <KeyRound className="size-4" />}
+                    {busy ? <Spinner /> : <Key className="size-4" />}
                     {t("Switch their login on")}
                   </Button>
                 </div>

@@ -1,16 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-<path d="M8 15.4V8.6C8 8.26863 8.26863 8 8.6 8H15.4C15.7314 8 16 8.26863 16 8.6V15.4C16 15.7314 15.7314 16 15.4 16H8.6C8.26863 16 8 15.7314 8 15.4Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20 4.6V19.4C20 19.7314 19.7314 20 19.4 20H4.6C4.26863 20 4 19.7314 4 19.4V4.6C4 4.26863 4.26863 4 4.6 4H19.4C19.7314 4 20 4.26863 20 4.6Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M17 4V2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M12 4V2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 4V2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 20V22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M12 20V22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M17 20V22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20 17H22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20 12H22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M20 7H22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M4 17H2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M4 12H2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M4 7H2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M104,104h48v48H104Zm136,48a8,8,0,0,1-8,8H216v40a16,16,0,0,1-16,16H160v16a8,8,0,0,1-16,0V216H112v16a8,8,0,0,1-16,0V216H56a16,16,0,0,1-16-16V160H24a8,8,0,0,1,0-16H40V112H24a8,8,0,0,1,0-16H40V56A16,16,0,0,1,56,40H96V24a8,8,0,0,1,16,0V40h32V24a8,8,0,0,1,16,0V40h40a16,16,0,0,1,16,16V96h16a8,8,0,0,1,0,16H216v32h16A8,8,0,0,1,240,152ZM168,96a8,8,0,0,0-8-8H96a8,8,0,0,0-8,8v64a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8Z"/></svg>

@@ -1,15 +1,15 @@
 "use client"
 
 // Onboarding (locked flow): first name + last name + optional photo + the
-// sidebar's colour, then the tenancy worker either accepts waiting invites or
-// creates "{First}'s team" with its own database. Everything here is library
-// components.
+// app's background colour, then the tenancy worker either accepts waiting
+// invites or creates "{First}'s team" with its own database. Everything here
+// is library components.
 //
 // THE SPINE IS OFFERED HERE — client ruling, 2026-09-02, verbatim: "default
 // spine to mango, but everyone can change it during the onboarding or anytime
 // at settings". This screen is the "during the onboarding" half; Settings ·
 // Appearance is the other. STILL ONE SCREEN: the flow's own comment calls it a
-// locked flow, and a second step to hold three cards would trade a one-screen
+// locked flow, and a second step to hold the cards would trade a one-screen
 // sign-up for a wizard in exchange for nothing — the kit's own three-step
 // OnboardingRoute is exempted for exactly that mismatch (COMPOSITION_EXEMPT,
 // "screens/onboarding.tsx"), and adding the step it describes would be
@@ -18,7 +18,11 @@
 // AND IT IS THE SAME CONTROL SETTINGS DRAWS, not a lighter one invented for
 // this screen. `SpineChoice` (shared/web/spine-section.tsx) is the kit's own
 // `AppearanceOptionGroup` + `SpinePicture` with the section furniture — the
-// heading, the prose and the save-on-press — taken off.
+// heading, the prose and the save-on-press — taken off. Its `short` prop is
+// on here: onboarding draws `compositions/screens/onboarding.tsx`'s own
+// SHORTER captions, not settings.tsx's longer ones — the kit itself keeps two
+// lengths of the same three names, and `SpineChoice` carries both rather than
+// picking one (see its own header for why that split is not R34 drift).
 //
 // A LIGHTER CONTROL WAS CONSIDERED AND IS NOT AVAILABLE, which is the whole
 // answer to "picture cards are heavy for a one-screen flow". Kit ruling 26.05
@@ -29,17 +33,19 @@
 // a second vocabulary on the same question Settings already answers — which is
 // exactly what `SpineChoice` was extracted to prevent. The kit's own
 // onboarding composition reaches the same conclusion independently: its step 2
-// draws `AppearanceOptionGroup` with these three `SpinePicture` cards.
+// draws `AppearanceOptionGroup` with these `SpinePicture` cards — three of
+// them again, since the client's 2026-09-03 reversal ("i want to go back to
+// the 3 options") restored `ink` and `paper` beside `mango`.
 //
 // SO THE SCREEN IS TALLER, AND THAT IS THE PRICE, PAID KNOWINGLY. The kit's
 // group is `repeat(auto-fit, minmax(13.125rem, 1fr))` above a 45rem VIEWPORT,
-// and this column is `max-w-sm` (24rem) — two 13.125rem tracks do not fit, so
-// on a desktop the three cards resolve to one column of full-width picture
-// cards (~3.625rem of picture each) rather than the compact rows a phone gets
-// below 45rem. The main is `min-h-[100svh]` and not `h-`, so it grows and the
-// page scrolls; nothing is clipped. Worth a look on a real screen before this
-// ships — it is the one thing here a test cannot see, because jsdom lays
-// nothing out.
+// and this column is `max-w-sm` (24rem) — even one 13.125rem track barely
+// fits, so on a desktop the three cards resolve to one column of full-width
+// picture cards (~3.625rem of picture each) rather than the compact rows a
+// phone gets below 45rem. The main is `min-h-[100svh]` and not `h-`, so it
+// grows and the page scrolls; nothing is clipped. Worth a look on a real
+// screen before this ships — it is the one thing here a test cannot see,
+// because jsdom lays nothing out.
 //
 // SKIPPING IT LANDS ON MANGO, and lands there by writing NOTHING. The cards
 // open on `toSpine(user.spine)` — mango for anybody who has never chosen — and
@@ -85,13 +91,15 @@ const firstNameField = { ...defaultFieldConfig, label: "First name", required: t
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
 /* R33's sanctioned way out: `label:`/`helpText:` on an object that spreads a
    field config is translated on the way to the screen by shared/web/field.tsx,
-   because `t` is a hook and this is a module-level constant. "Sidebar" is the
-   word Settings · Appearance heads the same three cards with — one thing, one
-   name (R34). The help line is the client's own second clause said out loud:
-   nobody should feel they are deciding something now that they cannot undo. */
+   because `t` is a hook and this is a module-level constant. "Background" is
+   the word Settings · Appearance heads the same three cards with — one thing,
+   one name (R34), renamed from "Sidebar" once the fill it picks stopped being
+   confined to the rail and started painting the whole screen. The help line
+   is the client's own second clause said out loud: nobody should feel they
+   are deciding something now that they cannot undo. */
 const spineField = {
   ...defaultFieldConfig,
-  label: "Sidebar",
+  label: "Background",
   helpText: "You can change this later in Settings.",
 }
 
@@ -376,6 +384,7 @@ export default function OnboardingPage() {
                 onChange={setSpine}
                 disabled={busy}
                 badgeLabel={t("Picked")}
+                short
               />
             </Field>
 

@@ -45,7 +45,7 @@ describe("ulid", () => {
 
 describe("email rules (same as the old Glide transformer)", () => {
   it("trims and lowercases", () => {
-    expect(normalizeEmail("  Alaap@SwiftStruck.com ")).toBe("alaap@swiftstruck.com")
+    expect(normalizeEmail("  Alaap@Kwapso.com ")).toBe("alaap@kwapso.com")
   })
   it("accepts real shapes, rejects junk", () => {
     expect(isValidEmail("a@b.co")).toBe(true)
@@ -70,7 +70,7 @@ describe("validateNewEmail (email-change shape check)", () => {
 
 describe("maskEmail (security notice)", () => {
   it("hides the local part, keeps the domain", () => {
-    expect(maskEmail("alaap@swiftstruck.com")).toBe("a****@swiftstruck.com")
+    expect(maskEmail("alaap@kwapso.com")).toBe("a****@kwapso.com")
   })
   it("never reveals a one-letter local part", () => {
     expect(maskEmail("a@b.co")).toBe("a*@b.co")

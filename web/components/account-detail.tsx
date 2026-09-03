@@ -60,7 +60,7 @@ import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
 
 import { ClientOrgPanel } from "@/components/client-org-panel"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
@@ -634,9 +634,12 @@ export function AccountDetailScreen({
       // clicks away led with a glyph. No logo falls back to the company's
       // initial, never to an empty square (shared/web/record-mark.tsx).
       leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `account`), client ruling 2026-08-31.
-      eyebrow={t("Account")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       recordNumber={account.code || undefined}
       collectionLabel={t("Company")}
       // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31, reading
@@ -659,7 +662,7 @@ export function AccountDetailScreen({
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />

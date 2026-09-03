@@ -48,7 +48,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Input } from "@shared/ui/components/input/input"
-import { Search } from "@shared/ui/foundations/icons"
+import { MagnifyingGlass } from "@shared/ui/foundations/icons"
 
 import { useT } from "@shared/web/language"
 import { askAssistant } from "@/lib/agent-open"
@@ -116,7 +116,7 @@ export function AskTheAssistant({
           aria-label={t("Ask the knowledge base")}
         />
         <Button type="submit" disabled={!question.trim()} className="shrink-0 gap-1">
-          <Search className="size-4" aria-hidden />
+          <MagnifyingGlass className="size-4" aria-hidden />
           {t("Ask")}
         </Button>
       </form>

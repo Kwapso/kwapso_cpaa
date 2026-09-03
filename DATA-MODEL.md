@@ -1,7 +1,7 @@
-# Data model. Glide Base v3 → Brimba (the mental model)
+# Data model. Glide Base v3 → the Kwapso System (the mental model)
 
 Every table and column from the user's Glide "Base v3" export (14 CSVs),
-re-read 2026-06-13, mapped to Brimba's design. Marks what we KEEP (real
+re-read 2026-06-13, mapped to the Kwapso System's design. Marks what we KEEP (real
 persisted data), what we DROP (Glide UI/computed artifacts), our additions, and
 OPEN questions. This is the canonical data-model reference. Keep it accurate.
 
@@ -94,7 +94,7 @@ that case; with no `image_url`, show initials (or a placeholder avatar when even
 initials aren't derivable).
 
 ### teams. KEEP (built)
-Real data: `id`, `name` (`Identity/Team name`), `logo_url`. Brimba adds
+Real data: `id`, `name` (`Identity/Team name`), `logo_url`. The Kwapso System adds
 `database_id`, `db_status`, `schema_version` (the per-team-DB architecture).
 
 ### team_members. KEEP (built, GLOBAL)
@@ -555,7 +555,7 @@ without opening every team DB.
 ### activity (Glide "All activity"). KEEP (table BUILT, per-team; feed + read path shipped). **Q3 RESOLVED.**
 Purpose: the human-readable change feed. Glide referenced the subject row via
 **one relation column per table** (`Invite logs/Teams/Member roles/Team members/
-Data import sessions Row ID`). Brimba uses a generic `(related_table,
+Data import sessions Row ID`). The Kwapso System uses a generic `(related_table,
 related_row_id)` pair instead → scales to any module without new columns.
 
 **Indexes (team migration `0023_activity_feed_index`, scaling review 2026-08-14).**
@@ -580,7 +580,7 @@ the SAME rows are surfaced four ways by the read path
 Real data: audit + the target (`table_key`/display), the column schema, a
 `reference_dataset_url`, an `overall_status`, and the three stages of the
 file → mapping → confirm session (uploaded CSV text + auto-mapped columns +
-preview + the write result). In Brimba the data-ops worker drives the 3 stages
+preview + the write result). In the Kwapso System the data-ops worker drives the 3 stages
 (read → auto-map/validate → INSERT-ONLY write), writing **act-as-user** through
 the target's gated create endpoint (so each import respects the caller's
 permissions + the module's own validation). Gated by the target's `create`

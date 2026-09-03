@@ -45,7 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Pencil, Plus, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Plus, Power } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 
 import type { InternalRate, RoleRate } from "@shared/types"
@@ -213,7 +213,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                         {
                           key: "edit",
                           label: t("Edit"),
-                          icon: <Pencil className="size-3.5" />,
+                          icon: <PencilSimple className="size-3.5" />,
                           disabled: busy,
                           onSelect: () => setEditing(r),
                         },
@@ -431,7 +431,7 @@ function RoleRateCard({ teamId }: { teamId: string }) {
                     {
                       key: "edit",
                       label: t("Edit"),
-                      icon: <Pencil className="size-3.5" />,
+                      icon: <PencilSimple className="size-3.5" />,
                       disabled: busy,
                       onSelect: () => {
                         setRole(r.roleName)

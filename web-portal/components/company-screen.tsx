@@ -26,13 +26,14 @@ import { useCached } from "@shared/web/store"
 import { portal } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { CollectionHeading } from "@/components/collection-heading"
+import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
 import { useT } from "@shared/web/language"
 
 export function CompanyScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
   const accountId = ready.currentAccountId
-  const { data, loading } = useCached<AccountDetail>(cacheKeys.company(accountId), () =>
+  const { data, loading, refresh } = useCached<AccountDetail>(cacheKeys.company(accountId), () =>
     portal.company(accountId)
   )
 
@@ -43,7 +44,20 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
         <Skeleton className="h-40 w-full rounded-[var(--radius)]" />
       </div>
     )
-  if (!data) return null
+  // `AccountDetail` is never legitimately falsy once the read resolves — `!data`
+  // past the loading check above means the fetch failed, not that there is
+  // nothing to show. This used to render nothing at all, indistinguishable from
+  // a blank screen the app forgot to finish.
+  if (!data)
+    return (
+      <div className="flex flex-col gap-4">
+        <ErrorPanel
+          title={t("We couldn't load your details.")}
+          description={t("Check your connection and try again.")}
+          onRetry={refresh}
+        />
+      </div>
+    )
 
   const { account, links, linksTotal } = data
   // Only the people who are currently contacts. An unlinked person keeps their

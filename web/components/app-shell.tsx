@@ -1,7 +1,7 @@
 "use client"
 
 // AppShell — the persistent frame every in-app screen sits inside. Desktop: a
-// left sidebar (team switcher, Home/Settings nav, profile). Mobile: a top bar
+// left sidebar (team switcher, House/Gear nav, profile). Mobile: a top bar
 // (switcher + profile) and a bottom tab bar. A breadcrumb strip (per page) shows
 // where you are and lets you climb back. One live channel for the active team is
 // opened here, refreshing caches when something changes. Composed from library
@@ -14,9 +14,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avata
 // The rail's own brand artwork, reached directly (R39: kit supplies the UI) —
 // see the note above `NavBrandHeader` for why this file draws the mark itself
 // instead of leaving it to Rail's own default.
-import { Isotype, Logotype } from "@shared/ui/components/brand/brand"
-import { Breadcrumbs } from "@shared/ui/components/breadcrumbs/breadcrumbs"
-import { Button } from "@shared/ui/components/button/button"
+import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/brand"
+// THE TRAIL, AS FOLDER TABS (kit v1.2.28). It used to be `Breadcrumbs` — a line
+// of text inside the card's header band. The reshaped `ScreenShell` gives the
+// trail its own slot ON THE GROUND, directly above the card, and the strip's
+// last tab is the card's own fill so the two read as one silhouette. Same
+// array, same `BreadcrumbsItem` shape, same fold rule (`collapse`, shared
+// between the two drawings); what changed is where it stands and what it is
+// made of. See the `breadcrumb` prop below for the client rule that governs
+// the strip: NAVIGATION TEXT ONLY, no controls on the ground.
+import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
 // The rule between the phone sheet's own named blocks (`railBlocks.map`,
 // below). Used to be a hand-rolled `<div className="bg-border h-px w-full"
 // role="separator" />`, the kit's own default weight spelled out by hand and
@@ -35,10 +42,10 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, PanelLeftClose, PanelLeftOpen, ProfileCircle, Route, Settings, LifeBuoy, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
-// `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
+// `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
-import { SeaWaves } from "@shared/ui/foundations/icons"
+import { Waves } from "@shared/ui/foundations/icons"
 // THE NAVBAR ITSELF (R45). Was hand-rolled — its own button markup reading the
 // same `--spine-*` tokens the kit's Rail reads, its own group/divider layout,
 // its own collapse control — while `ScreenShell`'s rail COLUMN was already the
@@ -54,7 +61,7 @@ import { SeaWaves } from "@shared/ui/foundations/icons"
 // `null`/`false` below, and this file draws its own equivalents instead. Each
 // is a documented kit gap, not an oversight:
 //   · Rail's `groups` prop has no "no heading" shape for a destination that
-//     wants to sit outside every section (Home) — every RailGroup draws a
+//     wants to sit outside every section (House) — every RailGroup draws a
 //     clickable disclosure control over its items, even at an empty label.
 //     `StandaloneNavItem` below draws that one, token-for-token with Rail's
 //     own row treatment.
@@ -91,7 +98,7 @@ import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED, TEAM_SCREENS_HIDDEN } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
-import { TimerBar } from "@/components/timer-bar"
+import { TimerBar, useRunningTimers } from "@/components/timer-bar"
 import {
   Sheet,
   SheetContent,
@@ -100,49 +107,51 @@ import {
 } from "@shared/ui/components/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
-import { toSpine } from "@shared/spine"
+import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+import { AgentDockSlot } from "@/lib/agent-dock"
+import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 
 // Kwapso is `inRail: false` now (client, 31 Aug 2026 — see NavGroup in
 // pages.ts), so this mapping is never actually looked up — kept anyway, the
 // same way `settings` already sat here unused, so `NavItem.icon`'s union
 // stays fully covered rather than needing a cast at the one call site below.
-const NAV_ICONS = { home: Home, settings: Settings, kwapso: BadgeCheck } as const
+const NAV_ICONS = { home: House, settings: Gear, kwapso: SealCheck } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
-// a section without one falls back to Home, which is the tell that one is missing.
+// a section without one falls back to House, which is the tell that one is missing.
 //
 // TWO WERE MISSING, and the fallback is exactly why nobody noticed: `time` and
-// `meetings` shipped without a line, so the rail drew Home three times — Home,
+// `meetings` shipped without a line, so the rail drew House three times — House,
 // Time and Meetings wearing one icon, which a tester reported as "Meetings and
 // Time share the same icon". Both concepts already had their own glyph in
 // CONCEPT_ICON (`timer`, `calendar-clock`); only this map had not been told.
 // web/test/nav.test.ts now derives the required keys from TEAM_SECTIONS and
 // insists every icon is distinct, so a silent fallback cannot ship again.
-const SECTION_ICONS: Record<string, typeof Home> = {
-  accounts: Building2,
+const SECTION_ICONS: Record<string, typeof House> = {
+  accounts: Briefcase,
   // The same glyph `CONCEPT_ICON.contacts` ("contact") resolves to everywhere
   // else it is drawn (the alias chain in shared/web/screen-engine/icon-names.ts
-  // — "contact" → "profile-circle" → ProfileCircle) — one concept, one icon,
+  // — "contact" → "profile-circle" → AddressBook) — one concept, one icon,
   // whether the rail draws it as a component or a screen draws it by name.
-  contacts: ProfileCircle,
-  tickets: LifeBuoy,
-  knowledge: LibraryBig,
-  processes: Route,
-  stories: Hammer,
-  sprints: CalendarRange,
+  contacts: AddressBook,
+  tickets: Tray,
+  knowledge: HardDrives,
+  processes: GitFork,
+  stories: PuzzlePiece,
+  sprints: CalendarDots,
   // The package a client bought — several sprints arriving together.
-  waves: SeaWaves,
+  waves: Waves,
   apps: AppWindow,
-  tasks: ListTodo,
+  tasks: CheckSquare,
   time: Timer,
-  meetings: CalendarClock,
+  meetings: Chat,
   brand: Palette,
 }
 
 /** THE SAME ROW SKIN RAIL'S OWN `RailRow` DRAWS, for the one destination that
- * sits outside any of Rail's `groups` (Home — see `NavGroup` in lib/pages.ts).
+ * sits outside any of Rail's `groups` (House — see `NavGroup` in lib/pages.ts).
  * Copied token-for-token from `templates/rail.tsx`'s private
  * `ROW_SHAPE`/`ROW_EXPANDED`/`ROW_COLLAPSED`/`ACTIVE_TREATMENT`/`ROW_IDLE`
  * (none of them exported — a kit gap, not a choice), so the standalone entry
@@ -153,7 +162,7 @@ function StandaloneNavItem({
   collapsed,
   onSelect,
 }: {
-  item: { slug: string; title: string; Icon: typeof Home }
+  item: { slug: string; title: string; Icon: typeof House }
   active: boolean
   collapsed: boolean
   onSelect: () => void
@@ -173,7 +182,7 @@ function StandaloneNavItem({
       ? "size-[var(--avatar-md)] justify-center rounded-pill p-0"
       // Transcribed from the kit's own `ROW_EXPANDED` (rail.tsx), which stopped
       // bleeding to the rail's true edge in v1.2.22 — the client asked for the
-      // active pill to keep "a bit of blank space on the sides". Home is the
+      // active pill to keep "a bit of blank space on the sides". House is the
       // one destination outside any group, so it is drawn here rather than by
       // the rail composition, and the kit exports no row-shape constant to
       // import; keeping the two in step is manual until it does.
@@ -186,12 +195,27 @@ function StandaloneNavItem({
       : "h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]",
     active
       ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] font-[var(--font-weight-medium)] hover:bg-[var(--spine-active-hover)]"
-      // `--ink-secondary`, not `--spine-ink-quiet` — the same darker-chip
-      // tier the kit-drawn rows get via the descendant-selector override on
-      // `railContent`'s own root, below. Home is a "chip" too (Standalone
-      // Nav Item's whole point is to draw the same row Rail draws), so it
-      // reads the token directly here instead of needing a selector of its own.
-      : "text-[var(--ink-secondary)] hover:text-[var(--spine-ink)]",
+      // TRANSCRIBED FROM THE KIT'S OWN `ROW_IDLE` (rail.tsx), the same way the
+      // shape above is transcribed from `ROW_EXPANDED` and for the same reason:
+      // House is the one destination outside any group, so it is drawn here
+      // rather than by the rail composition, and Standalone Nav Item's whole
+      // point is to draw the row Rail draws.
+      //
+      // This used to rest in the theme's secondary ink and hover up to the
+      // spine's full ink — described and not spelled, because Tailwind scans
+      // this file and would compile a quoted utility straight back into the
+      // stylesheet (see the longer note on `railContent`'s own root below, and
+      // web/app/globals.css, which carries the same warning). It matched the
+      // descendant-selector override that used to sit on that root. Both are
+      // gone for the reason spelled
+      // out in full there: `--ink-secondary` is THEME-scoped and this ground is
+      // SPINE-scoped, so it measured 1.95:1 on ink-in-light and 1.05:1 on
+      // mango-in-dark, and kit v1.2.18 had already moved the kit's own rows to
+      // `--spine-ink` on a later client ruling ("nav text should ALWAYS be
+      // either pure black or pure white — never gray"). The hover went with it:
+      // once a row RESTS at `--spine-ink` a hover step to `--spine-ink` is a
+      // no-op, and v1.2.18 replaced that colour step with a WEIGHT step.
+      : "font-[var(--font-weight-light)] text-[var(--spine-ink)] hover:font-[var(--font-weight-medium)]",
   ].join(" ")
 
   const control = (
@@ -252,13 +276,36 @@ function StandaloneNavItem({
 function NavBrandHeader({
   collapsed,
   homeLabel,
+  spine,
 }: {
   collapsed: boolean
   homeLabel: string
+  spine: Spine
 }) {
+  /* THE CUT COMES FROM THE SPINE, NOT FROM THE THEME — the kit's own law,
+     stated at rail.tsx §"THE SAME LOGIC IS WHY `markField` PICKS THE CUT FROM
+     THE SPINE AND NOT FROM THE MEDIA QUERY", and this line is that file's own
+     `markField` expression, transcribed for the same reason the row shape
+     below it is: this file draws the mark itself (`mark={null}` to Rail) and
+     the kit exports the mapping as a local, not as a helper.
+
+     It used to pass `on="paper"` unconditionally. `paper` is the THEME-driven
+     field — the kit hides one cut and shows the other on `prefers-color-
+     scheme` / `[data-theme]` — which is correct only for the spine whose own
+     ground follows the theme. The other two paint a ground that does NOT:
+     ink is dark in both palettes and mango is #FED069 in both. So a light
+     theme on the ink spine drew the DARK cut on ink's dark ground, and a dark
+     theme on mango drew the LIGHT cut on mango's bright one. Reported by the
+     client, 2026-09-03, on the ink half: the wordmark reads white and correct
+     in dark and is unreadable in light.
+
+     Same fault, same day, one layer up from the idle nav label — see the long
+     note on `railContent`'s own root below. A rail that paints its own ground
+     must own its own foregrounds; inheriting them from the theme is the bug. */
+  const markField: BrandField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper"
   // THE MARK IS THE WAY HOME (client, 31 Aug 2026): "remove home from navbar,
   // make that when we click the icon kwapso on top of sidebar it takes us
-  // there" — Welcome (the old "Home") has no rail row of its own any more
+  // there" — Welcome (the old "House") has no rail row of its own any more
   // (`inRail: false` in pages.ts), so the brand mark is now its only entry
   // point besides landing here straight off sign-in.
   return (
@@ -270,9 +317,9 @@ function NavBrandHeader({
         aria-label={homeLabel}
       >
         {collapsed ? (
-          <Isotype className="[--brand-step:var(--icon-24)]" on="paper" />
+          <Isotype className="[--brand-step:var(--icon-24)]" on={markField} />
         ) : (
-          <Logotype className="[--brand-step:var(--icon-24)]" on="paper" />
+          <Logotype className="[--brand-step:var(--icon-24)]" on={markField} />
         )}
       </button>
     </div>
@@ -325,12 +372,12 @@ export function AppShell({
   }, [userScale])
 
   // WHICH SPINE THE SIDEBAR IS PAINTED IN — ink, paper or mango, chosen in
-  // Settings (shared/web/spine-section.tsx) and persisted on the person's own
+  // Gear (shared/web/spine-section.tsx) and persisted on the person's own
   // row exactly as `scale` is, so it follows them between devices. Unlike
   // scale this is an ordinary React prop rather than a document-level side
   // effect: `toSpine` falls back to the default for null/unrecognised, which
   // has been MANGO since the client's ruling of 2026-09-02 — it was paper, to
-  // keep a person who had never opened Settings on the rail they already had,
+  // keep a person who had never opened Gear on the rail they already had,
   // and that argument is recorded in shared/spine.ts where it was overturned.
   const spine = toSpine(active.user?.spine)
 
@@ -400,6 +447,24 @@ export function AppShell({
   // paint, only for somebody who holds both rights the door asks for — see the
   // hook, which is where all the reasoning about why this is not a cron lives.
   useGoogleCatchUp(teamId, can)
+  // IS ANYTHING BEING TIMED. The same cached read `TimerBar` makes for itself,
+  // asked one level up so the shell can decide whether to draw the header BAND
+  // the timer would sit in at all — see the `header` prop below for why an
+  // always-drawn band is not free. One key, one request: both callers go
+  // through `loadShared`.
+  const runningTimers = useRunningTimers(teamId)
+  // IS THE ASSISTANT SHOWING. The same module store the panel itself reads
+  // (web/lib/agent-open.ts) — read here because the shell's third column is
+  // CONTROLLED by it: the kit holds the aside's state uncontrolled unless it is
+  // given one, and a state it held privately could not be persisted per person
+  // or shared with the panel's other presentation. One flag, two readers, never
+  // two answers.
+  const assistantOpen = useAgentOpen()
+  // THE TRAIL, AS ONE ARRAY, BECAUSE TWO THINGS READ IT. The strip itself and
+  // the DEPTH the shell derives the title's step from have to be the same
+  // fact; `breadcrumbs` is optional at the prop, so it is normalised once here
+  // rather than defaulted twice below.
+  const trail = breadcrumbs ?? []
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
@@ -420,7 +485,7 @@ export function AppShell({
   // page, it just asks each one where it goes. A section gated by a right the
   // caller lacks vanishes from its group, and a group that empties out draws
   // no heading.
-  type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string; group: NavGroup | "none" }
+  type ShellLink = { slug: string; title: string; Icon: typeof House; path: string; group: NavGroup | "none" }
   const universal: ShellLink[] = NAV.filter((i) => !i.need && i.inRail !== false).map((i) => ({
     slug: i.slug,
     title: t(i.title),
@@ -432,9 +497,9 @@ export function AppShell({
     ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && can(s.module, "read")).map((s) => ({
         slug: s.key,
         title: t(s.title),
-        Icon: SECTION_ICONS[s.key] ?? Home,
+        Icon: SECTION_ICONS[s.key] ?? House,
         // Clean top-level URL (/stories, /tickets) — resolves the active team from
-        // context, like Home. (The gateway serves the shell for any sub-path.)
+        // context, like House. (The gateway serves the shell for any sub-path.)
         path: `/${s.segment}`,
         group: s.group ?? "my-work",
       }))
@@ -473,7 +538,7 @@ export function AppShell({
   const railBlocks: ShellLink[][] = [homeStandalone, ...namedGroups].filter((b) => b.length > 0)
 
   // THE RAIL'S GROUPS, IN THE KIT'S OWN SHAPE (R45) — the four NAMED sections
-  // only; Home is drawn outside the kit's own Rail entirely by
+  // only; House is drawn outside the kit's own Rail entirely by
   // `StandaloneNavItem` (see the note above it). One `RailItem` per
   // destination, the same icon vocabulary the tabs use (`item.Icon`), and a
   // plain `onSelect` — deliberately NO `href`. Rail's own `<a>` fires
@@ -673,43 +738,105 @@ export function AppShell({
   // no actions slot to host the trigger in, so this file rebuilds the chip's
   // look (the same `--spine-*` tokens, the same `Avatar`) around it instead.
   //
-  // STICKY, ONE WINDOW TALL, INSIDE A PADDED COLUMN. The shell's rail column
-  // pads itself (`p-[var(--rail-inset)]`) so the padding is spent once for
-  // any rail content, `Rail` included. A sticky child sized to the padded
-  // box would be shorter than the viewport by twice the inset, so this node
-  // cancels the column's padding with an equal negative margin and re-spends
-  // it on itself. The nav region scrolls INSIDE its own wrapper (`min-h-0
-  // flex-1 overflow-y-auto`), not the whole column, so a long list of
-  // sections can never push the standalone anchor or the account menu off
-  // screen — Rail's own `min-h-full` needs a sized box to fill, and this
-  // wrapper is it. Home sits OUTSIDE that scrolling wrapper (the same "the
-  // anchor keeps its end of the rail" property the old Home-first/
-  // Settings-last order had), so it never scrolls out of view.
+  // IT FILLS THE COLUMN, AND THE COLUMN IS ALREADY ONE WINDOW TALL (kit
+  // v1.2.28, 2026-09-02). This node used to be `sticky top-0 h-[100svh]` with
+  // the column's own `--rail-inset` cancelled by a negative margin and
+  // re-spent here — a whole mechanism whose only job was to make a rail
+  // inside a DOCUMENT-SCROLLED page look viewport-tall while the column it
+  // sat in grew with whatever the page's body needed. THE PAGE DOES NOT
+  // SCROLL ANY MORE: `ScreenShell`'s page level is `h-dvh overflow-hidden`
+  // and the rail column is a flex item of a full-height row, so the column IS
+  // the window's height, exactly, on every route and at every scroll
+  // position. `flex-1 min-h-0` fills it — main-axis growth inside the
+  // column's own flex column, not a percentage — and there is nothing left
+  // for `sticky` to pin against, because nothing behind the rail moves.
+  //
+  // The nav region still scrolls INSIDE its own wrapper (`min-h-0 flex-1
+  // overflow-y-auto`), not the whole column, so a long list of sections can
+  // never push the standalone anchor or the account menu off screen — Rail's
+  // own `min-h-full` needs a sized box to fill, and this wrapper is it. House
+  // sits OUTSIDE that scrolling wrapper (the same "the anchor keeps its end
+  // of the rail" property the old House-first/Gear-last order had), so it
+  // never scrolls out of view.
+  //
+  // THE COLLAPSE CONTROL IS THE SHELL'S NOW, AND IT IS NOT DRAWN HERE. This
+  // file used to render `railEdgeToggle` beside this node — a floating,
+  // half-in-half-out circular button straddling the rail column's own border
+  // at the member card's height, sticky to its own `100svh` window for the
+  // same reason this node was. The kit draws the edge handle itself since
+  // v1.2.28 (a 3px bar in a 20x44 target, at the column's outer rim when the
+  // rail is open and its inner edge when it is shut), so drawing ours too
+  // would be two controls for one decision. What this file still owes the
+  // shell is the STATE: `railCollapsed` + `onRailCollapsedChange` below, and
+  // `collapsed` threaded into our own Rail — the shell cannot reach inside a
+  // rail node it was handed. (Rail's name is written in prose here and not as
+  // its JSX tag, for the reason `StandaloneNavItem`'s own header already
+  // gives: web/test/shell-nav.test.ts finds the rail by the FIRST index of
+  // that tag in this file, so a mention above the real element moves the
+  // anchor and fails a test about something else entirely.)
   // TWO DESCENDANT-SELECTOR OVERRIDES LIVE ON THIS ROOT NODE, THE SAME
   // REASON AS THE RADIUS OVERRIDE BELOW (`shared/ui/` is vendored and
   // pinned; a hand-edit there fails web/test/vendored-kit.test.ts): reached
   // from OUTSIDE the kit, on an ancestor this file owns.
   //
-  // (1) DARKER CHIP TEXT (client, 31 Aug 2026: "i want more visual
-  // differentiation between what's a section and what's a chip. maybe chips
-  // texts darker? keep section text as they are"). A "chip" is a nav ROW
-  // (Tasks, Meetings, …) as opposed to a SECTION HEADER (My work / Build /
-  // …) — both currently read `--spine-ink-quiet` at rest (`ROW_IDLE` and the
-  // group heading's own idle class in rail.tsx), which is exactly why they
-  // looked like one tone with two sizes rather than two tiers. The section
-  // heading is untouched — the client said keep it — so the fix is scoped to
-  // `[data-slot=rail-item]` only, never `[data-slot=rail-group-heading]`.
-  // `--ink-secondary` (tokens.css) is the real, already-named tier between
-  // `--spine-ink-quiet` (muted-foreground) and full `--spine-ink`
-  // (foreground) — "the charcoal-on-paper tier", used elsewhere for exactly
-  // this kind of readable-but-secondary ink — so this reaches for an
-  // existing token rather than inventing a colour (R32). `:not(:hover)`
-  // keeps the kit's own `hover:text-[var(--spine-ink)]` rule untouched: the
-  // override never matches while hovering, so there is no specificity race
-  // with the hover rule, only with the resting one (which the extra
-  // attribute selectors win outright).
+  // THERE IS NO LONGER A CHIP-TEXT OVERRIDE HERE, AND THE 31 AUG RULING IS
+  // STILL HONOURED — BY THE KIT, NOT BY THIS FILE. This slot used to hold a
+  // descendant-selector entry aimed at a rail row that is neither active nor
+  // hovered, colouring it with the theme's own secondary-ink token. (Described
+  // rather than spelled, and that is not fussiness: `@import "tailwindcss"`
+  // scans THIS FILE, so a comment quoting the utility compiles it back into
+  // the shipped stylesheet — web/app/globals.css carries the same warning over
+  // the same class of bug, and this comment's own first draft reproduced it.)
   //
-  // (2) THE SECTION CHEVRON, RE-ALIGNED (client, 31 Aug 2026: "on sections,
+  // It was added for the client's 31 Aug 2026 ruling ("i want more visual differentiation
+  // between what's a section and what's a chip. maybe chips texts darker?
+  // keep section text as they are"). At the time a nav ROW and a SECTION
+  // HEADING both rested at `--spine-ink-quiet`, so they read as one tone in
+  // two sizes, and `--ink-secondary` was the already-named tier between quiet
+  // and full ink. THE PREMISE EXPIRED TWO DAYS LATER. Kit v1.2.18
+  // (2026-09-02) moved `rail.tsx`'s `ROW_IDLE` off `--spine-ink-quiet` and
+  // onto `--spine-ink` outright, on a LATER client ruling given live against
+  // all six spine x theme combinations, verbatim: "nav text should ALWAYS be
+  // either pure black or pure white — never gray — depending on what it sits
+  // on." The heading was deliberately left on `--spine-ink-quiet` (a heading
+  // is not nav text), so the kit's own default now draws the 31 Aug
+  // separation MORE strongly than this override ever did — measured, not
+  // assumed, as ink on each spine's own `--spine-fill` ground:
+  //
+  //                 this override   kit ROW_IDLE   the heading it must beat
+  //   paper/light        8.08          15.76              5.90
+  //   ink/light          1.95  ✘       17.39             11.53
+  //   mango/light        6.19          12.07             12.07
+  //   paper/dark         9.03          13.62              7.03
+  //   ink/dark          11.31          17.06              8.81
+  //   mango/dark         1.05  ✘       12.07             12.07
+  //
+  // AND IT WAS BREAKING TWO OF THE SIX. `--ink-secondary` is THEME-scoped
+  // (#4a4946 light / #d5d1c9 dark) and knows nothing about spine, while two
+  // of the three spines have a ground that does NOT follow the theme: ink's
+  // is dark in both palettes, mango's is #FED069 in both. So light-theme
+  // ink put a dark grey on a dark ground at 1.95:1, and dark-theme mango put
+  // a light grey on a bright ground at 1.05:1 — both far under AA for
+  // primary navigation text, and neither reachable in the 2026-09-02 →
+  // 2026-09-03 window when `ink` was retired and mango was not yet paired
+  // with a dark palette in review. The kit's per-spine `--spine-ink` is
+  // correct on all six by construction (12.07 – 17.39) because it is
+  // SPINE-scoped, which is the axis this ground actually moves on.
+  //
+  // ON MANGO THE OVERRIDE WAS ALSO BACKWARDS: tokens.css states that spine
+  // has NO quiet tier on purpose (`--spine-ink-quiet` IS `--ink-on-accent`),
+  // so its rows and headings are one charcoal by design and the chip/section
+  // distinction there is carried by weight and size. Forcing `--ink-secondary`
+  // made a mango chip LIGHTER than the section above it — the opposite of what
+  // the client asked for on 31 Aug.
+  //
+  // Deleted rather than made spine-aware: a spine-aware rewrite would land on
+  // `--spine-ink` for every spine, which is exactly what `ROW_IDLE` already
+  // says. The not-hovered clause went with it — it was pairing with a kit hover
+  // rule that lifted the row to `--spine-ink`, and v1.2.18 removed that rule, so
+  // all the clause did was make a resting row jump colour under the pointer.
+  //
+  // (1) THE SECTION CHEVRON, RE-ALIGNED (client, 31 Aug 2026: "on sections,
   // move the arrow that collapse/expands to the right, so it aligns with the
   // icons"). Checked against the row geometry rather than guessed: a row's
   // icon slot and a heading's label both start at the same x (`--rail-inset
@@ -724,7 +851,7 @@ export function AppShell({
   // siblings in a flex row) puts the glyph at that same fixed x with no
   // accessibility cost: both chevrons are `aria-hidden`, so a screen
   // reader's order is unaffected and only the sighted layout moves.
-  // (3) A HAIRLINE BETWEEN NAMED SECTIONS (client, 31 Aug 2026: wants the
+  // (2) A HAIRLINE BETWEEN NAMED SECTIONS (client, 31 Aug 2026: wants the
   // same thin rule the profile menu already draws between its own blocks —
   // that menu's `DropdownMenuSeparator` is a filled `h-px bg-border` block,
   // the SAME token this file's own `Separator` import already draws with
@@ -763,7 +890,6 @@ export function AppShell({
   // item above the line does: 20px on both sides, measured and matched, not
   // assumed even.
   const RAIL_CONTENT_OVERRIDES = [
-    "[&_[data-slot=rail-item]:not([data-active]):not(:hover)]:text-[var(--ink-secondary)]",
     "[&_[data-slot=rail-group-heading]>span]:order-last",
     "[&_[data-slot=rail-group-heading]>svg]:order-first",
     "[&_[data-slot=rail-group]:not(:first-child)]:pt-[var(--space-5)]",
@@ -772,7 +898,7 @@ export function AppShell({
   const railContent = (
     <div
       data-rail-collapsed={collapsed ? "" : undefined}
-      className={`sticky top-0 flex h-[100svh] flex-col overflow-y-auto overflow-x-clip -m-[var(--rail-inset)] p-[var(--rail-inset)] ${RAIL_CONTENT_OVERRIDES} ${collapsed ? "items-center" : ""}`}
+      className={`flex min-h-0 flex-1 flex-col overflow-x-clip ${RAIL_CONTENT_OVERRIDES} ${collapsed ? "items-center" : ""}`}
     >
       {!TEAM_SCREENS_HIDDEN && (
         <div className="pb-3">
@@ -785,7 +911,7 @@ export function AppShell({
           purpose, because the client asked for air under the mark
           specifically and not for the whole rail to breathe more. */}
       <div className="pb-6">
-        <NavBrandHeader collapsed={collapsed} homeLabel={t("Go to Welcome")} />
+        <NavBrandHeader collapsed={collapsed} homeLabel={t("Go to Welcome")} spine={spine} />
       </div>
       {homeStandalone.map((item) => (
         <div key={item.slug} className="pb-3">
@@ -813,14 +939,14 @@ export function AppShell({
 
           THE ACTUAL BUG THAT KEPT RECURRING WAS NEVER HERE — it was that
           this div wraps ONLY `<Rail>` (below), and `StandaloneNavItem`'s
-          entries (Home, `homeStandalone.map` above) render BEFORE this div,
+          entries (House, `homeStandalone.map` above) render BEFORE this div,
           entirely outside it. Every prior pass fixed `<Rail>`'s own rows —
-          first this override, then the kit itself — and Home's separate,
+          first this override, then the kit itself — and House's separate,
           hand-copied skin (this file's own `StandaloneNavItem`, which has
           to duplicate the kit's row shape at all only because rail.tsx never
           exports `ROW_EXPANDED`/`ROW_COLLAPSED` — see that function's own
           header) kept its stale `rounded-none` untouched through both,
-          because nobody traced that Home takes neither code path. Fixed
+          because nobody traced that House takes neither code path. Fixed
           2026-09-02 by matching `StandaloneNavItem`'s own literal to the
           kit's current value. The durable fix — exporting the kit's row
           constants so there is only one shape to drift — is still owed;
@@ -973,157 +1099,6 @@ export function AppShell({
     </div>
   )
 
-  // THE CONDENSE TOGGLE, ON THE SEAM ITSELF (client feedback, 31 Aug 2026:
-  // "place the condense button at the bottom next to the user, but not
-  // 'inside' the navbar but on the 'line' that separates the navbar from the
-  // content... should be half in half out"). It used to sit beside the
-  // brand mark (see the note on `NavBrandHeader`, above) — this is where it
-  // moved to, a floating edge-handle straddling the rail column's own right
-  // border, at the member card's height.
-  //
-  // WHY THIS IS A SIBLING OF `railContent`, NOT A CHILD OF IT. `railContent`
-  // clips its own horizontal overflow (`overflow-x-clip`, for the sticky +
-  // negative-margin trick that lets it re-spend the column's padding on
-  // itself) — anything nested inside it that tries to spill half its width
-  // outside would be cut at that boundary, whatever position/transform it
-  // used to get there. So this node rides alongside `railContent` instead,
-  // both handed to `ScreenShell` as its `rail` prop below, both direct
-  // children of the column `ScreenShell` renders around them.
-  //
-  // "SOMETIMES THERE, SOMETIMES NOT" (client, 1 Sep 2026) — THE REAL BUG,
-  // FOUND BY MEASURING, NOT BY RE-CHECKING THE FOUR STATIC STATES. Every
-  // earlier pass checked theme × collapsed on one short screen and the
-  // button was always exactly where it should be, because on a short
-  // screen `data-slot="screen-shell-rail"` (the vendored, pinned column
-  // `ScreenShell` renders `railContent` and this node into) happens to be
-  // exactly one viewport tall anyway. This node used to be `absolute
-  // inset-0`, which fills its CONTAINING BLOCK — that rail column — and the
-  // column's own height is not the viewport, it is the tallest of every
-  // flex sibling in `SCREEN`'s row (`screen-shell.tsx`, vendored), the BODY
-  // pane among them. `railContent` only ever LOOKS viewport-tall because it
-  // is separately `sticky top-0 h-[100svh]`; the column it sits inside
-  // keeps growing with whatever the page's own body needs. So on any route
-  // whose content runs past one screen — most of them — the column was
-  // taller than the viewport, `inset-0` filled that real height, and
-  // `justify-end` put the button at the bottom of the COLUMN, not the
-  // bottom of the visible rail: hundreds or thousands of pixels below the
-  // fold, on a route the four-state check never opened. Measured live: a
-  // 4000px-tall body left this button sitting at `y≈4124` on a 720px-tall
-  // viewport scrolled to the top. That is the whole "sometimes" — it never
-  // depended on theme or on collapsed, it depended on whether THIS PAGE'S
-  // OWN CONTENT happened to be taller than one screen, which changes by
-  // route and was never one of the four states checked.
-  //
-  // THE FIX RIDES THE SAME WINDOW `railContent` ALREADY OWNS, instead of
-  // trusting the column's real height again. This wrapper is now `sticky
-  // top-0 h-[100svh]` too — pinned to the same viewport-relative window as
-  // `railContent`, so `justify-end` inside it always lands on the bottom of
-  // the space the rail is actually SHOWING, on any route, at any scroll
-  // position, from the first frame, before any data has loaded. `-mt-
-  // [100svh]` cancels its own height back out of the column's flow (a
-  // negative top margin exactly the size of the box collapses its margin
-  // box to zero, the standard "sticky overlay that costs no layout space"
-  // trick) — without it this box would ADD another full viewport of empty
-  // height below `railContent`'s own, inflating the column, and so the
-  // whole page, by 100svh on every route, short ones included.
-  //
-  // `position: relative` on the column is no longer needed for this —
-  // `sticky`, unlike `absolute`, anchors to the nearest scrolling ancestor
-  // and needs no positioned ancestor of its own — so that override is
-  // dropped from `ScreenShell`'s `className` below along with the reason
-  // for it.
-  //
-  // THE HALF-IN-HALF-OUT ITSELF is `right-0` (the column's true right edge)
-  // plus `translate-x-1/2` (shifts the control outward by exactly half of
-  // its own width) — the standard edge-badge technique, and the reason it
-  // reads as "on the line" rather than "inside the rail": half the control's
-  // box is left of that x, half is right of it.
-  //
-  // BUT `right-0` ONLY REACHES THE COLUMN'S TRUE EDGE IF THIS WRAPPER
-  // ACTUALLY FILLS THE COLUMN'S WHOLE WIDTH, and by default it does not:
-  // `screen-shell-rail` (the vendored column div, `RAIL_COLUMN` above) is a
-  // flex container padded on every side by `--rail-inset`, and a flex child
-  // with no width of its own stretches only to that container's CONTENT box
-  // — inset from the column's real, painted edge by `--rail-inset` on every
-  // side, same as any other padded box. Regression, found by measuring: this
-  // wrapper carried no correction for that, so `right-0` landed a whole
-  // `--rail-inset` short of the seam, and the straddle read as "inside the
-  // rail" instead of "on the line". `-me-[var(--rail-inset)]` cancels that
-  // one edge (inline-end only — nothing here depends on the left/start edge,
-  // so there is no need for `railContent`'s full `-m`/`p` cancel-and-respend
-  // round trip below), which is what actually earns "fills the column's
-  // whole width with no horizontal inset of its own".
-  //
-  // THE VERTICAL ANCHOR is a spacer exactly `--avatar-md` tall (the member
-  // chip's own avatar size), pinned to the column's bottom padding
-  // (`--rail-inset` — the same inset `railContent` cancels and re-spends on
-  // itself, so this wrapper's bottom padding lands the spacer's bottom edge
-  // exactly where the member row's own bottom edge sits).
-  //
-  // OFF-CENTRE BY EXACTLY `--space-1`, EXPANDED ONLY (client, 31 Aug 2026:
-  // "align with user card! its off center a bit."). The COLLAPSED card carries
-  // no padding of its own (`flex-col gap-[var(--space-2)]`, above) — its
-  // avatar's bottom edge sits flush with the row's own bottom, which is
-  // exactly what `pb-[var(--rail-inset)]` alone already matched. The EXPANDED
-  // card is a pill with `p-[var(--space-1)]` all round (the block building
-  // `railContent`'s last child, above), so its avatar's own bottom edge — and
-  // so its vertical centre — sits one `--space-1` ABOVE the row's bottom
-  // edge, not flush with it. The toggle button was centred on the row's edge
-  // in both states, which is why it read as centred on the avatar only when
-  // collapsed. Reading the same padding back in rather than guessing a pixel:
-  // `calc(var(--rail-inset) + var(--space-1))` only when expanded.
-  const railEdgeToggle = (
-    <div className="pointer-events-none sticky top-0 h-[100svh] -mt-[100svh] -me-[var(--rail-inset)]">
-      <div
-        className={`flex h-full flex-col justify-end ${
-          collapsed ? "pb-[var(--rail-inset)]" : "pb-[calc(var(--rail-inset)+var(--space-1))]"
-        }`}
-      >
-        <div className="relative h-[var(--avatar-md)] shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {/* PINNED TO THE RAIL'S OWN FILL, NOT THE KIT'S "SECONDARY" TOKEN
-              (client feedback, 31 Aug 2026: "on light, the condense/expand
-              button is not always visible. make it always the same color as
-              the navbar"). `variant="secondary"` reads `--btn-secondary-fill`,
-              which `screen-shell.tsx`'s vendored `RAIL_COLUMN` rebinds to
-              `--spine-chip-fill` (the member-chip pill's tone, one rung off
-              the rail) rather than to the rail's own `--spine-fill` — a
-              choice that is right for a chip sitting ON the rail and wrong
-              for a handle straddling the rail's OWN edge. In light mode that
-              chip tone is `--kw-off-beige` (#FFFEF9), a hair off the rail's
-              `--kw-soft-paper` (#F7F2EB) and an EXACT match for the content
-              column's own `--background` (also `--kw-off-beige`) — so the
-              half of the button sitting over the content pane vanished into
-              it outright, and the half over the rail read as barely-there.
-              Dark mode was never reported broken because its equivalent pair
-              (`--kw-unlit-raised` #26241F rail vs `--kw-unlit-quiet` #2F2D28
-              chip) happens to sit far enough apart to read as two tones.
-              Reaching for `--spine-fill` directly — the same token the rail
-              column itself paints with, one line up in `RAIL_COLUMN` — makes
-              the two literally the same value in every spine/theme
-              combination, not just the ones measured today; `enabled:hover:`
-              is restated at the same fill so hover cannot re-introduce a
-              second tone (the kit's own secondary hover is a literal, not a
-              spine token, and the client's ask was "always", not "at rest"). */}
-              <Button
-                type="button"
-                variant="secondary"
-                className="pointer-events-auto absolute top-0 right-0 size-[var(--avatar-md)] translate-x-1/2 rounded-pill p-0 shadow-md bg-[var(--spine-fill)] enabled:hover:bg-[var(--spine-fill)]"
-                aria-label={collapsed ? t("Expand") : t("Collapse")}
-                aria-expanded={!collapsed}
-                onClick={() => persistCollapsed(!collapsed)}
-              >
-                {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{collapsed ? t("Expand") : t("Collapse")}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-    </div>
-  )
-
   return (
     // THE LANGUAGE WRAPS THE WHOLE SHELL, so the nav, the breadcrumbs, every
     // routed screen and every dialog opened from one all read the same `t`.
@@ -1131,7 +1106,25 @@ export function AppShell({
     // component with no session: the preference arrives on `active.user`, which
     // this shell already has in hand before it paints.
     <LanguageProvider value={active.user?.language}>
-    <div className="flex min-h-[100svh] flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
+    {/* NOT A FLEX COLUMN ANY MORE, AND NOT `min-h-[100svh]`. This wrapper used
+        to lay the mobile bar and the shell out one above the other in a page
+        that could grow; `ScreenShell`'s page level is `h-dvh overflow-hidden`
+        since kit v1.2.28, so a bar in the flow ABOVE it would push a full
+        window's worth of shell past the bottom of a window that can no longer
+        scroll to reach it. The bar is lifted OUT of the flow instead (it was
+        already `sticky top-0 z-20`, i.e. already pinned to the window's own
+        top edge — `fixed` is the same position on a page that never moves) and
+        the shell pays for it in PADDING. Border-box means the ground is still
+        exactly one window tall and still paints edge to edge behind the bar;
+        what the padding insets is the card, which is the only thing that
+        should move.
+
+        `--shell-top` IS THE ONE NUMBER, READ TWICE — the bar's own height, and
+        the shell's inset for it. It was already declared here and had stopped
+        being read by anything; it is live again, and it is why the bar's
+        height is a variable rather than a literal. Zero at `md`, where the bar
+        is not drawn. */}
+    <div className="[--shell-top:3.75rem] md:[--shell-top:0px]">
       {/* Mobile top bar, an explicit height, because `--shell-top` above is a
           promise about it. ScreenShell has no mobile-chrome concept of its
           own (the rail simply disappears below `md`, by the kit's own
@@ -1140,7 +1133,7 @@ export function AppShell({
           header band, because it is a full-bleed, bg-card, bordered surface
           and the header band's whole law is that it paints no fill of its
           own. */}
-      <header className="bg-card sticky top-0 z-20 flex h-[3.75rem] min-w-0 items-center justify-between gap-2 overflow-hidden shadow-[var(--hairline-under)] px-4 md:hidden">
+      <header className="bg-card fixed inset-x-0 top-0 z-20 flex h-[var(--shell-top)] min-w-0 items-center justify-between gap-2 overflow-hidden shadow-[var(--hairline-under)] px-4 md:hidden">
         <div className="flex min-w-0 shrink items-center">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
         </div>
@@ -1153,12 +1146,12 @@ export function AppShell({
               to be wider than a phone. It is three segments the kit will not
               collapse to an icon, and on a 375px screen it pushed the avatar
               off the edge and the whole PAGE sideways with it. It lives in
-              Settings, under the text size, and in the profile menu. */}
+              Gear, under the text size, and in the profile menu. */}
           <ProfileMenu active={active} />
         </div>
       </header>
 
-      {/* THE SHELL. `spine={spine}` — the person's own Settings · Sidebar
+      {/* THE SHELL. `spine={spine}` — the person's own Gear · Sidebar
        * choice (shared/spine.ts), which defaults to MANGO since the client's
        * ruling of 2026-09-02 and is offered again at onboarding. It defaulted
        * to paper before that, which is also what this file hardcoded before
@@ -1174,92 +1167,231 @@ export function AppShell({
        * own breakpoint law, is what already made this adoptable at all — see
        * COMPOSITION-MISMATCHES.md, the ScreenShell-family entry. */}
       <ScreenShell
-        /* `flex flex-col` + the `screen-shell-card` descendant rule —
-           THE FOOTER-TO-THE-BOTTOM CHAIN'S MISSING LINK, found by measuring
-           the real compiled CSS rather than trusting the theory: `ScreenShell`
-           (the kit's `screen-shell.tsx`, vendored, R39) makes its own PAGE
-           level (`data-slot="screen-shell"`, the div this `className` lands
-           on) a plain block with `min-h-full`, and its child, the SCREEN
-           level (`data-slot="screen-shell-card"`), ALSO a plain block reading
-           `min-h-full` off IT. Two percentages in a row look harmless; they
-           are not the same shape. This PAGE div's own height already comes
-           from `flex-1` above (a real, resolved height — confirmed by
-           measuring it directly), but a flex item's MAIN-AXIS flex-grow size
-           only counts as a "specified" height for ITS OWN children's
-           percentages when the flex CONTAINER it grew inside (this app's
-           root, `min-h-[100svh]` — a floor, never a `height`) itself had one,
-           which a `min-height` floor never supplies. So the SCREEN level's
-           own `min-h-full` silently resolved to nothing: measured on a real
-           page, `[data-slot=screen-shell-card]` stayed 464px tall on a
-           2000px-tall viewport — its own CONTENT's height, not the page's.
-           Everything measured BELOW that level (the rail, the body pane, and
-           every one of this file's own `flex-1` links further down) was
-           packed into that same too-short 464px box the whole time; the rail
-           reading "full height" in review only ever meant "as tall as
-           whatever this page's own content happened to be", which is the
-           exact bug this whole change exists to fix, one level up.
-           `flex flex-col` turns the PAGE div into a flex COLUMN for its own
-           sake — SCREEN is its only real child — so the rule below can give
-           SCREEN a real `flex-1` (main-axis growth, not a percentage) instead
-           of leaning on the one that does not resolve. From there down
-           nothing else moves: `content-column`, one level inside SCREEN, is
-           stretched onto SCREEN's OWN rendered cross size by SCREEN's row
-           layout — a flex item's CROSS-axis stretch is unconditionally real,
-           the one part of this whole chain that never depended on a
-           container having a "specified" height — which is the exact
-           mechanic that was already correctly carrying `screen-shell.tsx`'s
-           `min-h-full` from `content-column` down to `BODY` down to this
-           file's own div at `AppShell`'s content wrapper, measured working
-           before this line changed anything. */
-        className="min-h-0 flex-1 flex flex-col [&_[data-slot=screen-shell-card]]:flex-1 [&_[data-slot=screen-shell-card]]:min-h-0"
+        /* THE ONE CLASS THIS SHELL STILL NEEDS: room for the mobile bar.
+           `ScreenShell`'s page level is `h-dvh` + `overflow-hidden` since kit
+           v1.2.28, and `box-sizing: border-box` means this padding comes OUT
+           of that window rather than adding to it — the ground still paints
+           the full viewport (a background paints the padding box) and still
+           runs flush to every edge, which is the client's own spine
+           screenshot; what the padding insets is the card, so the card clears
+           the `fixed` bar above it. Zero at `md`, where there is no bar.
+
+           EVERY OTHER CLASS THIS LINE USED TO CARRY IS GONE, AND THE KIT
+           RESOLVED THEM RATHER THAN THIS FILE DROPPING THEM. It read
+           `min-h-0 flex-1 flex flex-col
+           [&_[data-slot=screen-shell-card]]:flex-1
+           [&_[data-slot=screen-shell-card]]:min-h-0` — a hand-built height
+           chain, measured into place on 2026-08-31, whose whole job was to
+           give the SCREEN level a real height when the PAGE level was a
+           `min-h-full` block inside a `min-h-[100svh]` flex column and no
+           percentage in the chain resolved. The reshape makes all of that
+           unnecessary at the source: PAGE is a `h-dvh` box with a REAL
+           height, SCREEN reads `h-full` off it, and every level below is
+           `flex-1 min-h-0` inside the kit's own file. Keeping the override
+           would be a second opinion about a height the kit now states.
+
+           ONE OVERRIDE ARRIVES AS THE OTHERS LEAVE, AND IT IS A SCROLL FIX
+           RATHER THAN A SPACING OPINION — MEASURED IN A BROWSER, NOT REASONED.
+           `position: sticky` resolves its offsets against the SCROLLPORT'S
+           PADDING BOX, and the kit's body pane is `p-[var(--space-6)]
+           lg:p-[var(--space-7)]`. So every sticky bar this app draws inside
+           the pane — the record tab strip (`STICKY_TABS`, record-chrome.tsx)
+           and the collection tab strip
+           (`shared/web/screen-engine/tabs-view.tsx`) — pins 32px BELOW
+           the pane's own top edge, while the pane CLIPS at that edge. The band
+           between the two is inside the scroller, so content scrolls THROUGH
+           it: measured at 1440x900, a probe row sat at y=50.5-90.5 with the
+           pinned bar's top at y=86.5 — visibly above the thing that is
+           supposed to be covering it. Under the old shape the document was the
+           scroller, `top-0` meant the viewport's own top edge, and there was
+           no band for anything to appear in.
+
+           THE PADDING MOVES DOWN ONE LEVEL RATHER THAN AWAY. `pt-0` on the
+           pane, the same value re-spent on the content div below: the inset a
+           screen sees is unchanged to the pixel (border-box, so `min-h-full`
+           still floors that div to the pane and the footer still lands on the
+           pane's floor), and a sticky child now pins at the pane's true top
+           edge with nothing able to show above it. Only the BLOCK-START edge
+           moves — the pane keeps its own inline padding, so the bleed on
+           `STICKY_TABS` still reaches exactly the edge it was measured
+           against. (That bleed belonged to `CondensedTitleBar` until it was
+           deleted on 2026-09-03; the strip inherited both the bleed and the
+           measurement, which is why this paragraph still holds.)
+
+           IT IS AN OVERRIDE HERE AND NOT A KIT EDIT for the reason the five
+           rail overrides above give: `shared/ui/` is vendored and pinned and a
+           hand-edit fails web/test/vendored-kit.test.ts. Owed upstream — "a
+           scroller's own padding must not sit between a sticky child and the
+           clip" is the kit's sentence to write, not this file's. */
+        className="pt-[var(--shell-top)] [&_[data-slot=screen-shell-body]]:pt-0"
         spine={spine}
-        rail={
-          <>
-            {railContent}
-            {railEdgeToggle}
-          </>
-        }
+        rail={railContent}
         railLabel={t("Sections")}
+        /* THE COLLAPSE, THREADED BOTH WAYS. The shell draws the edge handle
+           and holds the collapsed state; this app supplies its own rail NODE,
+           and the shell cannot reach inside a node it was handed — so the
+           value goes down (`railCollapsed`, and `collapsed` on our own
+           Rail further up) and every change comes back
+           (`onRailCollapsedChange`) to the same localStorage key the rail's
+           own toggle used to write. Without the pair the handle would draw in
+           the open position for ever while the column beside it narrowed.
+
+           THE TWO LABELS ARE THE APP'S EXISTING WORDS, NOT THE KIT'S. The kit
+           defaults to "Collapse the navbar" / "Open the navbar" — good
+           English, and English is the only language a kit default is ever
+           said in (R28's walk stops at `shared/ui/`, so a default cannot be
+           in the catalogue). "Collapse" / "Expand" are already catalogued and
+           already translated, and they were this control's own labels before
+           the handle moved into the kit. */
+        railCollapsed={collapsed}
+        onRailCollapsedChange={persistCollapsed}
+        railCollapseLabel={t("Collapse")}
+        railExpandLabel={t("Expand")}
+        /* THE ASSISTANT'S COLUMN — the rail's mirror, and the shell's own
+           third level. Passed as an EMPTY BOX, not as the panel: the panel is
+           mounted once at the ROOT (agent-host.tsx) so it outlives the
+           navigation it causes itself, and it portals its elements into this
+           box (web/lib/agent-dock.tsx has the whole argument, and
+           web/test/agent-host.test.ts still locks the panel out of this file).
+
+           SHUT MEANS ABSENT, AND THAT IS THE CLIENT'S OWN SENTENCE ("closed
+           asstant show nothing. it's literally only the bar"). The kit does
+           it: with `asideOpen` false it renders no column at all — not a
+           zero-width box, not an icon strip — and the card takes the width
+           back. Only the 3px handle stays, in the ground's own gutter. So
+           nothing here needs a second opinion about the closed state; passing
+           the slot unconditionally is what makes the HANDLE exist, and the
+           handle is the only assistant control on a wide screen (the mango
+           launcher is not drawn there — `SHELL.md`'s one-mango rule, argued in
+           agent-host.tsx).
+
+           GATED THE SAME WAY THE LAUNCHER ALWAYS WAS. No `agent:create`, no
+           column and no handle: a bar that opens an empty panel is worse than
+           no bar. The server re-checks every action regardless.
+
+           BELOW `md` THE KIT DROPS THIS COLUMN ITSELF, and the assistant
+           becomes the floating panel again — one decision, taken by width in
+           agent-host.tsx against the kit's own 48rem, never a second copy of
+           the panel.
+
+           THE OPEN STATE IS CONTROLLED AND PERSISTED, exactly as the rail's
+           collapse is one prop above: the value goes down (`asideOpen`) and
+           every change comes back (`onAsideOpenChange`) to the module store
+           that mirrors it to `localStorage`, so the column the person left
+           open is the column they come back to.
+
+           THE LABELS ARE THE KIT'S NOUNS, in this app's catalogue. Unlike the
+           rail's "Collapse"/"Expand" — which were this app's words before the
+           handle moved into the kit — the assistant had no shorter name of its
+           own: "Open the assistant" was already the launcher's own label and
+           "Close the assistant" is new (R28: extracted, catalogued, and the
+           ceiling moved in the same commit). */
+        aside={can("agent", "create") ? <AgentDockSlot /> : undefined}
+        asideLabel={t("Assistant")}
+        asideOpen={assistantOpen}
+        onAsideOpenChange={setAgentOpen}
+        asideOpenLabel={t("Open the assistant")}
+        asideCloseLabel={t("Close the assistant")}
+        breadcrumb={
+          /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
+             stated at the kit's own `breadcrumb` prop: no buttons, no pills,
+             no counts, no status. The handover drew a `+` up here; a screen's
+             one create control belongs in the card, which is where every
+             screen in this app already draws it.
+
+             `onClickCapture` ON THE STRIP ITSELF, not on a wrapper div.
+             `BreadcrumbFolders` spreads its rest props onto its own `<nav>`,
+             so the interception rides the component and adds no element —
+             which matters here more than it did in the header band: the strip
+             pays a negative block-end margin to tuck its tabs' feet under the
+             card, and the kit's own slot deliberately declares no z-index, no
+             isolate and no transform so the tabs' z-1/z-3 can resolve either
+             side of the card's z-2. A wrapper is one more box that could open
+             a stacking context by accident.
+
+             R37: the kit renders REAL `<a href>` crumbs — middle-click and
+             copy-address still work — and the plain left click is intercepted
+             into the app's own soft-navigation bus, which is exactly the
+             inline form the law names. */
+          trail.length === 0 ? undefined : (
+            <BreadcrumbFolders
+              items={trail}
+              onClickCapture={(e) => {
+                const a = (e.target as HTMLElement).closest("a")
+                if (!a) return
+                const href = a.getAttribute("href")
+                if (!href || !href.startsWith("/")) return
+                e.preventDefault()
+                ;(onNavigate ?? softNavigate)(href)
+              }}
+            />
+          )
+        }
+        /* HOW DEEP THE TRAIL IS, BECAUSE THE SHELL WILL NOT LOOK. `breadcrumb`
+           is an opaque node to the kit and it refuses to inspect one, so the
+           length of the same array is stated here: one level is a top-level
+           location and takes the door's own big title, two or more steps it
+           down a rung. A screen with no trail at all is a top-level screen,
+           which is the kit's own default and what `|| 1` says out loud. */
+        breadcrumbDepth={trail.length || 1}
         header={
-          /* Breadcrumbs — URL-derived, collapsing on small screens (library
-           * primitive). The host owns the router, so links route through
-           * onNavigate. The running timer sits on the same row on desktop
-           * (the mobile bar has its own copy above): one line present on
-           * every screen, showing nothing when nobody is timing anything. */
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              {breadcrumbs && breadcrumbs.length > 0 && (
-                /* The kit's Breadcrumbs renders real <a href> links; the shell
-                   intercepts the click so navigation stays soft (client-side)
-                   the way the old component's onNavigate did. */
-                <div
-                  onClickCapture={(e) => {
-                    const a = (e.target as HTMLElement).closest("a")
-                    if (!a) return
-                    const href = a.getAttribute("href")
-                    if (!href || !href.startsWith("/")) return
-                    e.preventDefault()
-                    ;(onNavigate ?? softNavigate)(href)
-                  }}
-                >
-                  <Breadcrumbs items={breadcrumbs} />
-                </div>
-              )}
+          /* THE HEADER BAND HOLDS THE RUNNING TIMER, AND ONLY WHEN ONE IS
+           * RUNNING. The breadcrumbs used to share this row; they are on the
+           * ground now (above), and the timer cannot follow them there —
+           * "navigation text only" is the client's rule for that strip and a
+           * clock with a Stop button on it is a control. So it stays in the
+           * band, inside the card, which is where the kit says a screen's
+           * controls go.
+           *
+           * IT IS CONDITIONAL BECAUSE THE BAND COSTS REAL SPACE. `TimerBar`
+           * renders nothing when nothing is running, which is most of the
+           * time — but the band it sits in is the SHELL's element and carries
+           * the shell's own header padding whether or not anything is inside
+           * it, so an unconditional `header` would put ~90px of empty band
+           * above every screen in the app. `useRunningTimers` is the same
+           * cached read `TimerBar` itself makes (one key, one in-flight
+           * request, `loadShared`), asked one level up so the row can be
+           * decided rather than drawn empty.
+           *
+           * BUILD-1 §5 — "a running timer appears in the header of EVERY
+           * screen" — is unaffected: the timer is still in the shell, on
+           * every screen, and still shows nothing when nobody is timing
+           * anything. The mobile bar keeps its own copy above. */
+          !teamId || runningTimers.length === 0 ? undefined : (
+            <div className="hidden justify-end md:flex">
+              <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />
             </div>
-            <div className="hidden shrink-0 md:flex">
-              {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
-            </div>
-          </div>
+          )
         }
       >
         {/* `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
             they are not: CSS says an element with `overflow-x: hidden` and a
             visible other axis computes `overflow-y` to `auto`, which makes this
-            a SCROLL CONTAINER. A `position: sticky` child then sticks to a box
-            that never scrolls, so it silently does nothing, which is exactly
-            what happened to the record header and tab strip (D3) the first time
-            they were built. `clip` clips the same overflow and creates no scroll
-            container, so the document stays the scroller and sticky works.
+            a SCROLL CONTAINER — and a `position: sticky` child then pins to a
+            box that never scrolls, so it silently does nothing, which is
+            exactly what happened to the record header and tab strip (D3) the
+            first time they were built. `clip` clips the same overflow and
+            creates no scroll container.
+         *
+         * THE BOX IT MUST NOT BECOME IS NO LONGER THE DOCUMENT, AND THE RULE
+         * IS UNCHANGED BY THAT. Since kit v1.2.28 the one scroller behind
+         * every screen is `ScreenShell`'s body pane
+         * (`[data-slot="screen-shell-body"]`), the direct parent of this div;
+         * the page itself is `h-dvh overflow-hidden` and does not move. So the
+         * sticky layers this div wraps — the record tab strip (`STICKY_TABS`,
+         * record-chrome.tsx) and the collection tab strip
+         * (`shared/web/screen-engine/tabs-view.tsx`) — now pin to the pane
+         * instead of to the window, which is what they always read as. Turning
+         * THIS div into a scroll container would put a second scroller between
+         * them and the pane and break both the same way; `clip` is still what
+         * stops that.
+         *
+         * THERE WERE THREE OF THEM UNTIL 2026-09-03. The condensed title bar
+         * was the first, and it is gone — client: "when i scroll down, the
+         * whole compressed title is useless, so remove that. When I scroll
+         * down, what is at the top should be only the tabs." Its measured
+         * offset mechanism went with it: both strips pin at `top-0` now
+         * because there is nothing above them to clear.
          *
          * ONE PAGE CONTAINER, ONE CAP, ON THE SHELL (R29, UI-RULEBOOK L1). This
          * used to live one level down, in `deep-link-screen.tsx`'s own return —
@@ -1282,21 +1414,32 @@ export function AppShell({
          * them even wider!" — answered with a guessed fluid cap,
          * `min(96vw,2200px)`. Round three, the one that actually fixed it:
          * "wider screens, align to the right same level as breadcrumbs!" — a
-         * real target, not a bigger guess. The breadcrumb ROW above (this
-         * same `header` prop) sets no width of its own — `ScreenShell`'s
-         * header band is `min-w-0` and nothing else (kit
-         * compositions/templates/screen-shell.tsx), so it already runs to the
-         * full padded edge of the body column, same padding as this content
-         * div's own parent (`DENSITY_HEADER`/`DENSITY_BODY` converge at `lg`).
-         * `max-w-none` is what makes this div's right edge land on that same
-         * edge — no guessed number, fluid or fixed, does that on every rail
-         * state (expanded/collapsed) and every viewport the way matching the
-         * header's own lack of a cap does. `mx-auto`/`w-full` stay on the line
-         * for R29's own positional signature (`one-page-width`,
-         * web/test/rules.test.ts) even though centring has nothing left to
-         * do once there is no cap to centre inside of. `PAGE_WIDTH_OWNER` in
-         * shared/rules/registry.ts carries the same string — R29 checks it
-         * verbatim.
+         * real target, not a bigger guess. `ScreenShell`'s header band is
+         * `min-w-0` plus its own density padding and sets no width, so it
+         * already runs to the full padded edge of the card, the same padding
+         * as this content div's own parent (`DENSITY_HEADER`/`DENSITY_BODY`
+         * converge at `lg`). `max-w-none` is what makes this div's right edge
+         * land on that same edge — no guessed number, fluid or fixed, does
+         * that on every rail state (expanded/collapsed) and every viewport
+         * the way matching the band's own lack of a cap does.
+         *
+         * THE CAP IS STILL THIS FILE'S, AND THE SHELL DID NOT TAKE IT.
+         * Re-examined on 2026-09-02, because the reshape gave the kit a
+         * floating CARD and that is the kind of thing that quietly becomes a
+         * second page container: `screen-shell.tsx`'s card is `flex-1` inside
+         * the ground's gutter and names no `max-w-*` anywhere, so it is a
+         * fluid column and not a measure. There is still exactly one page
+         * width in this door and it is still declared here — the same string
+         * `PAGE_WIDTH_OWNER` carries in shared/rules/registry.ts, which R29
+         * checks verbatim, and there is no `SCREEN_WIDTH_EXEMPT` pin this
+         * change makes stale. `mx-auto`/`w-full` stay on the line for R29's
+         * own positional signature (`one-page-width`, web/test/rules.test.ts)
+         * even though centring has nothing left to do once there is no cap to
+         * centre inside of. What DID change is the reference: the crumbs the
+         * client asked this edge to line up with are on the GROUND now,
+         * outside the card, so the two no longer share an edge and cannot be
+         * made to — the card's own padded edge is what a screen aligns to,
+         * which is the same edge this line has been landing on all along.
          *
          * `flex flex-col min-h-full` — THE FOOTER-TO-THE-BOTTOM CHAIN STARTS
          * HERE, 2026-08-31. Client, verbatim: "i want that the footer is
@@ -1318,11 +1461,19 @@ export function AppShell({
          * `RecordScreen` (the one caller this reaches that draws a footer at
          * all — every other screen this div wraps just ends up with a
          * flex column one item taller than its content, which is invisible).
-         * The document stays the ONE scroller throughout (this file's own
-         * `overflow-x-clip` note above); nothing here creates a nested
-         * scroll box, so a long record's footer still scrolls away
-         * ordinarily, past the end of its own content. */}
-        <div className="mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pb-24 md:pb-0">{children}</div>
+         * THE PANE IS THE ONE SCROLLER THROUGHOUT, and since 2026-09-02 that
+         * is a real height rather than an inferred one: `BODY` is `flex-1
+         * min-h-0 overflow-y-auto` inside a card inside a `h-dvh` page, so
+         * `min-h-full` here floors this div to a number the browser knows
+         * outright — the whole hand-built height chain this file used to
+         * carry on `ScreenShell`'s own `className` is deleted with it.
+         * Nothing here creates a nested scroll box, so a long record's footer
+         * still scrolls away ordinarily, past the end of its own content.
+         *
+         * `pb-24 md:pb-0` IS STILL THE PHONE'S BOTTOM BAR, and it still has
+         * to be paid inside the scroller: that bar is `fixed` and overlays
+         * the pane's last rows whether or not the page behind it moves. */}
+        <div className="mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pt-[var(--space-6)] lg:pt-[var(--space-7)] pb-24 md:pb-0">{children}</div>
       </ScreenShell>
 
       {/* Mobile bottom tabs — five slots, gated items hidden, and when there
@@ -1371,7 +1522,7 @@ export function AppShell({
                 : "text-muted-foreground"
             }`}
           >
-            <MoreHorizontal className="size-5 shrink-0" />
+            <DotsThree className="size-5 shrink-0" />
             <span className="w-full text-center leading-tight">{t("More")}</span>
           </button>
         )}

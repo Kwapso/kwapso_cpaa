@@ -53,7 +53,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Link2, Paperclip, Trash2 } from "@shared/ui/foundations/icons"
+import { LinkSimple, Paperclip, Trash } from "@shared/ui/foundations/icons"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { brand } from "@shared/brand"
 import type { HelpAttachment } from "@shared/types"
@@ -184,7 +185,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
         <ul className="divide-y rounded-[var(--radius)] bg-surface-panel">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
-            const Glyph = a.kind === "file" ? Paperclip : Link2
+            const Glyph = a.kind === "file" ? fileTypeIcon(a.label) : LinkSimple
             // The row is `items-start` rather than centred: its column now
             // carries a picture, and centring would hang the glyph and the
             // remove button halfway down the preview.
@@ -241,7 +242,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
                   disabled={!!busy}
                   onClick={() => setRemoving(a)}
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash className="size-3.5" />
                 </Button>
               </li>
             )
@@ -280,7 +281,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           disabled={!!busy}
           onClick={() => setAdding(true)}
         >
-          <Link2 className="size-3.5" />
+          <LinkSimple className="size-3.5" />
           {t("Add a link")}
         </Button>
       </div>
@@ -314,7 +315,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
                 if (removing) void remove(removing)
               }}
             >
-              {busy === "remove" ? <Spinner /> : <Trash2 className="size-3.5" />}
+              {busy === "remove" ? <Spinner /> : <Trash className="size-3.5" />}
               {t("Take it off")}
             </AlertDialogAction>
           </AlertDialogFooter>

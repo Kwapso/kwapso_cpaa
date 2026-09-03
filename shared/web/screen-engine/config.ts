@@ -1,5 +1,5 @@
 // =============================================================================
-// Swift Struck UI configuration system — the shared vocabulary every component's
+// Kwapso UI configuration system — the shared vocabulary every component's
 // `config` is built from. See ARCHITECTURE.md "Configuration" + "Taxonomy".
 //
 // Model: a universal BaseConfig (visibility) sits under every component, then a

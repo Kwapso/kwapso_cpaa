@@ -1,4 +1,4 @@
-// reset-all — wipe Brimba back to a clean slate, per environment.
+// reset-all — wipe the Kwapso System back to a clean slate, per environment.
 //
 //   node scripts/reset-all.mjs staging
 //   node scripts/reset-all.mjs production

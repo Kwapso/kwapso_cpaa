@@ -18,7 +18,7 @@ export const metadata = appMetadata
 export const viewport = appViewport
 
 // Root layout: theme, ambient background, and toasts all come straight from
-// the Swift Struck UI library. Every kwapso screen renders inside this shell.
+// the Kwapso UI library. Every kwapso screen renders inside this shell.
 export default function RootLayout({
   children,
 }: {

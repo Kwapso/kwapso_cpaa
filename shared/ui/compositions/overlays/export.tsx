@@ -111,7 +111,7 @@ import {
   ToggleGroupItem,
 } from "../../components/toggle-group/toggle-group";
 import { Hint } from "../../components/typography/typography";
-import { Download } from "../../foundations/icons";
+import { DownloadSimple } from "../../foundations/icons";
 
 /** Which door. The portal has no internal notes and no Excel. */
 export type ExportDoor = "system" | "portal";
@@ -520,7 +520,7 @@ function ExportScreen({
       {/* THE ONE MANGO, AND IT CARRIES THE NUMBER — and p36's download
           glyph, at both widths. */}
       <Button onClick={onExport}>
-        <Download aria-hidden="true" />
+        <DownloadSimple aria-hidden="true" />
         {hasRoom ? formatCommit(count) : formatCommitNarrow(count)}
       </Button>
     </React.Fragment>

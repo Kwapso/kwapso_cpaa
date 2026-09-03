@@ -1,4 +1,4 @@
-# Brimba. Architecture (the 20 locked decisions)
+# The Kwapso System. Architecture (the 20 locked decisions)
 
 The gateway is also the app's public address: it serves the web screens as
 static assets AND routes /api/* to the domain workers (service bindings), so
@@ -9,7 +9,7 @@ Decided with the user on 2026-06-12 across 20 targeted questions. This is the
 **master decision document**, every worker, table, and screen must follow it.
 Do not relitigate any "LOCKED" item without the user.
 
-> Brimba is a real product meant to run at scale immediately. Never call it a
+> The Kwapso System is a real product meant to run at scale immediately. Never call it a
 > "v1" or "MVP". Reference data model: the user's Glide "Base v3" exports
 > (users, teams, team members, member roles, learning, help + help threads,
 > invite logs, email change logs, all activity, selectable data + types,
@@ -315,15 +315,15 @@ on top follows [CACHING.md](CACHING.md).
 - Sign-in: a 6-digit email code (Resend sends ALL email) **or Google**, two ways to prove ONE
   identity, never two accounts. All user data lives in OUR database; no auth vendor holds anything.
   - **Google was parked on 2026-06-12** and its `users.google_sub` column dropped (`db/core/0003`).
-    That was a **Brimba** scope decision ("strict email-OTP only") for the generic base, not a
+    That was **the Kwapso System's** scope decision ("strict email-OTP only") for the generic base, not a
     security finding. kwapso's SCOPE re-decides it: ch.03 names `kwapso-auth` as "OTP + Google
     sign-in", ch.06 says "email one-time code … or Google — same person as long as the email
     matches", and SCOPE wins where it speaks. Rebuilt 2026-08-11 **without** re-adding `google_sub`:
     the verified email IS the identity, so both doors go through the one seam
     (`findOrCreateUserByEmail`) and a person who used a code yesterday and Google today is one row.
     `db/core/0003` is NOT reverted and carries a comment pointing here, so a reader who finds the
-    June migration can follow the trail forward instead of concluding Google is off. **The Brimba
-    base upstream may still be email-only** — kwapso is the fork that turned it back on, and a
+    June migration can follow the trail forward instead of concluding Google is off. **The generic
+    Kwapso System base upstream may still be email-only** — kwapso is the fork that turned it back on, and a
     future fork of the base inherits whatever the base says, not this decision.
   - The flow is the OAuth **authorization-code** flow with PKCE (`GET /api/auth/google/start` →
     Google → `GET /api/auth/google/callback`), not the Identity-Services button: that button POSTs
@@ -431,7 +431,7 @@ on top follows [CACHING.md](CACHING.md).
 - **UI comes ONLY from the component library, and the library is a PINNED
   dependency vendored IN this repo (CHANGED 2026-08-22; updated 26 Aug 2026: the
   kit became a pinned dependency on 25 Aug).** It is `shared/ui/`, imported as
-  `@shared/ui/…` — `github.com/Kwapso/design` at the tag in
+  `@shared/ui/…` — `github.com/Kwapso/kwapso-ui-ux` at the tag in
   `shared/ui/VERSION.json`, pulled by `scripts/sync-design.mjs`.
   Until 2026-08-22 it was the npm package `@kwapso/ui`, installed from a separate
   repository the owner deployed, and this line read "gaps go INTO the library
@@ -445,7 +445,7 @@ on top follows [CACHING.md](CACHING.md).
   used to be a written request to another repo on somebody else's release schedule
   (UI-GAPS.md is that list, and it still names the open ones); for three days it
   was work this repo could do in the same commit; and since 25 Aug a kit change is
-  made upstream in `Kwapso/design`, tagged, and pulled — a hand-edit under
+  made upstream in `Kwapso/kwapso-ui-ux`, tagged, and pulled — a hand-edit under
   `shared/ui/` turns the build red (`web/test/vendored-kit.test.ts` recomputes the
   content hash). See `shared/ui/README.md` for the rationale in full.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
@@ -544,7 +544,7 @@ subscription, which needs the activity feed to listen for something narrower tha
 shards rather than to all of them — was built in August 2026 (`TeamInterest`; fact
 updated 26 Aug 2026), so it is already working before either alarm has fired.
 
-**THIS IS ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** Brimba is reusable and the audit
+**THIS IS ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** The Kwapso System is reusable and the audit
 scored it against a base's yardstick. A fork whose one tenant is a company rather than
 an agency meets the arithmetic in that table for real. See
 [BASE-MANUAL.md](BASE-MANUAL.md) §5. A fork's first architectural question is whether

@@ -22,7 +22,7 @@ import {
 } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
-import { Download, Upload, Plus } from "@shared/ui/foundations/icons"
+import { Download, UploadSimple, Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
 import { WavesScreen } from "@/components/waves-screen"
@@ -436,6 +436,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           // moving the action buttons up did not touch it.
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
+          // R50 — the resting read's own row count, across BOTH tabs: a team
+          // with companies but no individuals yet is not a genuinely empty
+          // Accounts collection, only an empty Contacts one (its own screen).
+          restingEmpty={loaded.length === 0}
           fixed={accountTab === "all" ? undefined : { type: "entity" }}
           // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
           // beside every other paged collection's. A `status` facet stood here
@@ -488,7 +492,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   onClick={() => go(`/t/${teamId}/import/accounts`)}
                   className="gap-1"
                 >
-                  <Upload className="size-4" />
+                  <UploadSimple className="size-4" />
                   {t("Import CSV")}
                 </Button>
               )}
@@ -501,10 +505,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             </>
           )}
           // THE ONE CARD — toolbar, then rows, exactly the reference's
-          // [panel: toolbar, body]. `attached`: zero gap to the tabs above
-          // (this file's `tabs` slot, not the outer column's `gap-4`), the
-          // same join `SectionWithCreate`'s own `folderTabs` slot draws.
-          wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+          // [panel: toolbar, body]. Zero gap to the tabs above (this file's
+          // `tabs` slot, not the outer column's `gap-4`), the same join
+          // `SectionWithCreate`'s own `folderTabs` slot draws.
+          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
             const rows = found.active ? found.rows : loaded
@@ -630,6 +634,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <PagedFind<KnowledgeSource>
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
+          // R50 — the resting read's own row count.
+          restingEmpty={loadedSources.length === 0}
           listKey={knowledgeKey(teamId as string)}
           placeholder={t("Search")}
           matches={{

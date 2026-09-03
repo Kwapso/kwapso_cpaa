@@ -84,7 +84,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../select/select";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock } from "../../foundations/icons";
+import {
+  Calendar,
+  CaretLeft,
+  CaretRight,
+  Clock,
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    Date arithmetic — local, not exported. Plain `Date`, no library: the
@@ -633,7 +638,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
 
     const showsCalendar = mode !== "time";
     const showsClock = mode !== "date";
-    const TriggerGlyph = mode === "time" ? Clock : CalendarDays;
+    const TriggerGlyph = mode === "time" ? Clock : Calendar;
     const panelName =
       panelLabel ??
       (mode === "time"
@@ -779,7 +784,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
               >
                 {/* Mirrored, not swapped: the same glyph turns so "previous"
                     keeps pointing backwards in reading order. */}
-                <ChevronLeft size={16} aria-hidden="true" className="rtl:rotate-180" />
+                <CaretLeft size={16} aria-hidden="true" className="rtl:rotate-180" />
               </button>
 
               <div
@@ -801,7 +806,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                   "transition-colors duration-[var(--duration-colour)] ease-kwapso",
                 )}
               >
-                <ChevronRight size={16} aria-hidden="true" className="rtl:rotate-180" />
+                <CaretRight size={16} aria-hidden="true" className="rtl:rotate-180" />
               </button>
             </div>
             ) : null}

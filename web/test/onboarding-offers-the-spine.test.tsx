@@ -127,6 +127,14 @@ describe("the ruling's first half — mango is what an unset spine means", () =>
     // …and an unrecognised value still costs a rail, never a screen.
     expect(toSpine("not-a-spine")).toBe("mango")
   })
+
+  it("costs a retired 'quiet' row its rail, never its screen", () => {
+    // `quiet` was legal for exactly one day (v1.2.28-v1.2.29, 2026-09-02 to
+    // 2026-09-03) and is not a spine any more — no migration resurrects it,
+    // it falls through to the ordinary catch-all like any other unrecognised
+    // value (shared/spine.ts). A row still holding it is not a broken row.
+    expect(toSpine("quiet")).toBe("mango")
+  })
 })
 
 describe("the ruling's second half — the choice is on the onboarding screen", () => {
@@ -135,9 +143,9 @@ describe("the ruling's second half — the choice is on the onboarding screen", 
     await screen.findByLabelText(/first name/i)
 
     expect(spineCards()).toHaveLength(3)
-    expect(checkedOf("Mango")).toBe("true")
     expect(checkedOf("Ink")).toBe("false")
     expect(checkedOf("Paper")).toBe("false")
+    expect(checkedOf("Mango")).toBe("true")
   })
 
   it("opens on the spine this person already has, not on the default", async () => {
@@ -146,6 +154,14 @@ describe("the ruling's second half — the choice is on the onboarding screen", 
     await screen.findByLabelText(/first name/i)
 
     expect(checkedOf("Ink")).toBe("true")
+  })
+
+  it("opens on mango when the stored value is the retired 'quiet'", async () => {
+    me.mockResolvedValue({ user: { ...fresh, spine: "quiet" } })
+    render(<OnboardingPage />)
+    await screen.findByLabelText(/first name/i)
+
+    expect(checkedOf("Mango")).toBe("true")
   })
 })
 
@@ -186,7 +202,7 @@ describe("what the submit posts", () => {
   it("saves the spine BEFORE the photo upload and the invite acceptance", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
-    fireEvent.click(card("Paper"))
+    fireEvent.click(card("Ink"))
     await fillAndSubmit()
 
     await waitFor(() => expect(bootstrap).toHaveBeenCalled())

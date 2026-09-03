@@ -428,52 +428,52 @@ export const TEAM_SECTIONS: TeamSection[] = [
  * page, section-tab and button level so "members" always looks the same wherever
  * it appears. Add a concept here, not a one-off icon at a call site. */
 export const CONCEPT_ICON = {
-  home: "home",
-  settings: "settings",
+  home: "house",
+  settings: "gear",
   // The agency itself — a building would be the team, so this is the badge on
   // the door: who we are, said once.
-  kwapso: "badge-check",
+  kwapso: "seal-check",
   team: "building",
-  overview: "layout-dashboard",
+  overview: "squares-four",
   members: "users",
-  roles: "shield-half",
-  invites: "mail",
-  dropdowns: "list",
+  roles: "shield-check",
+  invites: "envelope",
+  dropdowns: "list-bullets",
   // The money, both halves. ONE icon, because a rate is a rate wherever it is
   // read — the audiences differ, the concept does not (UI-CONVENTIONS §4: a
   // concept gets one icon, reused at page, tab and button level).
-  "internal-rates": "banknote",
+  "internal-rates": "money",
   // The customer spine's own vocabulary: an account, the people on it, and a login.
-  accounts: "building-2",
-  contacts: "contact",
-  portal: "key-round",
-  knowledge: "library-big",
-  tickets: "life-buoy",
+  accounts: "buildings",
+  contacts: "address-book",
+  portal: "key",
+  knowledge: "hard-drives",
+  tickets: "tray",
   // The map and the numbers drilled through it: a process is a route someone
   // follows, a step is one stop on it, a version is a point in its history, and
   // impact is the time it gives back.
-  processes: "route",
-  steps: "list-checks",
+  processes: "git-fork",
+  steps: "git-commit",
   versions: "git-branch",
   impact: "piggy-bank",
-  comments: "message-square",
+  comments: "chat-teardrop",
   // The work engine: a story is a piece of work in hand, a sprint is the block
   // it was sold inside, an app is the system it runs on, a task is our own
   // admin, a to-do is what we are waiting on a client for, and a timer is the
   // clock running on any of it.
-  stories: "hammer",
-  sprints: "calendar-range",
+  stories: "puzzle-piece",
+  sprints: "calendar-dots",
   // The package a client bought — several sprints arriving together.
-  waves: "layers",
+  waves: "waves",
   apps: "app-window",
   // WHAT WE HAND OVER on a system: the parcel, because that is what a
   // deliverable is — the thing that leaves our hands and arrives in theirs.
   deliverables: "package",
-  tasks: "list-todo",
+  tasks: "check-square",
   // A meeting is two people and an hour — the icon says the hour, because that
   // is what distinguishes it from every other list in the rail.
-  meetings: "calendar-clock",
-  todos: "inbox",
+  meetings: "chat",
+  todos: "clipboard-text",
   // TIME — the section, the story tab and the running clock in the header are
   // ONE concept wearing one icon (UI-CONVENTIONS §4), which is why this is `time`
   // and not `timer`: the key has to match the section key the rail looks it up
@@ -485,21 +485,21 @@ export const CONCEPT_ICON = {
   // reason this map exists: the day triage grows a second surface, the two would
   // otherwise pick two icons for one idea. A funnel, because that is what triage
   // does to a queue.
-  triage: "list-filter",
+  triage: "funnel",
   // DASHBOARD — a collection's own summary view, charts rather than rows
   // (Tickets' own tab strip, following Triage's precedent above: a line here
   // rather than an icon chosen at the tab, so a second collection that grows
   // a Dashboard tab reaches for this instead of picking a second icon for one
-  // idea). Distinct from `overview`'s "layout-dashboard" — that one is a
+  // idea). Distinct from `overview`'s "squares-four" — that one is a
   // RECORD's own summary tab; this is a chart.
-  dashboard: "layout-dashboard",
-  import: "upload",
-  activity: "history",
+  dashboard: "chart-donut",
+  import: "upload-simple",
+  activity: "clock-counter-clockwise",
   // The agency's own housekeeping: the material we make our own work with, why
   // we meet, and who our people are.
   brand: "palette",
-  purposes: "calendar-check",
-  staff: "id-card",
+  purposes: "crosshair",
+  staff: "identification-badge",
 } as const
 
 

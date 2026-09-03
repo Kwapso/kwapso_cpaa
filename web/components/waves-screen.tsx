@@ -39,7 +39,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power, ArrowCounterClockwise } from "@shared/ui/foundations/icons"
 import { Gantt, GanttPeriodStepper, type GanttBar, type GanttLane } from "@shared/ui/components/gantt/gantt"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
@@ -53,7 +53,8 @@ import {
   waveQueryIsActive,
   type WaveQuery,
 } from "@/components/wave-finder"
-import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { InAppLink } from "@/components/in-app-link"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -330,12 +331,18 @@ export function WaveCollection({
         }
       />
     )
-  if (wavesQ.data === undefined) return <Skeleton variant="list" lines={4} />
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): this unmounted the card, the
+  // `WaveFinder` toolbar and "Sell a wave" along with the rows. Fixed the same
+  // way every sibling screen was: keep the chrome drawn and swap only the
+  // rows region below.
+  const wavesLoading = wavesQ.data === undefined
 
   // ON A CLIENT'S RECORD the list is narrowed before anything else is asked, so
   // the count under the search box and the empty state both speak about that
   // client rather than about the team.
-  const all = accountId ? wavesQ.data.filter((w) => w.accountId === accountId) : wavesQ.data
+  const loadedWaves = wavesQ.data ?? []
+  const all = accountId ? loadedWaves.filter((w) => w.accountId === accountId) : loadedWaves
   const rows = selectWaves(all, query)
   const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
@@ -384,43 +391,46 @@ export function WaveCollection({
           like Roles and Processes), so the toolbar is the first thing inside
           the card. */}
       <CollectionCard>
-        {all.length > 0 ? (
-          // Only once there is something to look through — a search box over
-          // an empty collection is a control that cannot do anything, so the
-          // button falls back to a bare `<ToolbarRow>` below instead.
-          <div className="mb-4">
-            <WaveFinder
-              query={query}
-              onChange={setQuery}
-              clients={clients}
-              showClientFilter={!accountId}
-              resultCount={rows.length}
-              view={view}
-              onViewChange={(v) => {
-                setView(v)
-                // A fresh view starts at the most recent window — carrying
-                // the old offset forward would land on a period the reader
-                // never chose from this collection.
-                setTimelineOffset(0)
-              }}
-              period={timelineStepper}
-              actions={
-                canCreate && clients.length > 0 && (
-                  <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
-                )
-              }
-            />
-          </div>
-        ) : (
-          canCreate &&
-          clients.length > 0 && (
-            <ToolbarRow
-              className="mb-4"
-              actions={<AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />}
-            />
-          )
+        {/* R50 — never toolbar on an empty collection. `all.length === 0` used
+            to fall back to a BARE `<ToolbarRow>` carrying only "Sell a wave" —
+            exactly the lone-"+"-pill shape the client's Time screenshot
+            named, reasoned in a comment ("the button falls back to...
+            instead") that read as an intentional design rather than the bug
+            it was. A genuinely empty Waves screen now draws no toolbar at
+            all, below — `CollectionEmptyState` carries "Add the first"
+            alone.
+            `wavesLoading ||` — the same fold every sibling screen's own
+            `empty` gate carries now (2026-09-03 audit): `all` defaults to
+            `[]` before the read resolves, which reads exactly like a
+            genuinely empty collection unless the loading state says
+            otherwise, so this keeps the toolbar drawn through the load. */}
+        {(wavesLoading || all.length > 0) && (
+          <WaveFinder
+            query={query}
+            onChange={setQuery}
+            clients={clients}
+            showClientFilter={!accountId}
+            resultCount={rows.length}
+            view={view}
+            onViewChange={(v) => {
+              setView(v)
+              // A fresh view starts at the most recent window — carrying
+              // the old offset forward would land on a period the reader
+              // never chose from this collection.
+              setTimelineOffset(0)
+            }}
+            period={timelineStepper}
+            actions={
+              canCreate && clients.length > 0 && (
+                <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
+              )
+            }
+          />
         )}
-        {view === "timeline" && timeline ? (
+        {wavesLoading ? (
+          // ROWS ONLY — the toolbar above is already real.
+          <Skeleton variant="list" lines={4} />
+        ) : view === "timeline" && timeline ? (
           // ONE LANE PER ACCOUNT, one bar per wave, months across the top —
           // waveTimelineWindow's own header says why lanes are accounts and
           // periods are months rather than weeks. `Gantt` draws its own
@@ -440,11 +450,23 @@ export function WaveCollection({
             }
           />
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-sm">
-            {asking
-              ? t("No waves match that.")
-              : t("No waves yet. A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.")}
-          </p>
+          asking ? (
+            <p className="text-muted-foreground py-4 text-sm">{t("No waves match that.")}</p>
+          ) : (
+            // GENUINELY EMPTY — R50's own carve-out (composition 27.21): the
+            // toolbar above is gone, so this is the only "Sell a wave" left
+            // on screen. `clients.length > 0` is the same real-world gate the
+            // toolbar's own button carried (a wave needs a client to sell it
+            // to) — offering a button that would open a dialog with nowhere
+            // to point would be worse than none.
+            <CollectionEmptyState
+              title={t("No waves yet.")}
+              description={t(
+                "A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards."
+              )}
+              onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
+            />
+          )
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (
@@ -472,7 +494,7 @@ export function WaveCollection({
                     reveal. */}
                 {canEdit ? (
                   <Button variant="ghost" size="icon" onClick={() => setEditing(w)} aria-label={t("Edit")}>
-                    <Pencil className="size-3.5" />
+                    <PencilSimple className="size-3.5" />
                   </Button>
                 ) : null}
                 {canEdit && w.active ? (
@@ -498,7 +520,7 @@ export function WaveCollection({
                       )
                     }
                   >
-                    <RotateCcw className="size-3.5" aria-hidden />
+                    <ArrowCounterClockwise className="size-3.5" aria-hidden />
                     <span className="sr-only sm:not-sr-only">{t("Bring back")}</span>
                   </Button>
                 ) : null}

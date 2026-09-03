@@ -27,7 +27,7 @@ import {
 } from "@shared/ui/components/avatar/avatar"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Building2, CalendarClock, ChevronRight, Hammer, LifeBuoy, ListTodo, Settings, Timer, Users } from "@shared/ui/foundations/icons"
+import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, CheckSquare, Gear, Timer, Users } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 
 import { PulseBand } from "@/components/pulse"
@@ -52,17 +52,17 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
   // thing wherever somebody meets it. A line for a page the caller cannot open
   // is not drawn: a link to a 403 is worse than no link.
   const LINKS = [
-    { need: "help", title: t("Tickets"), desc: t("What clients have asked us for"), icon: LifeBuoy, href: "/tickets" },
-    { need: "work", title: t("Stories"), desc: t("The work in hand"), icon: Hammer, href: "/stories" },
-    { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: ListTodo, href: "/tasks" },
+    { need: "help", title: t("Tickets"), desc: t("What clients have asked us for"), icon: Tray, href: "/tickets" },
+    { need: "work", title: t("Stories"), desc: t("The work in hand"), icon: PuzzlePiece, href: "/stories" },
+    { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: CheckSquare, href: "/tasks" },
     { need: "work", title: t("Work logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
-    { need: "meetings", title: t("Meetings"), desc: t("The meetings list"), icon: CalendarClock, href: "/meetings" },
-    { need: "accounts", title: t("Accounts"), desc: t("The companies and contacts we work with"), icon: Building2, href: "/accounts" },
+    { need: "meetings", title: t("Meetings"), desc: t("The meetings list"), icon: Chat, href: "/meetings" },
+    { need: "accounts", title: t("Accounts"), desc: t("The companies and contacts we work with"), icon: Briefcase, href: "/accounts" },
   ].filter((l) => can(l.need, "read"))
 
   const ADMIN = [
     { title: t("Team"), desc: t("Members, roles and invites"), icon: Users, href: ctx.team ? `/t/${ctx.team.id}` : "/settings" },
-    { title: t("Settings"), desc: t("Your account and teams"), icon: Settings, href: "/settings" },
+    { title: t("Settings"), desc: t("Your account and teams"), icon: Gear, href: "/settings" },
   ]
 
   return (
@@ -106,7 +106,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
             ),
             title: l.title,
             subtitle: l.desc,
-            trailing: <ChevronRight className="text-muted-foreground size-4" />,
+            trailing: <CaretRight className="text-muted-foreground size-4" />,
           }
         })}
       />

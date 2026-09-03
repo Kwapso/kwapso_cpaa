@@ -1,6 +1,6 @@
 "use client"
 
-// The profile menu — your name/email, links to your profile, Settings and
+// The profile menu — your name/email, links to your profile, Gear and
 // Kwapso (the agency itself), appearance, and sign out. Extracted from the
 // app shell so each stays small. Menu opacity is handled by the library
 // dropdown now (UI-GAPS row 5).
@@ -28,7 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
-import { BadgeCheck, LogOut, Palette, Settings, UserRound } from "@shared/ui/foundations/icons"
+import { SealCheck, SignOut, Palette, Gear, User } from "@shared/ui/foundations/icons"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
@@ -115,16 +115,16 @@ export function ProfileMenu({
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* YOUR OWN PAGE, not Settings. Your name, your email address, the
+        {/* YOUR OWN PAGE, not Gear. Your name, your email address, the
             language you read kwapso in and what you have done are about a
-            PERSON; Settings is about the app. They were one screen until 17 Aug
+            PERSON; Gear is about the app. They were one screen until 17 Aug
             2026, and a tester looking for "change my name" had to guess. */}
         <DropdownMenuItem onSelect={() => softNavigate("/profile")} className="gap-2">
-          <UserRound className="size-4" />
+          <User className="size-4" />
           {t("Your profile")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => softNavigate("/settings")} className="gap-2">
-          <Settings className="size-4" />
+          <Gear className="size-4" />
           {t("Settings")}
         </DropdownMenuItem>
         {/* THE AGENCY ITSELF — a rail SECTION for part of one day (client, 31
@@ -133,10 +133,10 @@ export function ProfileMenu({
             your profile and settings," the same day. One entry, not three —
             `KwapsoScreen`'s own tab strip (Details · The team · Brand
             library) is how the section's other two rows stay reachable
-            without a second and third row here, the same shape `Settings`
+            without a second and third row here, the same shape `Gear`
             above already has for its own page. */}
         <DropdownMenuItem onSelect={() => softNavigate("/kwapso")} className="gap-2">
-          <BadgeCheck className="size-4" />
+          <SealCheck className="size-4" />
           {t("Kwapso")}
         </DropdownMenuItem>
         {/* LIGHT / DARK / SYSTEM, HERE RATHER THAN IN THE RAIL.
@@ -172,7 +172,7 @@ export function ProfileMenu({
           }
           className="gap-2"
         >
-          <LogOut className="size-4" />
+          <SignOut className="size-4" />
           {t("Sign out")}
         </DropdownMenuItem>
       </DropdownMenuContent>

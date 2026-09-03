@@ -53,6 +53,79 @@ import { reportError } from "@shared/web/log"
 let nextId = 0
 const newId = () => `m${++nextId}`
 
+/* ────────────────────────────────────────────────────────────────────────
+   THE LIVE CHAT STATE, HOISTED TO MODULE LEVEL.
+
+   THE BUG: AgentHost (web/components/agent-host.tsx) renders EITHER the
+   docked column OR a floating `Popover`, chosen by `useShellColumns()` (a
+   48rem media query) — two structurally different subtrees at the same
+   return, so React UNMOUNTS AgentPanel (and this hook with it) the instant a
+   window crosses that width, or a tablet rotates through it (many sit
+   exactly at 768px in portrait). Every field below used to be a plain
+   `React.useState` owned by that one component instance, so crossing the
+   width silently destroyed the transcript, the thread, staged attachments
+   and a confirm the assistant was mid-way through waiting on — with nobody
+   told; the panel just came back empty.
+
+   THE FIX matches the precedent already in this codebase for exactly this
+   failure mode — `web/lib/agent-open.ts` (the open flag) and
+   `web/lib/agent-dock.tsx` (the dock node) both live outside the React tree
+   so a remount can't lose them. `makeCell` below is that same shape
+   (a module-level value + a subscriber Set + `useSyncExternalStore`),
+   factored once because this hook owns eight such fields where those two
+   files each own one — writing it out eight times would be the copy that
+   drifts, not the fix.
+
+   NO KEY, ON PURPOSE — matching both files above: the app shows one team's
+   assistant at a time (the ACTIVE team), so one shared cell per field is the
+   same "one flag, one node" shape they already use, not a Map this hook has
+   no reason to keep in sync with anything.
+
+   SIGN-OUT NEEDS NO EXPLICIT CLEARING, for the same reason those two files
+   don't have any: leaving the app (the /login boundary) is a genuine,
+   full-page reload — "entering or leaving the app is the one real
+   navigation" (EDGE-CASES.md §1) — which throws away this whole JS heap,
+   this module included. A transcript cannot survive a sign-out because
+   nothing module-level here does; the one thing that WOULD leak it is a
+   soft, in-SPA route change, and /login sits outside the one client-resolved
+   shell that soft-navigation covers. */
+function makeCell<T>(initial: T) {
+  let value = initial
+  const subs = new Set<() => void>()
+  function set(next: T | ((prev: T) => T)): void {
+    const resolved = typeof next === "function" ? (next as (prev: T) => T)(value) : next
+    if (Object.is(resolved, value)) return
+    value = resolved
+    for (const fn of subs) fn()
+  }
+  function useValue(): T {
+    return React.useSyncExternalStore(
+      (cb) => {
+        subs.add(cb)
+        return () => subs.delete(cb)
+      },
+      () => value,
+      () => initial
+    )
+  }
+  return { set, useValue }
+}
+
+const itemsCell = makeCell<AgentChatItem[]>([])
+const threadIdCell = makeCell<string | undefined>(undefined)
+const attachedCell = makeCell<{ name: string; csv: string }[]>([])
+const sourcesCell = makeCell<string[]>([...SOURCE_CHIP_KEYS])
+const busyCell = makeCell(false)
+const quotaCell = makeCell<AgentQuota | null>(null)
+const pendingCell = makeCell<{ calls: PendingCall[]; text: string } | null>(null)
+const failureCell = makeCell<ModelFailure | null>(null)
+/** A TURN HAS BEGUN. Module-level rather than a per-instance ref, for the same
+ * reason as the cells above: an in-flight resume that started BEFORE a
+ * remount must still see the flag it set AFTER the remount, or the exact
+ * stale-resume race `handed-in-question.test.tsx` locks reopens the moment
+ * this hook's own component gets torn down and rebuilt mid-turn. */
+let started = false
+
 // We remember the last thread per team so reopening the panel resumes it (instead of
 // minting a fresh thread each time). localStorage is per-device and best-effort —
 // every access is guarded so a locked-down browser never breaks the panel.
@@ -147,11 +220,19 @@ export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
 
 export function useAgentChat(teamId: string | null, open: boolean, canUse: boolean) {
   const t = useT()
-  const [items, setItems] = React.useState<AgentChatItem[]>([])
-  const [threadId, setThreadId] = React.useState<string | undefined>(undefined)
+  // Every field below reads/writes the module-level cells above, NOT a local
+  // `React.useState` — see the block comment there for why: it is what lets
+  // the transcript, the thread, staged attachments and a pending confirm
+  // survive AgentHost swapping this hook's own component out from under it
+  // when the docked/floating breakpoint crosses.
+  const items = itemsCell.useValue()
+  const setItems = itemsCell.set
+  const threadId = threadIdCell.useValue()
+  const setThreadId = threadIdCell.set
   // CSV files staged for the NEXT message (the chat import): picked or dropped,
   // sent with the message, planned server-side, run via the normal confirm panel.
-  const [attached, setAttached] = React.useState<{ name: string; csv: string }[]>([])
+  const attached = attachedCell.useValue()
+  const setAttached = attachedCell.set
   // WHICH DOORS THIS CONVERSATION READS FROM — the source chips.
   //
   // ALL ON is the state a person who has never touched them is in, and the wire
@@ -160,7 +241,8 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // per message: a person narrows to find out where an answer came from, and a
   // scope that reset after one question would answer the next one from
   // everywhere again without saying so.
-  const [sources, setSources] = React.useState<string[]>(() => [...SOURCE_CHIP_KEYS])
+  const sources = sourcesCell.useValue()
+  const setSources = sourcesCell.set
   const toggleSource = React.useCallback((key: string) => {
     setSources((prev) => {
       const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
@@ -170,21 +252,24 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
       // on stays on, and the control simply does not move.
       return next.length ? next : prev
     })
-  }, [])
-  const [busy, setBusy] = React.useState(false)
-  const [quota, setQuota] = React.useState<AgentQuota | null>(null)
+    // `setSources` is `sourcesCell.set` — a fixed module-level function, stable
+    // across every render exactly like `useState`'s own setter, so listing it
+    // here cannot make this callback identity change.
+  }, [setSources])
+  const busy = busyCell.useValue()
+  const setBusy = busyCell.set
+  const quota = quotaCell.useValue()
+  const setQuota = quotaCell.set
   // A paused turn awaiting the user's go-ahead — the proposed actions + the text.
-  const [pending, setPending] = React.useState<{ calls: PendingCall[]; text: string } | null>(null)
+  const pending = pendingCell.useValue()
+  const setPending = pendingCell.set
   // WHY THE LAST TURN COULDN'T ANSWER, when the model door was the reason. Held
   // beside the transcript rather than inside it: the bubble is what the assistant
   // SAID, and this is a fact about the app, which is a different thing and gets
   // its own quiet notice. Cleared the moment the next question is asked — a
   // warning about a limit that has since cleared is its own small lie.
-  const [failure, setFailure] = React.useState<ModelFailure | null>(null)
-  /** A TURN HAS BEGUN IN THIS PANEL. A ref, not state, because the thing that
-   * has to read it is an async continuation that started before the turn did —
-   * see the resume effect below. */
-  const started = React.useRef(false)
+  const failure = failureCell.useValue()
+  const setFailure = failureCell.set
 
   // A QUESTION HANDED IN FROM A SCREEN (web/lib/agent-open.ts): the knowledge
   // base's ask box, and the same box on an account's or an app's knowledge tab.
@@ -254,7 +339,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
             //
             // A stale async write has to re-ask its own question at the moment
             // it lands. `alive` covered unmounting and nothing else.
-            if (!alive || started.current) return
+            if (!alive || started) return
             setItems(toChatItems(r.messages))
             setThreadId(id)
             // Remember it on THIS device so the next open resumes instantly.
@@ -490,7 +575,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     if (busy) return
     // Before anything is appended: from here on, a resume that was already in
     // flight must leave this panel alone.
-    started.current = true
+    started = true
     const assistantId = newId()
     const files = attached.length ? attached : undefined
     // Same attachment note the server saves, so the optimistic bubble matches history.
@@ -574,7 +659,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     if (busy) return
     // A deliberate reset is allowed to clear the flag — the person asked for an
     // empty panel, so a resume landing afterwards has nothing to trample.
-    started.current = false
+    started = false
     setItems([])
     setThreadId(undefined)
     setPending(null)

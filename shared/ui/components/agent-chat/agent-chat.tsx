@@ -93,7 +93,12 @@ import { Button } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import { Textarea } from "../textarea/textarea";
 import { CollectionRegister } from "../collection-frame/collection-frame";
-import { CircleStop, Paperclip, Send, Sparkles } from "../../foundations/icons";
+import {
+  StopCircle,
+  Paperclip,
+  PaperPlaneRight,
+  Sparkle,
+} from "../../foundations/icons";
 
 const turnVariants = cva(
   [
@@ -363,7 +368,7 @@ function AssistantMark() {
         "bg-surface-brand text-ink-on-accent",
       )}
     >
-      <Sparkles className="size-3" />
+      <Sparkle className="size-3" />
     </span>
   );
 }
@@ -1092,19 +1097,28 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                 onClick={onStop}
                 aria-label={stopLabel}
               >
-                <CircleStop aria-hidden="true" />
+                <StopCircle aria-hidden="true" />
               </Button>
             ) : (
               <Button
                 type="button"
-                variant="inverse"
+                // MANGO, IN EVERY STATE — client ruling, 2026-09-03: "the
+                // send button to the assistant, make it mango in all modes
+                // and variations." `variant="default"` is this kit's one
+                // mango fill (R32), and `Button`'s own state machine already
+                // keeps a variant's fill through `loading` (a spinner over
+                // the same fill) and `disabled` (the one state that dims it,
+                // deliberately, on every variant) -- so the single prop
+                // change carries every mode this control has, nothing further
+                // to wire.
+                variant="default"
                 size="sm"
                 disabled={disabled}
                 loading={streaming}
                 onClick={send}
                 aria-label={sendLabel}
               >
-                <Send aria-hidden="true" />
+                <PaperPlaneRight aria-hidden="true" />
               </Button>
             )}
           </div>

@@ -40,7 +40,7 @@ changed nothing anybody could see; stages 5–13 changed the look.
 ## Stage by stage
 
 ### 1 · Vendor the code
-Swift Struck UI copied out of `node_modules/@kwapso/ui` into `shared/ui/`, folder
+Kwapso UI copied out of `node_modules/@kwapso/ui` into `shared/ui/`, folder
 shape and relative imports untouched, so a diff against upstream stays readable
 and the copy could not acquire a rewriting mistake. Its 33 dependencies moved to
 the ROOT `package.json` at the exact pinned versions, because `shared/` is a
@@ -89,7 +89,7 @@ cost** and no amount of care during the copy could have prevented it.
 
 Twenty comments and fifteen docs said the library was "a separate repo this one
 never edits". Replaced rather than deleted: upstream is a live dependency of
-other Swift Struck products and is never edited, PR'd or synced back from here.
+other Kwapso products and is never edited, PR'd or synced back from here.
 
 ### 4 · The laws that named the library
 Mostly already true, and checking that was the point. R2 and R3 stand on

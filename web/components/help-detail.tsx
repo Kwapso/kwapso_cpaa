@@ -20,7 +20,7 @@ import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
 type TicketMember = { id: string; name: string }
-import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "@shared/ui/foundations/icons"
+import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import type {
   HelpMessage,
@@ -506,7 +506,7 @@ export function HelpDetailScreen({
       {
         value: "conversation",
         label: t("Conversation"),
-        icon: "messages-square",
+        icon: "chat-teardrop-dots",
         badge: formatCount(threadTotal),
         badgeVariant: "" as const,
       },
@@ -514,7 +514,7 @@ export function HelpDetailScreen({
       {
         value: "activity",
         label: t("Activity"),
-        icon: "history",
+        icon: "clock-counter-clockwise",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
@@ -589,7 +589,7 @@ export function HelpDetailScreen({
           {
             key: "translate",
             label: translating ? t("Translating…") : t("Set an English title"),
-            icon: <Languages className="size-3.5" />,
+            icon: <Translate className="size-3.5" />,
             disabled: translating,
             onSelect: () => void translate(),
           },
@@ -600,7 +600,7 @@ export function HelpDetailScreen({
           {
             key: "edit",
             label: t("Edit"),
-            icon: <Pencil className="size-3.5" />,
+            icon: <PencilSimple className="size-3.5" />,
             onSelect: () => setEditing(true),
           },
         ]
@@ -614,7 +614,7 @@ export function HelpDetailScreen({
             ? {
                 key: "unarchive",
                 label: t("Take it back out"),
-                icon: <ArchiveRestore className="size-3.5" />,
+                icon: <TrayArrowUp className="size-3.5" />,
                 disabled: statusBusy,
                 onSelect: () => void restoreTicket(),
               }
@@ -649,7 +649,7 @@ export function HelpDetailScreen({
           }
           className="shrink-0 gap-1"
         >
-          <CheckCheck className="size-3.5" />
+          <Checks className="size-3.5" />
           {t("They've confirmed it")}
         </Button>
       )}
@@ -659,7 +659,7 @@ export function HelpDetailScreen({
           because the door refuses without them (5.6). */}
       {canEdit && ticket.status === "ready" && (
         <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
-          <Send className="size-3.5" />
+          <PaperPlaneTilt className="size-3.5" />
           {t("Answer and close")}
         </Button>
       )}
@@ -681,9 +681,12 @@ export function HelpDetailScreen({
       // The glyph the team set beside this ticket type on the Dropdown values
       // screen, in the square the header band keeps for it (G3).
       mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `ticket`), client ruling 2026-08-31.
-      eyebrow={t("Ticket")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4: THE NUMBER THE CLIENT QUOTES, above the title. The reference had
       // existed on this record since the work engine landed and appeared on no
       // screen — the one thing a person needs when a client rings up saying

@@ -47,7 +47,10 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { Loader2, TriangleAlert } from "../../foundations/icons";
+import {
+  CircleNotch,
+  Warning,
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    The frame. Shared drawing for every media state, so a picture that fails
@@ -155,7 +158,7 @@ export interface ImageProps
  *  7. empty          — no `src`: the quiet frame alone, holding its box. It
  *                      draws no icon, because an empty well is a resting state
  *                      and not a failure. `hideWhenEmpty` collapses it instead.
- *  8. error          — the failure register: `TriangleAlert` over `errorLabel`
+ *  8. error          — the failure register: `Warning` over `errorLabel`
  *                      in secondary ink on the quiet ground, `role="img"` with
  *                      the label as its accessible name so the failure is
  *                      announced once and not read as decoration.
@@ -273,7 +276,7 @@ const Image = React.forwardRef<HTMLImageElement, ImageProps>(
                 700ms turn on the linear curve. It keeps running under reduced
                 motion on purpose: a frozen spinner is the absence of the only
                 signal that the fetch is still open. */}
-            <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+            <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
           </span>
         ) : null}
 
@@ -287,7 +290,7 @@ const Image = React.forwardRef<HTMLImageElement, ImageProps>(
               "px-4 text-center",
             )}
           >
-            <TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />
+            <Warning size={20} aria-hidden="true" className="text-ink-tertiary" />
             {/* Caption step, secondary ink — the register's body treatment. */}
             <span aria-hidden="true" className="text-caption text-ink-secondary">
               {errorLabel}

@@ -168,9 +168,10 @@ to remove it.
 ```
 foundations/   the three that everything else is built out of
   tokens/      tokens.css is the ONLY file where a colour or a size is decided
-  icons/       1,383 React exports — the Iconoir pack (MIT), drawn as strokes
-             on a 24 grid. The commission's 96 spellings are aliases onto it;
-             see foundations/icons/ATTRIBUTION.md
+  icons/       1,512 React exports — the Phosphor pack (MIT), fill weight
+             throughout except three named exceptions at regular weight
+             (Plus, Power, Prohibit). No alias table: a name here is a name
+             on phosphor.dev. See foundations/icons/ATTRIBUTION.md
   motion/      100 rules, all 16 of the commission's motion cases
 assets/fonts/ Saans and SerrifCondensed — the client's real type, shipped
               here as .woff2 (what browsers fetch) with the .otf/.ttf masters
@@ -196,8 +197,10 @@ lib/           the cn helper and use-has-room
 compositions/  the client: "everything currently compositions/xyz is
                compositions (and then sections inside of it)"
   templates/   15 — the SHAPE of a screen with nothing product-specific in
-               it. MainScreen, DetailScreen, the shell, the rail. THIS IS
-               WHAT THE KIT SHIPS INSTEAD OF ONE FILE PER COLLECTION
+               it. ScreenShell — THE screen since the 2026-09-02 collapse —
+               the rail, and the eleven that stand on them. MainScreen and
+               DetailScreen survive as deprecated adapters over the shell.
+               THIS IS WHAT THE KIT SHIPS INSTEAD OF ONE FILE PER COLLECTION
   screens/     17 — the finished pages the client named as exceptions:
                home, settings, profile, onboarding, brand, company hub, the
                external doors
@@ -233,7 +236,7 @@ from it, everything else is superseded.
 | | |
 |---|---|
 | Tokens — 276, both palettes, three scales | done |
-| Icons — 1,383 exports, six sizes | done — Iconoir (MIT) |
+| Icons — 1,512 exports, six sizes | done — Phosphor (MIT) |
 | Motion — 100 rules | done |
 | Components — 108 (controls + structures merged 2026-08-26; was 67 + 42, minus portal-conversation, deleted the same day) | done |
 | Compositions — 45: 15 templates · 17 screens · 8 overlays · 5 states | done |

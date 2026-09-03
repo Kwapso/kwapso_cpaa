@@ -22,7 +22,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { List } from "@shared/web/list-compat"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
-import { Mail } from "@shared/ui/foundations/icons"
+import { Envelope } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { EmailChangeDialog } from "@/components/email-change-dialog"
@@ -70,7 +70,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
                 id: "email",
                 leading: (
                   <div className="text-muted-foreground flex size-9 items-center justify-center">
-                    <Mail className="size-4" />
+                    <Envelope className="size-4" />
                   </div>
                 ),
                 title: user?.email,

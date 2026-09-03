@@ -363,31 +363,47 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
 // asks for a trail in the first place, not in what `buildCrumbs` hands back
 // when asked — so this reads the caller, the same way the nesting regression
 // above does.
-describe("a main screen carries no breadcrumb trail — only a detail screen does", () => {
+// OVERTURNED 2026-09-03. Everything above is kept because the reasoning is
+// still sound about the object it was reasoning about — a TEXT BAR above the
+// content, repeating in words what the title and the sidebar already said. That
+// object no longer exists. The trail is now a strip of FOLDER TABS whose last
+// tab is filled with the card's own paper and joined to it: not a sign pointing
+// at the card, but the card's own edge.
+//
+// Aurora, shown a top-level collection drawn with one tab reading "Apps" over a
+// card titled "Apps", and told in as many words that every top-level screen
+// would gain a tab it does not have today: "On a top-level collection, we would
+// only have one tab, and that's correct. There would be nothing on the left.
+// That's correct."
+//
+// So the gate is gone and every screen carries its trail. What these two tests
+// now guard is the half that did NOT change: that the caller still asks
+// `buildCrumbs` for the trail rather than hand-rolling one, which is what both
+// historical regressions actually turned on.
+describe("every screen carries its trail, and a top-level one carries a trail of one", () => {
   const shell = stripComments(
     readFileSync(join(WEB, "components", "deep-link-screen.tsx"), "utf8")
   )
 
-  it("gates the trail on an open record or a nested ancestor, never on neither", () => {
+  it("asks for the trail on every screen, with no gate in front of it", () => {
     expect(
-      /const showCrumbs\s*=\s*Boolean\(recordId\)\s*\|\|\s*trail\.length\s*>\s*1/.test(shell),
-      "deep-link-screen.tsx must compute `showCrumbs = Boolean(recordId) || " +
-        "trail.length > 1` — a record actually open, or a screen nested inside one " +
-        "an ordinary nav item cannot reach on its own. Recreating the old " +
-        "`recordId === null` check (even inverted to `!== null`) is not enough on " +
-        "its own: after the screen's early returns `recordId` is always a STRING " +
-        "(a flat collection's is `\"\"`, never `null`), so `!== null` alone would " +
-        "be true everywhere and reopen today's exact regression."
+      /const showCrumbs\s*=\s*true\b/.test(shell),
+      "deep-link-screen.tsx must compute `showCrumbs = true`. The trail is the " +
+        "card's own folder tab now, so a top-level collection carries a trail of " +
+        "one — Aurora's ruling of 2026-09-03, on a drawing of exactly that case. " +
+        "Reinstating a gate here reopens the question she closed; if it ever needs " +
+        "reopening, it is a client decision and not a refactor."
     ).toBe(true)
   })
 
-  it("only builds the trail behind that gate — never unconditionally", () => {
+  it("still asks buildCrumbs for it, rather than hand-rolling a trail", () => {
     expect(
       /const crumbs = showCrumbs\s*\n\s*\?\s*buildCrumbs\(/.test(shell),
-      "buildCrumbs is called unconditionally. A flat collection screen (no record " +
-        "open, no ancestor) will then get the same one-line trail a detail screen " +
-        "gets — the exact regression the client screenshotted on the Sprints page " +
-        "the same day the detail-screen trail was fixed."
+      "The trail must still come from `buildCrumbs`. Both historical regressions " +
+        "here were in the CALLER — whether it asked, and with what — never in what " +
+        "`buildCrumbs` returns when asked. A trail assembled inline in this file " +
+        "would be a second implementation of the labels, the ancestor resolution " +
+        "and the record names, drifting from the one the rest of the app reads."
     ).toBe(true)
   })
 

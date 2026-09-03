@@ -74,7 +74,10 @@ import { cn } from "../../lib/utils";
 import { Button } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import { CollectionRegister } from "../collection-frame/collection-frame";
-import { ChevronLeft, ChevronRight } from "../../foundations/icons";
+import {
+  CaretLeft,
+  CaretRight,
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    The day cell.
@@ -507,7 +510,7 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                   aria-label={previousLabel}
                   onClick={onPrevious}
                 >
-                  <ChevronLeft />
+                  <CaretLeft />
                 </Button>
               ) : null}
               {onNext ? (
@@ -518,7 +521,7 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                   aria-label={nextLabel}
                   onClick={onNext}
                 >
-                  <ChevronRight />
+                  <CaretRight />
                 </Button>
               ) : null}
             </div>

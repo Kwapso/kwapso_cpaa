@@ -37,7 +37,7 @@ import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { ExternalLink, PenLine, Send } from "@shared/ui/foundations/icons"
+import { ArrowSquareOut, PenNib, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, content } from "@/lib/api"
 import { safeHref } from "@shared/web/rich-text"
@@ -161,7 +161,7 @@ export function MailReplyDialog({
               onClick={() => void writeDraft()}
               className="gap-1"
             >
-              {busy === "draft" ? <Spinner /> : <PenLine className="size-4" />}
+              {busy === "draft" ? <Spinner /> : <PenNib className="size-4" />}
               {busy === "draft" ? t("Writing…") : written ? t("Write it again") : t("Save to Gmail drafts")}
             </Button>
           </div>
@@ -171,7 +171,7 @@ export function MailReplyDialog({
          different act from sending, so it keeps its own words in the footer
          above; the SUBMIT is the send, and it says Submit like every other form
          (F1). It is offered only to somebody who may send. */
-      submit={canSend ? { busy: busy === "send", disabled: !ready || busy !== null, icon: <Send className="size-4" /> } : undefined}
+      submit={canSend ? { busy: busy === "send", disabled: !ready || busy !== null, icon: <PaperPlaneTilt className="size-4" /> } : undefined}
     >
       <Field config={toField} htmlFor="mail-to" className={fieldSpacing}>
         <Input
@@ -216,7 +216,7 @@ export function MailReplyDialog({
             rel="noreferrer noopener"
             className="text-primary inline-flex shrink-0 items-center gap-1 underline-offset-2 hover:underline"
           >
-            <ExternalLink className="size-3.5" />
+            <ArrowSquareOut className="size-3.5" />
             {t("Open it in Gmail")}
           </a>
         </p>

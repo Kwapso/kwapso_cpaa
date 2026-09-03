@@ -79,7 +79,7 @@
    selection STATE plus an overlay, and `SHELL.md` gives selection its own
    treatment rather than a screen of its own. But the collection UNDER the
    overlay is an ordinary main screen: it is in the navbar, it has an eyebrow
-   with a count, folder tabs and a toolbar. So it is drawn by `MainScreen`
+   with a count, tabs and a toolbar. So it is drawn by `MainScreen`
    rather than assembled here.
 
    It used to hand `eyebrow` and `heading` straight to a bare
@@ -143,7 +143,12 @@ import {
   type DataTableColumn,
 } from "../../components/data-table/data-table";
 import { Form, FormActions } from "../../components/form/form";
-import { Check, Download, EditPencil, List } from "../../foundations/icons";
+import {
+  CheckFat,
+  DownloadSimple,
+  PencilSimple,
+  List,
+} from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "../templates";
 
@@ -579,7 +584,7 @@ function BulkEditScreen({
             waited on the icon pack, which is on main now. */}
         {onEdit === undefined ? null : (
           <Button variant="secondary" size="sm" onClick={onEdit}>
-            <EditPencil aria-hidden="true" />
+            <PencilSimple aria-hidden="true" />
             {words.edit}
           </Button>
         )}
@@ -592,7 +597,7 @@ function BulkEditScreen({
         {/* The artifact's narrow bar drops Export and keeps the other four. */}
         {onExport === undefined ? null : (
           <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={onExport}>
-            <Download aria-hidden="true" />
+            <DownloadSimple aria-hidden="true" />
             {words.exportLabel}
           </Button>
         )}
@@ -681,7 +686,7 @@ function BulkEditScreen({
     >
       {/* THE COLLECTION BEHIND THE OVERLAY, ON THE MODEL. `MainScreen` draws
           the four levels and puts the eyebrow and the title in the header
-          band; the folder tabs and the toolbar are the panel's own first rows,
+          band; the tabs and the toolbar are the panel's own first rows,
           one level down. See the header block on why this is not a bare
           `CollectionFrame`. */}
       <MainScreen
@@ -771,7 +776,7 @@ function BulkEditScreen({
             {/* THE ONE MANGO, AND IT CARRIES THE COUNT — 4 of 4. */}
             <Button onClick={onCommit}>
               {/* p36 draws the ✓ on the commit at both widths. */}
-              <Check aria-hidden="true" />
+              <CheckFat aria-hidden="true" />
               {formatCommit(count)}
             </Button>
           </FormActions>

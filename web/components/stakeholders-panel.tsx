@@ -29,9 +29,9 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 
-import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
 import { useT } from "@shared/web/language"
@@ -69,17 +69,33 @@ function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
           {mainLabel}
         </Badge>
       )}
-      <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
+      <CaretRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
     </li>
   )
 }
 
-function Group({ title, people, empty, mainLabel }: { title: string; people: Side[]; empty: string; mainLabel: string }) {
+function Group({
+  title,
+  people,
+  empty,
+  concept,
+  mainLabel,
+}: {
+  title: string
+  people: Side[]
+  empty: string
+  /** the CONCEPT_ICON key this side's people are — see `EmptyLine`'s own doc:
+   * a bare grey line here reads as a screen that FAILED rather than one with
+   * nothing on it yet, which is exactly the state a brand-new system's own
+   * record meets on both sides. */
+  concept: "members" | "contacts"
+  mainLabel: string
+}) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
       {people.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{empty}</p>
+        <EmptyLine concept={concept}>{empty}</EmptyLine>
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (
@@ -139,9 +155,10 @@ export function StakeholdersPanel({
   const shownTheirs = theirs.filter(matches)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       {ours.length + theirs.length > 1 && (
         <ToolbarRow
+          empty={ours.length + theirs.length === 0}
           search={
             <SearchInput
               value={query}
@@ -153,28 +170,36 @@ export function StakeholdersPanel({
           }
         />
       )}
-      <Group
-        title={t("Ours")}
-        people={shownOurs}
-        empty={
-          query.trim()
-            ? t("Nobody on our side matches that.")
-            : t("Nobody from our side is on this yet.")
-        }
-        // "Team lead" is the word the app already uses for this person on the
-        // form that sets them — not "main", which is the client side's word.
-        mainLabel={t("Team lead")}
-      />
-      <Group
-        title={t("Theirs")}
-        people={shownTheirs}
-        empty={
-          query.trim()
-            ? t("Nobody on the client's side matches that.")
-            : t("Nobody from the client's side is on this yet.")
-        }
-        mainLabel={t("Main")}
-      />
+      {/* Group-to-group rhythm is its own — gap-6, unrelated to R49's
+          toolbar-content-gap, which `<ToolbarRow>` above now pays itself as
+          its own trailing margin. Nested so the two numbers stay
+          independent instead of one flex-col gap spending both. */}
+      <div className="flex flex-col gap-6">
+        <Group
+          title={t("Ours")}
+          people={shownOurs}
+          empty={
+            query.trim()
+              ? t("Nobody on our side matches that.")
+              : t("Nobody from our side is on this yet.")
+          }
+          concept="members"
+          // "Team lead" is the word the app already uses for this person on the
+          // form that sets them — not "main", which is the client side's word.
+          mainLabel={t("Team lead")}
+        />
+        <Group
+          title={t("Theirs")}
+          people={shownTheirs}
+          empty={
+            query.trim()
+              ? t("Nobody on the client's side matches that.")
+              : t("Nobody from the client's side is on this yet.")
+          }
+          concept="contacts"
+          mainLabel={t("Main")}
+        />
+      </div>
     </div>
   )
 }

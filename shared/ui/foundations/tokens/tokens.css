@@ -708,14 +708,37 @@
      reading one string -- was not what was overturned; only the paper was. */
   --surface-selected: var(--surface-raised); /* a chosen row, item or card   */
 
-  /* ---- THE THREE SPINES · only the four values that FLIP with the palette.
+  /* ---- THE THREE SPINES · the six values that FLIP with the palette.
      The spine MAPPING is palette-free and lives in section 7b; these are the
-     four halves of it that the two palettes disagree about.
+     six halves of it the two palettes disagree about.
+
+     CLIENT RULING, 2026-09-03 — BACK TO THREE, VERBATIM: "you know, i
+     changed my mind. i want to go back to the 3 options (sorry)." This
+     reverses the ruling of 2026-09-02 that cut Ink and Paper to the one
+     spine Quiet; `quiet` and everything that named it are gone from this
+     file, and `ink` / `paper` are exactly what they were the day before that
+     cut (commit 08bbd28) — restored from history rather than re-derived,
+     with ONE considered change, on Paper's dark ground alone, at the dark
+     block below.
+
+     AND THE REASON SHARPENS WHAT "RIGHT" MEANS FOR INK. The client, on why
+     three: "my goal is that in light i can choose to have a 'dark'
+     background option." Ink is not a taste option sitting beside Paper — it
+     is how a workspace stays on the LIGHT theme (Appearance) while its
+     window reads dark (Background). That makes Ink's LIGHT half the case
+     that matters most, not a symmetrical twin of its dark half, and it is
+     the half this rebuild exercises hardest: under the pre-09-02 design Ink
+     only ever painted a rail; now the spine is the ground the WHOLE window
+     stands on (§7b), so every value below is load-bearing over a much larger
+     surface than it was drawn for. See §7b's own note for the full measured
+     set this ruling required.
 
      26.02, verbatim, and it states both dark hexes so neither is derived:
      "In dark mode ink becomes #1C1B18 and paper becomes #26241F; mango is
      unchanged in both palettes." Both were already brand papers in this file
-     (--kw-unlit-panel, --kw-unlit-raised).
+     (--kw-unlit-panel, --kw-unlit-raised) — and #26241F is exactly the
+     defect this reversal does not re-ship; see the dark block below for why
+     Paper's dark hex is no longer that one.
 
      --spine-ink-quiet-label is the artifact's own --invfg2 in light (override
      13 pinned that hex) and this file's own dark --muted-foreground in dark,
@@ -724,16 +747,16 @@
      spine, which is what 27.1 itself draws (a var(--card) chip on a
      var(--sheet) rail).
 
-     --spine-{paper,ink}-member-fill, ADDED 2026-09-02, ARE A FIFTH AND SIXTH
-     HALF, for the same reason the first four exist: the client's ruling on
-     the member chip's fill only bites in ONE palette. Verbatim: the chip at
-     the rail's foot is BLACK whenever the app is in dark mode (any spine) or
-     whenever the spine is mango (either palette) — and unchanged everywhere
-     else. Mango needs no split (`--kw-charcoal` is `--kw-charcoal` in both
-     palettes, same law as the rest of 7b), but paper and ink's LIGHT value is
-     today's chip — `--spine-paper-chip` / the raw `--kw-unlit-raised` a spine
-     block down — and their DARK value is the new, unconditional black. Kept
-     apart from `--spine-chip-fill` on purpose: that token also re-binds
+     --spine-{paper,ink}-member-fill are a fifth and sixth half, for the same
+     reason the first four exist: the client's ruling on the member chip's
+     fill only bites in ONE palette. Verbatim: the chip at the rail's foot is
+     BLACK whenever the app is in dark mode (any spine) or whenever the spine
+     is mango (either palette) — and unchanged everywhere else. Mango needs no
+     split (`--kw-charcoal` is `--kw-charcoal` in both palettes, same law as
+     the rest of 7b), but paper and ink's LIGHT value is today's chip —
+     `--spine-paper-chip` / the raw `--kw-unlit-raised` a spine block down —
+     and their DARK value is the unconditional black. Kept apart from
+     `--spine-chip-fill` on purpose: that token also re-binds
      `--btn-secondary-fill` / `--pill-fill` for anything else a route renders
      inside the rail column (`screen-shell.tsx`'s `RAIL_COLUMN`), and the
      client's ruling was about the member chip alone — repointing the shared
@@ -744,6 +767,63 @@
   --spine-paper-chip:      var(--kw-off-beige);
   --spine-paper-member-fill: var(--kw-off-beige);
   --spine-ink-member-fill:   var(--kw-unlit-raised);
+
+  /* RULED, 2026-09-03 — THE BREADCRUMB'S RESTING TAB COLLIDES WITH ITS OWN
+     GROUND ON TWO OF THE THREE SPINES, NOT JUST THE ONE THAT SURFACED IT.
+     The fix the client chose while the spine was still called `quiet`
+     carries straight onto PAPER-LIGHT unchanged, because it is the SAME
+     ground: quiet borrowed this exact hex from paper in the first place (the
+     retired §7b note said so in as many words — "LIGHT #F7F2EB, which is
+     today's paper spine in light"). Paper-light's ground is
+     `--kw-soft-paper` #F7F2EB, byte-identical to `--surface-panel`, which is
+     what `breadcrumb-folders.tsx`'s `--kw-crumb-rest` falls back to absent an
+     override — so the resting tab measures 1.000 against the rail again,
+     the moment Paper comes back, unless this rides along with it:
+
+         PAPER · LIGHT   rest #EDE8E1 vs ground #F7F2EB   1.094
+
+     Carried over with the hex unchanged — it is still her pick, not
+     re-derived — and with the same reasoning: `--surface-quiet` (#E2DDD4)
+     was tried and withdrawn as a different token for a different job, and
+     #EDE8E1 was the quietest of the alternatives that puts a real step
+     between the tab and the ground it was disappearing into.
+
+     RESTORING INK REOPENS A SECOND INSTANCE OF THE SAME FAULT — NEVER SEEN
+     BEFORE, BECAUSE `--spine-crumb-rest` DID NOT EXIST THE LAST TIME INK
+     SHIPPED. Ink's dark ground is `--kw-unlit-panel` #1C1B18, also
+     byte-identical to `--surface-panel` dark, so the same fallback resolves
+     to the same ground it stands on:
+
+         INK · DARK      rest #1C1B18 vs ground #1C1B18   1.000  (the fault)
+
+     No client ruling covers this exact case — it is chosen here, not asked,
+     the same way Paper's dark ground below is. `--kw-unlit-quiet` #2F2D28 is
+     the value: one rung up the same dark ladder `--surface-selected` already
+     climbs, already in the file, nothing invented. It was picked over the
+     nearer rung, `--kw-unlit-raised` #26241F, because #26241F is ALSO this
+     spine's own `--spine-chip-fill` and, in dark, `--card` — a resting tab
+     painted there would trade the ground-collision for a new one against the
+     LIVE tab, which paints `--card`. `--kw-unlit-quiet` clears both:
+
+         INK · DARK      rest #2F2D28 vs ground #1C1B18   1.252
+         INK · DARK      rest #2F2D28 vs live  #26241F    1.127
+
+     LOGGED FOR A CLIENT RULING, same as the quiet-era value was before her
+     ruling made it definite.
+
+     PAPER-DARK AND MANGO NEED NO ENTRY HERE. Paper's new dark ground (see
+     the dark block below) is no longer `--surface-panel`'s own value, so the
+     fallback no longer collides with it — measured 1.252 against the
+     fallback, the same figure as ink's fix above by coincidence of sharing a
+     rung, not by design. Mango was always clear of this fault in both
+     palettes (1.306 light, 11.843 dark) and stays clear, untouched.
+
+     Bound per spine, per palette, as `--spine-crumb-rest` two blocks down;
+     `breadcrumb-folders.tsx` reads it with a `var(…, var(--surface-panel))`
+     fallback, so a spine this file has not named for it (or a stale stored
+     one) still gets the surface's own resting fill rather than nothing. */
+  --spine-paper-crumb-rest: #EDE8E1;
+  --spine-ink-crumb-rest:   var(--kw-unlit-quiet);
 
   --ink-primary:     var(--foreground);
   --ink-tertiary:    var(--muted-foreground);
@@ -1339,19 +1419,51 @@
        context. */
     --surface-selected:     var(--surface-raised);
 
-    /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
-       mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
-       in both palettes." Both spines are DARK grounds in dark, so the ink
-       spine's quiet label stops being --invfg2 (which flips dark) and becomes
-       this palette's own quiet ink; and the paper spine's chip moves one rung
-       on, to the paper the file already keeps after #26241F. */
+    /* THE THREE SPINES, dark — restored 2026-09-03, with Paper's ground
+       moved. 26.02 stated two dark fills — "In dark mode ink becomes
+       #1C1B18 and paper becomes #26241F" — and this reversal restores both
+       names but not both hexes: Ink keeps 26.02's own #1C1B18 unchanged;
+       Paper does not keep #26241F, because #26241F is `--card` in dark
+       (§4's `--surface-raised`), and a card floating on a rail painted the
+       same hex measures 1.000 against it — no edge at all. That is the
+       defect the 2026-09-02 cut existed partly to close, and reverting the
+       cut cannot re-open it.
+
+       MEASURED, THE CANDIDATE THE CUT'S OWN NOTE POINTS AT FIRST:
+       `--kw-unlit-panel` #1C1B18, because it is what Ink already uses here
+       and costs no new hex.
+           PAPER · DARK (panel)  ground #1C1B18  card #26241F  1.111  fixes it
+       But #1C1B18 is Ink's OWN dark ground, so this "fix" makes Paper and
+       Ink BYTE-IDENTICAL in dark — not close, equal:
+           INK · DARK vs PAPER · DARK (panel)                  1.000  same spine
+       Shipping that trades one collision for another: two spines a client
+       chose apart would render as one. REJECTED on the measurement, not on
+       taste.
+
+       CHOSEN INSTEAD: `--kw-unlit-quiet` #2F2D28 — one rung further out on
+       the same ladder, already in the file (it is `--surface-selected`'s own
+       dark value, §4), so nothing is invented here either.
+           PAPER · DARK (quiet)  ground #2F2D28  card #26241F  1.127  fixes it
+           INK · DARK vs PAPER · DARK (quiet)                  1.252  two spines
+       This is a CHOSEN value, not a client ruling — she has not been shown
+       this exact pair. Written down so she can overrule it.
+
+       THE CHIP MOVES WITH IT. `--spine-paper-chip` (dark) was `--kw-unlit-
+       quiet` #2F2D28 when the ground was #26241F, one rung further out; now
+       the ground IS #2F2D28, so the chip takes the next rung again or it
+       would paint the exact colour of the rail it sits on. `--kw-unlit-
+       secondary` #3A3833 — also already in the file — keeps the same kind
+       of step: 1.175 against the new ground, close to the 1.127 the old
+       ground/chip pair measured.
+
+       THE MEMBER CHIP DOES NOT MOVE. Client ruling, unchanged by any of
+       this: the chip at the rail's foot is BLACK in dark mode regardless of
+       spine, and mango needs no dark half (see §7b) — so only Ink and Paper
+       state it, and both still do. */
     --spine-ink-fill:        var(--kw-unlit-panel);
     --spine-ink-quiet-label: var(--muted-foreground);
-    --spine-paper-fill:      var(--kw-unlit-raised);
-    --spine-paper-chip:      var(--kw-unlit-quiet);
-    /* The member chip's own fill, dark. Client ruling, 2026-09-02: the chip is
-       BLACK in dark mode regardless of spine. Mango needs no dark half (see
-       §7b) — only these two. */
+    --spine-paper-fill:      var(--kw-unlit-quiet);
+    --spine-paper-chip:      var(--kw-unlit-secondary);
     --spine-paper-member-fill: var(--kw-charcoal);
     --spine-ink-member-fill:   var(--kw-charcoal);
     --hair-strong:          rgba(255, 254, 249, .24);
@@ -1461,19 +1573,51 @@
      context. */
   --surface-selected:     var(--surface-raised);
 
-  /* THE THREE SPINES, dark. 26.02 states the two fills outright: "In dark
-     mode ink becomes #1C1B18 and paper becomes #26241F; mango is unchanged
-     in both palettes." Both spines are DARK grounds in dark, so the ink
-     spine's quiet label stops being --invfg2 (which flips dark) and becomes
-     this palette's own quiet ink; and the paper spine's chip moves one rung
-     on, to the paper the file already keeps after #26241F. */
+  /* THE THREE SPINES, dark — restored 2026-09-03, with Paper's ground
+     moved. 26.02 stated two dark fills — "In dark mode ink becomes
+     #1C1B18 and paper becomes #26241F" — and this reversal restores both
+     names but not both hexes: Ink keeps 26.02's own #1C1B18 unchanged;
+     Paper does not keep #26241F, because #26241F is `--card` in dark
+     (§4's `--surface-raised`), and a card floating on a rail painted the
+     same hex measures 1.000 against it — no edge at all. That is the
+     defect the 2026-09-02 cut existed partly to close, and reverting the
+     cut cannot re-open it.
+
+     MEASURED, THE CANDIDATE THE CUT'S OWN NOTE POINTS AT FIRST:
+     `--kw-unlit-panel` #1C1B18, because it is what Ink already uses here
+     and costs no new hex.
+         PAPER · DARK (panel)  ground #1C1B18  card #26241F  1.111  fixes it
+     But #1C1B18 is Ink's OWN dark ground, so this "fix" makes Paper and
+     Ink BYTE-IDENTICAL in dark — not close, equal:
+         INK · DARK vs PAPER · DARK (panel)                  1.000  same spine
+     Shipping that trades one collision for another: two spines a client
+     chose apart would render as one. REJECTED on the measurement, not on
+     taste.
+
+     CHOSEN INSTEAD: `--kw-unlit-quiet` #2F2D28 — one rung further out on
+     the same ladder, already in the file (it is `--surface-selected`'s own
+     dark value, §4), so nothing is invented here either.
+         PAPER · DARK (quiet)  ground #2F2D28  card #26241F  1.127  fixes it
+         INK · DARK vs PAPER · DARK (quiet)                  1.252  two spines
+     This is a CHOSEN value, not a client ruling — she has not been shown
+     this exact pair. Written down so she can overrule it.
+
+     THE CHIP MOVES WITH IT. `--spine-paper-chip` (dark) was `--kw-unlit-
+     quiet` #2F2D28 when the ground was #26241F, one rung further out; now
+     the ground IS #2F2D28, so the chip takes the next rung again or it
+     would paint the exact colour of the rail it sits on. `--kw-unlit-
+     secondary` #3A3833 — also already in the file — keeps the same kind
+     of step: 1.175 against the new ground, close to the 1.127 the old
+     ground/chip pair measured.
+
+     THE MEMBER CHIP DOES NOT MOVE. Client ruling, unchanged by any of
+     this: the chip at the rail's foot is BLACK in dark mode regardless of
+     spine, and mango needs no dark half (see §7b) — so only Ink and Paper
+     state it, and both still do. */
   --spine-ink-fill:        var(--kw-unlit-panel);
   --spine-ink-quiet-label: var(--muted-foreground);
-  --spine-paper-fill:      var(--kw-unlit-raised);
-  --spine-paper-chip:      var(--kw-unlit-quiet);
-  /* The member chip's own fill, dark. Client ruling, 2026-09-02: the chip is
-     BLACK in dark mode regardless of spine. Mango needs no dark half (see
-     §7b) — only these two. */
+  --spine-paper-fill:      var(--kw-unlit-quiet);
+  --spine-paper-chip:      var(--kw-unlit-secondary);
   --spine-paper-member-fill: var(--kw-charcoal);
   --spine-ink-member-fill:   var(--kw-charcoal);
   --hair-strong:          rgba(255, 254, 249, .24);
@@ -1502,13 +1646,61 @@
    literals" and "the rail's fills must be tokens, not literals, so a switch
    re-paints without touching markup."
 
-   CLIENT RULING D3, 2026-08-24, verbatim: "d3 offer teh threee! but on mango
-   backgorund always baclk text!" So all three ship, as a per-member setting,
-   and A MANGO GROUND CARRIES CHARCOAL TYPE, ALWAYS.
+   CLIENT RULING, 2026-09-03 — BACK TO THREE, VERBATIM: "you know, i changed
+   my mind. i want to go back to the 3 options (sorry)." This reverses the
+   2026-09-02 ruling that cut `ink` and `paper` to the one spine `quiet`;
+   `quiet` and the block that named it are gone, and `ink` / `paper` return
+   to ruling D3 of 2026-08-24 ("d3 offer teh threee! but on mango backgorund
+   always baclk text!"), which offered three and is fully back in force. D3's
+   second half was never touched by the cut and needed no restoring: A MANGO
+   GROUND CARRIES CHARCOAL TYPE, ALWAYS. The mango block below is still
+   byte-for-byte the block D3 produced.
 
-   `ScreenShell` stamps `data-spine` on the screen root; `paper` is the value
-   on bare `:root` so a rail rendered outside a shell still paints. Nothing in
-   `rail.tsx` names a colour: it reads these eight names and only these.
+   THE REASON IS NOT NOSTALGIA FOR A SPINE. The client, on why: "my goal is
+   that in light i can choose to have a 'dark' background option." Appearance
+   (Settings) decides whether the app is light or dark; Background decides
+   the colour behind everything; Ink is what lets those two disagree — a
+   light-themed workspace with a dark window. That makes INK'S LIGHT HALF the
+   case that has to hold, not a symmetrical twin of its dark half: under D3,
+   ink only ever painted a rail; today the spine is the ground the WHOLE
+   window stands on (see the reshape note above this section), so every
+   value below now carries a much bigger surface than it was drawn for.
+   MEASURED, because "carries" has to mean something:
+
+       INK    · LIGHT  ground #1A1918  card #FFFEF9        contrast 17.386
+       INK    · DARK   ground #1C1B18  card #26241F         contrast  1.111
+       PAPER  · LIGHT  ground #F7F2EB  card #FFFEF9         contrast  1.103
+       PAPER  · DARK   ground #2F2D28  card #26241F         contrast  1.127
+       MANGO  · LIGHT  ground #FED069  card #FFFEF9         contrast  1.440
+       MANGO  · DARK   ground #FED069  card #26241F         contrast 10.661
+
+   Ink-light is the strongest edge of the six by a wide margin — the card
+   reads as a card with no help from the shadow. The other five, ink-dark
+   included, are the thin case `--shadow-lifted` exists to carry (screen-
+   shell.tsx's own note); that was already true of quiet and mango before
+   this ruling and is unchanged by it, PAPER-DARK now among them instead of
+   at the 1.000 collision it used to be.
+
+   EVERYTHING OUTSIDE THE CARD ON INK-LIGHT ALSO HOLDS, MEASURED RATHER THAN
+   ASSUMED, because a rail's worth of values is now a window's worth:
+   `--spine-ink` (labels, the mark, the edge handle) is off-beige on this
+   ground at 17.386, matching its dark half at 17.056; the active row's mango
+   fill measures 12.072 against the ground and its charcoal label 12.072
+   against the fill; the quiet label (`--spine-ink-quiet-label`) measures
+   11.531 in light against 8.807 in dark, both comfortably over AA. The one
+   pair that reads thin in BOTH palettes is `--spine-chip-fill` /
+   `--spine-ink-member-fill`, both the literal `--kw-unlit-raised` #26241F
+   regardless of palette: 1.132 against the light ground, 1.111 against the
+   dark one. That is not new — it is 26.02's own chip colour for this spine,
+   unchanged since before any of this quarter's spine rulings — and it reads
+   the same on a full window as it did on a rail. LOGGED FOR A CLIENT RULING,
+   not fixed here: nothing about restoring three spines requires touching a
+   value the two-spine cut never touched either.
+
+   `ScreenShell` stamps `data-spine` on the screen root. BARE `:root` GOES
+   BACK TO CARRYING PAPER — see the note above that block below for why the
+   direction reverses again. Nothing in `rail.tsx` names a colour: it reads
+   these thirteen names and only these.
 
    WHERE EVERY VALUE COMES FROM — 26.02's own three spine specimens:
      ink    column `var(--inv)` #1A1918 · active row `#FED069` with `#1A1918`
@@ -1543,6 +1735,19 @@
        blocked row and a quiet one rest at the same ink.
    ========================================================================= */
 
+/* WHY BARE `:root` CARRIES PAPER, NOW THAT `paper` IS A SPINE AGAIN. Back to
+   the reason D3 always had — `paper` is first among the three, and a rail
+   rendered outside a shell has to paint something — plus the one the quiet
+   interlude added and which still holds with the names swapped back:
+
+     · IT IS THE SAFE LANDING FOR A STALE VALUE. An account whose stored
+       spine is still `"quiet"` — from the 2026-09-02 build, or a demo or
+       harness still passing it — matches no block below, so it inherits
+       `:root` and paints PAPER rather than nothing. There is no transitional
+       alias anywhere in this file, and no token is left defined for a spine
+       that no longer exists: the cascade does the whole job, same as it did
+       for a stale `"ink"` or `"paper"` during the interlude it is now
+       undoing. */
 :root,
 [data-spine="paper"] {
   --spine-fill:        var(--spine-paper-fill);
@@ -1595,6 +1800,61 @@
   --spine-hair:        var(--hair-inverse);
 }
 
+/* THE BREADCRUMB'S RESTING TAB, TWO OF THREE SPINES, ONE PALETTE EACH —
+   NEITHER RULE ADDED TO THE COMBINED SELECTOR ABOVE. That selector's other
+   properties are fallback defaults, fine to also land on bare `:root`; this
+   property is not — a value bound to `:root` would inherit onto every OTHER
+   spine's own element too, unless that spine overrides it, and mango does
+   not. So both rules below match their own `[data-spine="…"]` alone, and
+   nothing outside the spine named ever sees either value before the
+   fallback in `breadcrumb-folders.tsx` is consulted. (Caught by
+   `verify/tab-joint/` during the quiet interlude: writing this on the
+   combined selector first made mango's own resting crumb read the override
+   too, inherited straight off `:root`.)
+
+   See §4's own comment beside `--spine-paper-crumb-rest` and
+   `--spine-ink-crumb-rest` for the fault each closes, the values and the
+   measurements. Paper needs LIGHT ONLY — its dark ground no longer equals
+   the fallback — and Ink needs DARK ONLY — its light ground (charcoal) was
+   never close to the fallback (off-white) in the first place.
+
+   PAPER'S RULE IS UNCONDITIONAL, THOUGH, SO IT NEEDS ITS OWN DARK REVERSION —
+   caught here by measuring, not by reasoning: the first version of this
+   shipped `[data-spine="paper"] { --spine-crumb-rest: var(--spine-paper-
+   crumb-rest); }` with no dark half, and #EDE8E1 — a LIGHT hex — leaked into
+   dark, measuring **11.285** against paper-dark's own #2F2D28 ground. Not a
+   collision, but not the ground-relative fallback either, and not what any
+   ruling asked for. Ink's rule is written the other way round instead — set
+   ONLY inside the dark-scoped blocks below, never unconditionally — so it
+   needs no light reversion of its own; light simply never assigns the
+   property and the `var(…, var(--surface-panel))` fallback in `breadcrumb-
+   folders.tsx` answers for it, same as mango does in both palettes. */
+[data-spine="paper"] {
+  --spine-crumb-rest: var(--spine-paper-crumb-rest);
+}
+
+/* THE DARK REVERSION FOR PAPER, AND INK'S DARK-ONLY ASSIGNMENT, TOGETHER —
+   both belong in the same two blocks, matching the two ways dark is reached
+   elsewhere in this file (system preference, then explicit choice), because
+   neither spine selector is `:root` and so neither is covered by tokens.css
+   §6/§7's own dark blocks — those redefine properties AT `:root` for
+   whatever inherits them, and this property is set directly ON the spine
+   element, which wins over anything it would otherwise inherit. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-spine="paper"] {
+    --spine-crumb-rest: var(--surface-panel);
+  }
+  :root:not([data-theme="light"]) [data-spine="ink"] {
+    --spine-crumb-rest: var(--spine-ink-crumb-rest);
+  }
+}
+:root[data-theme="dark"] [data-spine="paper"] {
+  --spine-crumb-rest: var(--surface-panel);
+}
+:root[data-theme="dark"] [data-spine="ink"] {
+  --spine-crumb-rest: var(--spine-ink-crumb-rest);
+}
+
 /* A VALUE ON A GROUND THAT DOES NOT MOVE BETWEEN PALETTES MUST NOT MOVE
    BETWEEN PALETTES EITHER. That is the whole rule, and this block is the
    reason it is written down.
@@ -1602,13 +1862,18 @@
    Every other value here is already palette-independent, because the mango
    spine's ground is: `--kw-mango` is #FED069 in light and in dark, so the
    charcoal active row on it, and the off-beige label on that, are the same
-   two colours in both. Nine of these ten names obey that without being told.
+   two colours in both. Twelve of these thirteen names obey that without being
+   told. (The counts in this note were nine-of-ten when it was written and are
+   corrected here, 2026-09-02, with the block itself untouched: the member
+   chip's pair and the hairline joined it after.)
 
    `--spine-active-hover` did not. It pointed at `--btn-inverse-hover`, which
    flips #333230 -> #ECE8DF — correct for the inverse BUTTON, whose ground
    inverts with the palette, and wrong here, whose ground does not. MEASURED
-   on the default spine (client ruling D3 makes mango the default, so this is
-   what every screen does), off-beige label on the hover fill:
+   on the default spine (OVERRIDE 56 makes mango the default, so this is what
+   every screen does — this note used to credit ruling D3, whose spine-COUNT
+   half was overturned on 2026-09-02 while its mango law and this default were
+   not), off-beige label on the hover fill:
 
        light   #FFFEF9 on #333230   12.683  ✔
        dark    #FFFEF9 on #ECE8DF    1.211  ✘   and the row itself only
@@ -1617,7 +1882,7 @@
 
    Pinned to #333230 — this file's own LIGHT `--btn-inverse-hover`, an
    existing value, no new hex — because on this spine the value has to be
-   palette-independent, exactly like the nine names around it. Now 12.683 in
+   palette-independent, exactly like the twelve names around it. Now 12.683 in
    both. Found by the rail audit and routed here; `rail.tsx` §"ONE VALUE
    GENUINELY BROKE THIS" carries the same note from the consuming end.
 
@@ -1637,7 +1902,7 @@
   /* THE MEMBER CHIP'S OWN FILL, ADDED 2026-09-02 — CLIENT RULING, NOT D3/D5.
      "The chip is black whenever the spine is mango, in either palette." No
      dark half needed: `--kw-charcoal` does not move between palettes, same
-     law as every other name in this block. UNLIKE THE OTHER TEN NAMES HERE,
+     law as every other name in this block. UNLIKE THE OTHER TWELVE NAMES HERE,
      `--spine-member-ink` is NOT `--ink-on-accent` (this spine's `--spine-ink`)
      — the member chip's fill just became the SAME charcoal that text already
      was, so the text has to invert or vanish. `--kw-off-beige` is the pair
@@ -1649,7 +1914,7 @@
      flips with the palette (charcoal-based in light, off-beige-based in dark)
      and the off-beige half would read close to invisible on a ground this
      light. Pinned to the light `--border`'s own value, literally — a fixed
-     charcoal alpha, no new hex, palette-independent like the nine names
+     charcoal alpha, no new hex, palette-independent like the twelve names
      around it. */
   --spine-hair:        rgba(26, 25, 24, .08);
 }

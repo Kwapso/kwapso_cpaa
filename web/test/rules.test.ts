@@ -31,6 +31,9 @@ import {
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
+  TOOLBAR_EXEMPT,
+  TOOLBAR_CONTENT_GAP_EXEMPT,
+  EMPTY_TOOLBAR_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -1219,6 +1222,29 @@ describe("RULES — the laws of the base", () => {
         // component's own start and the tag — wide enough to reach the real
         // call, narrow enough that a DIFFERENT panel's key builder elsewhere
         // in the file still cannot satisfy it.
+        // `<ActivityPanel>` IS A SHARED PAGED BODY TOO, 2026-09-03 — same
+        // argument as `PagedPanelBody` above, and it earns it the same way:
+        // it renders `<LoadMore listKey={activity.listKey}>` inside itself,
+        // which this file's own `record-detail-tabs` assertion independently
+        // requires of `activity-panel.tsx`. So a caller that hands it a real
+        // listKey HAS reached a real pager.
+        //
+        // IT NEEDS ITS OWN BRANCH rather than joining the tag list below,
+        // because it is passed its key INSIDE the tag (an `activity={{ …
+        // listKey: … }}` object literal) rather than reading a variable built
+        // earlier in the enclosing function — so the "walk back to the
+        // enclosing function" scope those tags need would look in the wrong
+        // place entirely and report a correctly-wired pager as missing.
+        //
+        // WHAT THIS RETIRES: the recipe host used to draw its own `<LoadMore>`
+        // as a SIBLING of the whole screen, which is exactly why "Load more
+        // activity" rendered underneath the Overview tab. The pager lives
+        // inside the Activity tab now. Teaching the census about that move is
+        // what keeps this law true across it — otherwise the law quietly
+        // demands the bug back.
+        [...pager.matchAll(/<ActivityPanel[\s\S]{0,1200}?\/>/g)].some((m) =>
+          m[0].includes(c.pagerKey)
+        ) ||
         [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
           const tagAt = m.index ?? 0
           const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
@@ -2439,8 +2465,14 @@ describe("RULES — the laws of the base", () => {
     // the hand-edit guard forbids fixing it, so the only response is a message
     // upstream, which is a review comment wearing a build failure's clothes.
     const ours = (f: { rel: string }) => !f.rel.startsWith(VENDORED_UI)
+    // `black`/`white` are Tailwind's own colour names too, and they carry no
+    // shade digit — `bg-black/50` slipped through for exactly that reason (a
+    // hand-rolled scrim in shared/web/screen-engine/screen-renderer.tsx,
+    // fixed alongside this widening) until a full-repo grep confirmed it was
+    // the only live instance. Same prefix list, same reasoning: neither name
+    // means anything here, only a token does.
     const RAMP =
-      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g
+      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}|black|white)\b/g
     const HEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g
     const lawBook = join(ROOT, "shared", "rules") // it quotes what it forbids
     const ramps: string[] = []
@@ -2467,6 +2499,399 @@ describe("RULES — the laws of the base", () => {
     expect(
       stale,
       `these PALETTE_LITERAL_OK entries match nothing — the file no longer holds a colour literal, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R48 — THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT.
+  //
+  // Client ruling, correcting a narrower fix already shipped once: "I don't
+  // care here. You're giving me specifics, and I told you that the toolbar,
+  // including the search, should be absolutely everywhere we have a data view
+  // or a collection view. Stop hardcoding this. Just write it as a rule."
+  //
+  // Two censuses, off the disk, never a hand-list — the same shape R29's page
+  // width and R31's radius vocabulary already use:
+  //
+  //   i.  Every `BASE_RECIPES` (web/lib/screens.ts) entry whose recipe carries
+  //       a `CollectionConfig` must have `searchable: true`, the ENGINE'S own
+  //       default (`defaultCollectionConfig`, config.ts) — or be named in
+  //       `TOOLBAR_EXEMPT` with the real reason search lives elsewhere.
+  //   ii. Every `<ToolbarRow>` call site (screen-bits.tsx's own bespoke
+  //       toolbar, reached by a BOUNDED collection with no recipe search to
+  //       inherit — apps, sprints, tasks' Calendar tab, Triage, every nested
+  //       panel) must pass a `search` prop, or be named in the same registry.
+  //
+  // (ii) is a brace-depth-aware scan rather than a plain regex, because a
+  // `search={<SearchInput .../>}` prop is not the only thing between
+  // `<ToolbarRow` and its own closing `>` — `actions={<AddButton .../>}` sits
+  // there too, nested JSX and all, and a naive "first `>` wins" read would
+  // stop at the INNER element's close tag and call the outer `<ToolbarRow`
+  // self-closing with no props read at all.
+  it("toolbar-shows-search: a collection/data-view screen shows search by default (R48)", () => {
+    // i · THE RECIPE CENSUS.
+    const recipeOffenders: string[] = []
+    const recipeExemptUsed = new Set<string>()
+    for (const [key, recipe] of Object.entries(BASE_RECIPES)) {
+      if (!recipe.collection) continue // a detail recipe — nothing to search
+      if (recipe.collection.searchable) continue
+      if (key in TOOLBAR_EXEMPT) {
+        recipeExemptUsed.add(key)
+        continue
+      }
+      recipeOffenders.push(
+        `${key}: this recipe's collection.searchable is false and it is not in TOOLBAR_EXEMPT — ` +
+          `either turn search on, or name the reason (a host <PagedFind>/<ToolbarRow> that already supplies it)`
+      )
+    }
+    expect(
+      recipeOffenders,
+      `R48 — every BASE_RECIPES collection shows search by default:\n  ${recipeOffenders.join("\n  ")}`
+    ).toEqual([])
+
+    // ii · THE <ToolbarRow> CALL-SITE CENSUS.
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const rowOffenders: string[] = []
+    const rowExemptUsed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      // screen-bits.tsx DECLARES <ToolbarRow> — it is not a call site of it.
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue
+      const src = stripComments(f.source)
+      let from = 0
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        // A reference in prose (a backticked mention) rather than real JSX —
+        // stripComments already removed // and /* */ comments, so what is left
+        // here is either the genuine tag or, rarely, a JSDoc-style line this
+        // repo writes as `` `<ToolbarRow>` `` inside a /** */ block, which
+        // stripComments also removes. Nothing legitimate reaches this point
+        // that isn't the real tag.
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        // Walk to this tag's OWN closing `>` — the one at braceDepth 0, so a
+        // `search={<SearchInput onClear={() => …} />}` prop's own nested tags
+        // and braces are skipped rather than ending the scan early.
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        const hasSearch = /\bsearch\s*=/.test(tag)
+        if (!hasSearch) {
+          if (f.rel in TOOLBAR_EXEMPT) rowExemptUsed.add(f.rel)
+          else
+            rowOffenders.push(
+              `${f.rel}: a <ToolbarRow> with no \`search\` prop, and the file is not in TOOLBAR_EXEMPT`
+            )
+        }
+        from = i + 1
+      }
+    }
+    expect(
+      rowOffenders,
+      `R48 — every <ToolbarRow> call site carries a \`search\` prop, or is named in TOOLBAR_EXEMPT with a real reason:\n  ${rowOffenders.join("\n  ")}`
+    ).toEqual([])
+
+    // iii · THE RATCHET, BOTH DIRECTIONS — the same shape R29/R31/R32 already
+    // run: an entry nothing uses is a pin left behind by a screen that got
+    // fixed, and it has to go, or the list stops being able to only shrink.
+    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed])
+    const stale = Object.keys(TOOLBAR_EXEMPT).filter((k) => !usedKeys.has(k))
+    expect(
+      stale,
+      `these TOOLBAR_EXEMPT entries match nothing any more — the recipe or call site now shows search, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R49 — THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER.
+  //
+  // The client, item 5 of the 2026-09-03 spacing round: "tehre's wahy too much
+  // space between the toolbar and the contenta" — confirmed on every screen.
+  // It had drifted into five numbers (gap-2/3/4/6, space-y-3, mb-4) doing the
+  // identical job across fourteen call sites. `<ToolbarRow>` now pays the gap
+  // itself, as its own trailing margin (`mb-[var(--toolbar-content-gap)]` on
+  // its root, screen-bits.tsx) — so the census here is anti-regression: no
+  // call site may hand the SAME row a second, competing spacing decision.
+  //
+  // Two shapes of offence, both derived off disk, never a hand-list:
+  //   i.  A `<ToolbarRow>` tag's OWN `className` prop hard-codes a `mb-*` —
+  //       the same brace-depth scan R48 uses, so a `search={<X onClear={…}/>}`
+  //       prop nested inside the tag can't be mistaken for its own close.
+  //   ii. The nearest OPEN `<div>`/`<section>` wrapper immediately before the
+  //       row (or before a `{someToolbar}` variable a screen renders in its
+  //       place — sprints-screen.tsx's own shape) still carries its own
+  //       `gap-*`/`space-y-*` on a `flex-col` — the same double-spend the row
+  //       used to leave to callers.
+  it("toolbar-content-gap: <ToolbarRow> pays its own trailing gap, never a call site (R49)", () => {
+    const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
+    expect(
+      screenBits,
+      "R49 — <ToolbarRow>'s own root must carry `mb-[var(--toolbar-content-gap)]` (screen-bits.tsx) — every call site inherits it from there, so a call site never has to ask for it"
+    ).toContain("mb-[var(--toolbar-content-gap)]")
+
+    // A wrapper's className, read backward from a `<ToolbarRow` (or a toolbar
+    // variable) occurrence: the nearest preceding `<div`/`<section` opening
+    // tag that is still OPEN at that point (nothing else opened after it —
+    // stripComments turns a JSX `{/* … */}` into a bare `{ }`, and a
+    // `{cond && (` guard, so both are tolerated in the gap between).
+    const WRAPPER_OPEN = /<(?:div|section)\s+className="([^"]*)"\s*>\s*$/
+    const BETWEEN_OK = /^(?:\{\s*\}|\{\s*[\w.]+(?:\s*&&\s*\(?)?|\s|\/\/[^\n]*\n)*$/
+
+    function wrapperGapOffence(before: string): string | null {
+      // Walk backward over "nothing but whitespace / an emptied comment / an
+      // opened `{cond && (`" until a JSX opening tag is reached — if it is a
+      // gapped flex-col div/section, that gap is a second hand on this row's
+      // own number.
+      const tail = before.slice(-400)
+      if (!BETWEEN_OK.test(tail.replace(WRAPPER_OPEN, ""))) return null
+      const m = WRAPPER_OPEN.exec(tail)
+      if (!m) return null
+      const cls = m[1]
+      if (!/flex-col/.test(cls)) return null
+      const gapMatch = cls.match(/\b(?:gap|space-y)-(\[[^\]]+\]|[0-9]+(?:\.5)?)\b/)
+      if (!gapMatch) return null
+      if (gapMatch[0].includes("--toolbar-content-gap")) return null
+      return gapMatch[0]
+    }
+
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const offenders: string[] = []
+    const exemptUsed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue // declares the row, not a call site
+      const src = stripComments(f.source)
+
+      // i · every real `<ToolbarRow` TAG (brace-depth scan, R48's shape).
+      let from = 0
+      const tagStarts: number[] = []
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        tagStarts.push(at)
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        const classNameMatch = tag.match(/\bclassName\s*=\s*"([^"]*)"/)
+        if (classNameMatch && /\bmb-(?!\[var\(--toolbar-content-gap\)\])/.test(classNameMatch[1])) {
+          if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) exemptUsed.add(f.rel)
+          else
+            offenders.push(
+              `${f.rel}: <ToolbarRow className="${classNameMatch[1]}"> hard-codes its own \`mb-*\` — the row already pays --toolbar-content-gap itself, so this doubles it`
+            )
+        }
+        from = i + 1
+      }
+
+      // ii · the nearest OPEN flex-col wrapper before each tag, and before a
+      // `{xToolbar}`-shaped variable this file also defines from a real
+      // `<ToolbarRow` (sprints-screen.tsx's own indirection).
+      const checkpoints = [...tagStarts]
+      for (const m of src.matchAll(/\{(\w*[Tt]oolbar\w*)\}/g)) {
+        if (new RegExp(`\\b(?:const|let)\\s+${m[1]}\\s*=[\\s\\S]{0,600}?<ToolbarRow\\b`).test(src)) {
+          checkpoints.push(m.index ?? 0)
+        }
+      }
+      for (const at of checkpoints) {
+        const offence = wrapperGapOffence(src.slice(0, at))
+        if (!offence) continue
+        if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) {
+          exemptUsed.add(f.rel)
+          continue
+        }
+        offenders.push(
+          `${f.rel}: a flex-col wrapper immediately around a <ToolbarRow> (or the toolbar it renders) still carries its own \`${offence}\` — the row already pays --toolbar-content-gap itself, so this doubles it`
+        )
+      }
+    }
+    expect(
+      offenders,
+      `R49 — every <ToolbarRow> call site leaves the gap to the row itself, never a second hand on the same number:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(TOOLBAR_CONTENT_GAP_EXEMPT).filter((k) => !exemptUsed.has(k))
+    expect(
+      stale,
+      `these TOOLBAR_CONTENT_GAP_EXEMPT entries match nothing any more — the call site no longer double-spends the gap, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R50 — NEVER TOOLBAR ON AN EMPTY COLLECTION, NOT EVEN THE CREATE BUTTON.
+  //
+  // The client's own words, verbatim, about a Time tab with zero rows: "once
+  // again, when empty collection no toolbar at all - fix everywhere and set
+  // as a rule." R48 already ruled "never toolbar on empty collection" once —
+  // but its own two censuses only ever asked "does this `<ToolbarRow>` have
+  // a `search` prop", never whether the REST of the row (`actions`, the
+  // create button above everything else) agreed with it. A
+  // `<ToolbarRow search={data.length > 0 && …} actions={canCreate &&
+  // <AddButton/>} />` passed R48 outright — `search` genuinely was gated —
+  // while still drawing a lone, floating "+" the moment the collection held
+  // zero rows, because `actions` was never asked the same question. Found
+  // seven more times once this law's own census went looking: Sprints'
+  // Overview/Calendar toolbar, Waves' own finder, a wave's own Sprints tab,
+  // Deliverables, Modules, all three of Client-org's lists, Dropdown values,
+  // and Triage's toolbar (drawn by a PARENT component that could not see
+  // whether the CHILD's own fetch, two components away, held a single row).
+  //
+  // THE FIX IS CENTRAL, not fourteen more per-call-site patches: `empty` and
+  // `restingEmpty` are REQUIRED props on `<ToolbarRow>` and `<PagedFind>`
+  // respectively, checked FIRST, before any other slot — so a caller cannot
+  // gate `search` correctly and forget `actions` the way every one of the
+  // eight instances above did. Three things, off the disk, never a hand-list:
+  //
+  //   i.   Both components' OWN source still gates on the prop, unconditionally,
+  //        ahead of every other slot — the CENTRAL guard this law leans on,
+  //        so a future edit that moved the check after `actions` would be
+  //        caught here rather than trusted forever.
+  //   ii.  Every `<ToolbarRow>` call site (the same brace-depth scan R48/R49
+  //        use) passes an `empty` prop, or is named in `EMPTY_TOOLBAR_EXEMPT`.
+  //   iii. Every `<PagedFind>` call site passes a `restingEmpty` prop, or is
+  //        named in the same registry.
+  //
+  // `<SectionWithCreate>`'s own header create button is NOT censused the same
+  // way: every current call site already passes `folderTabs` or `useKitPanel`,
+  // either of which suppresses that button through its OWN, older mechanism
+  // (`showCreateInHeader`), so the shape this law is about — a create button
+  // with no gate on the collection's row count — cannot occur there today.
+  // Its `empty` prop exists for the day a call site uses neither; nothing to
+  // census until one does.
+  it("empty-toolbar: never toolbar on an empty collection, actions included (R50)", () => {
+    const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
+    // i(a) · `ToolbarRow`'s own central guard — checked BEFORE the "nothing to
+    // draw" early return, so `empty` decides ahead of every slot.
+    const toolbarRowBody = screenBits.slice(screenBits.indexOf("export function ToolbarRow("))
+    const emptyGateAt = toolbarRowBody.indexOf("if (empty) return null")
+    const noSlotsGateAt = toolbarRowBody.indexOf("if (!search && !filters && !sort && !view && !actions)")
+    expect(
+      emptyGateAt,
+      "R50 — ToolbarRow must open with `if (empty) return null` (screen-bits.tsx) — the central guard every call site leans on instead of gating its own `actions`"
+    ).toBeGreaterThan(-1)
+    expect(
+      noSlotsGateAt === -1 || emptyGateAt < noSlotsGateAt,
+      "R50 — ToolbarRow's `empty` check must run BEFORE the no-slots-truthy check, so a truthy `actions` alone can never keep the row alive on an empty collection"
+    ).toBe(true)
+
+    // i(b) · `PagedFind`'s own central guard — `genuinelyEmpty` computed from
+    // `restingEmpty` and gating the whole toolbar column, before `children`.
+    const pagedFind = stripComments(readFileSync(join(WEB, "components/paged-find.tsx"), "utf8"))
+    expect(
+      pagedFind,
+      "R50 — PagedFind must compute `genuinelyEmpty` from its own `restingEmpty` prop (paged-find.tsx)"
+    ).toMatch(/const genuinelyEmpty = restingEmpty && !active/)
+    expect(
+      pagedFind,
+      "R50 — PagedFind's toolbar column must be null when genuinely empty (paged-find.tsx: `genuinelyEmpty ? null : (…)`)"
+    ).toMatch(/genuinelyEmpty \? null : \(/)
+
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const offenders: string[] = []
+    const exemptUsed = new Set<string>()
+
+    // Brace-depth-aware scan to one tag's own closing `>` — R48's exact
+    // shape, so a nested `search={<SearchInput onClear={() => …} />}` can't
+    // be mistaken for the outer tag's own close. Extended for `<PagedFind`'s
+    // own generic (`<PagedFind<Row>`): the `<Row>` is skipped, angle-depth
+    // aware, BEFORE the brace-depth prop scan starts — without this, the
+    // scan reads the generic's own closing `>` as the whole tag's close and
+    // never sees a single prop.
+    function ownTag(src: string, at: number, tagName: string): string {
+      let i = at + tagName.length
+      if (src[i] === "<") {
+        let angleDepth = 0
+        while (i < src.length) {
+          if (src[i] === "<") angleDepth++
+          else if (src[i] === ">") {
+            angleDepth--
+            i++
+            if (angleDepth === 0) break
+            continue
+          }
+          i++
+        }
+      }
+      let braceDepth = 0
+      while (i < src.length) {
+        const ch = src[i]
+        if (ch === "{") braceDepth++
+        else if (ch === "}") braceDepth--
+        else if (ch === ">" && braceDepth === 0) break
+        i++
+      }
+      return src.slice(at, i + 1)
+    }
+
+    // A prop present but hardcoded to a boolean LITERAL is the row answering
+    // R50's own question with a constant rather than the collection's real
+    // row count — exactly the shape a caller could otherwise use to quietly
+    // opt back out, so it is held to the same "named in the registry" bar as
+    // a prop that is missing outright.
+    function propIsLiteral(tag: string, prop: string): boolean {
+      return new RegExp(`\\b${prop}\\s*=\\s*\\{\\s*(?:true|false)\\s*\\}`).test(tag)
+    }
+
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      const src = stripComments(f.source)
+
+      // ii · every real `<ToolbarRow` TAG — screen-bits.tsx DECLARES it, not a
+      // call site of it.
+      if (!f.rel.endsWith("deep-link/screen-bits.tsx")) {
+        let from = 0
+        for (;;) {
+          const at = src.indexOf("<ToolbarRow", from)
+          if (at === -1) break
+          const tag = ownTag(src, at, "<ToolbarRow")
+          const missing = !/\bempty\s*=/.test(tag)
+          const literal = propIsLiteral(tag, "empty")
+          if (missing || literal) {
+            if (f.rel in EMPTY_TOOLBAR_EXEMPT) exemptUsed.add(f.rel)
+            else
+              offenders.push(
+                `${f.rel}: a <ToolbarRow> with ${missing ? "no `empty` prop" : "a hardcoded `empty={true|false}` literal"}, and the file is not in EMPTY_TOOLBAR_EXEMPT`
+              )
+          }
+          from = at + tag.length
+        }
+      }
+
+      // iii · every real `<PagedFind` TAG — paged-find.tsx DECLARES it.
+      if (!f.rel.endsWith("components/paged-find.tsx")) {
+        let from = 0
+        for (;;) {
+          const at = src.indexOf("<PagedFind", from)
+          if (at === -1) break
+          const tag = ownTag(src, at, "<PagedFind")
+          const missing = !/\brestingEmpty\s*=/.test(tag)
+          const literal = propIsLiteral(tag, "restingEmpty")
+          if (missing || literal) {
+            if (f.rel in EMPTY_TOOLBAR_EXEMPT) exemptUsed.add(f.rel)
+            else
+              offenders.push(
+                `${f.rel}: a <PagedFind> with ${missing ? "no `restingEmpty` prop" : "a hardcoded `restingEmpty={true|false}` literal"}, and the file is not in EMPTY_TOOLBAR_EXEMPT`
+              )
+          }
+          from = at + tag.length
+        }
+      }
+    }
+    expect(
+      offenders,
+      `R50 — every <ToolbarRow>/<PagedFind> call site answers "is this collection empty", or is named in EMPTY_TOOLBAR_EXEMPT:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(EMPTY_TOOLBAR_EXEMPT).filter((k) => !exemptUsed.has(k))
+    expect(
+      stale,
+      `these EMPTY_TOOLBAR_EXEMPT entries match nothing any more — the call site now passes the prop, so delete the entry:\n  ${stale.join("\n  ")}`
     ).toEqual([])
   })
 
@@ -2519,6 +2944,9 @@ describe("RULES — the laws of the base", () => {
       "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
       "assistant-coverage", // R47: workers/mcp/test/assistant-coverage.test.ts — the module census, beside R19/R22/R27/R43 on the same door census
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
+      "toolbar-shows-search", // R48: the BASE_RECIPES + <ToolbarRow> censuses below
+      "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
+      "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -2850,137 +3278,76 @@ describe("closing a form is not a decision to discard it", () => {
   })
 })
 
-// THE TAB SHAPE IS ONE DECISION, NOT SIXTEEN.
+// THE TAB SHAPE IS ONE DECISION, NOT SIXTEEN — AND NOW NOT EVEN TWO.
 //
 // The owner, seeing the folder on three screens and the old flat strip on the
 // rest: "if we change tabs in one central place… it should have changed
 // everywhere. If this is not done then the entire way we have built our design
 // system is incorrect."
 //
-// The architecture was fine — one TabsView, one kit Tabs control, one `variant`.
-// What was wrong is that sixteen screens had hard-coded `variant: "line"` before
-// the folder existed, so the central value governed nothing. It is the DEFAULT
-// now, for a COLLECTION's own strip (a main screen switching between records,
-// or between collections).
-//
-// AMENDED 2026-08-31 — THE CLIENT, verbatim: "Detail screens are using the
-// folder-tab design, but that style belongs to main screens only. Detail
-// screens should use the line (underline) tabs." This is the same ruling
-// `RecordDetail`'s own internal tab strip already states explicitly
-// (record-detail.tsx: "client ruling E … a record IS the detail screen, so
-// `line` is stated rather than inherited"), just reaching the twelve detail
-// screens that hand their tabs to `RecordScreen`'s `children` instead of that
-// prop, and so never got the memo — the App detail screen's Overview / Sprints
-// / Stories strip was drawing folder tabs, because every one of them spread
-// `defaultTabsConfig` (the COLLECTION default) with no override. So a screen
-// that wants a line now has THREE reasons, not two: a strip filtering WITHIN a
-// collection (no card to attach to), and — new — a RECORD's own top-level
-// section strip, which is `web/components/record-chrome.tsx`'s
-// `RECORD_TABS_CONFIG` (ONE constant, spread by every detail screen's own
-// tabsConfig, so the decision is made once rather than twelve times — exactly
-// the defect this describe block exists to catch).
+// This block used to enforce a THREE-WAY split (folder default for a
+// collection's own strip, `variant: "line"` for a strip filtering WITHIN one
+// collection, `RECORD_TABS_CONFIG`'s own `line` for a record's top-level
+// strip). SUPERSEDED, v1.2.28 — CLIENT RULING, 2026-09-02, verbatim: "the
+// whole concept of folders as tabs gets killed. All the current folders as
+// tabs we have will become line tabs. Completely kill and remove folder
+// tabs… the only tabs that we will have are the line tabs" — so the split
+// this block checked is gone along with the shape on one side of it.
+// `defaultTabsConfig` is `"line"` now, full stop, and there is nothing left
+// to override it WITH: `TabsConfig.variant` is a one-member union
+// (tabs-view.tsx), so a call site that still tries to write its own value
+// fails to compile — this describes the census that also catches the same
+// mistake AT THE SOURCE, before a build even runs.
 describe("a tab strip's shape is decided in one place", () => {
-  it("tab-shape: the default is the folder", () => {
+  it("tab-shape: the default (and only) value is line", () => {
     const src = stripComments(read(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx")))
     const decl = src.slice(src.indexOf("defaultTabsConfig: TabsConfig"))
-    expect(decl.slice(0, decl.indexOf("}") + 1), "the one default must be the folder").toContain('variant: "folder"')
+    expect(decl.slice(0, decl.indexOf("}") + 1), "the kit draws one shape now — line").toContain('variant: "line"')
   })
 
-  it("tab-shape: only the inner filter strips and the record strip override it", () => {
-    const allowed = new Set([
-      "web/components/tickets-collection.tsx",
-      "web/components/meetings-screen.tsx",
-      // ACCOUNTS' COMPANIES/ALL STRIP IS NOT ON THIS LIST, and that is a
-      // correction, not an oversight. It was added here for a day (client
-      // ruling, 2026-08-31, annotating a screenshot of this exact screen: the
-      // search/sort/filter toolbar moved to sit BETWEEN the strip and the
-      // list) on the assumption that ANY intervening element breaks the
-      // folder tab's attachment the way it does for tickets-collection.tsx and
-      // meetings-screen.tsx above. Checked rather than trusted (client, same
-      // day, first on losing the shape entirely — "bring back the rounded
-      // active tabs!" — then on a reference screenshot of the kit's own
-      // collection composition, tabs flush against the SAME card as the
-      // toolbar, zero gap): the strip switches between COLLECTIONS (all
-      // accounts vs. just the companies), which is `defaultTabsConfig`'s own
-      // folder case, not the "filters WITHIN one collection" case the two
-      // lines above are for. tickets-collection.tsx's and meetings-screen.tsx's
-      // toolbars sit in the outer flex column, a real gap away from their
-      // card, which is genuinely fatal to the attachment; Accounts' toolbar
-      // now renders through `PagedFind`'s own `renderAbove`/`wrap` slots
-      // (paged-find.tsx), which put the tab strip and the card in ONE
-      // zero-gap column of their own, the same join `SectionWithCreate`'s
-      // `folderTabs` slot draws for apps-screen.tsx/sprints-screen.tsx/
-      // tasks-screen.tsx below. So the strip is back to saying nothing here,
-      // same as any other collection-switching strip.
-      // The steps view switch (List / Flow / Compare) sits INSIDE the Steps
-      // folder tab. Two folders stacked put one strip's feet through the
-      // other's toolbar — seen on a phone the moment the default flipped.
-      // It moved out of `process-detail.tsx` with the panel it belongs to on
-      // 26 Aug 2026; the reason above is unchanged, only the address.
-      "web/components/process/steps-panel.tsx",
-      // The to-do panel's Open / Done pair, and the same sentence as the two
-      // above: it is a strip filtering WITHIN a collection, and the panel it
-      // sits in has no card of its own to attach a folder to. It is also
-      // routinely mounted INSIDE a record's folder strip (a client's To-dos
-      // tab), which is exactly the stacking the steps-panel line describes.
-      "web/components/work-panels.tsx",
-      // RECORD_TABS_CONFIG — the ONE seam every detail screen's own top-level
-      // tab strip spreads (help/role/sprint/wave/contact/selectable/account/
-      // meeting/knowledge/app/story/task/process detail), per the client's
-      // 2026-08-31 ruling above. A record's OWN section strip is a line; a
-      // MAIN screen's strip (switching between records or collections) stays
-      // the folder default untouched.
-      "web/components/record-chrome.tsx",
-    ])
-    const offenders: string[] = []
-    let scanned = 0
+  it("tab-shape: no call site writes its own variant any more — there is nothing left to choose", () => {
     const files = [
       ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
       ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
     ]
-    for (const f of files) {
-      const rel = f.path.replace(ROOT + "/", "")
-      if (!/variant:\s*"line"/.test(read(f.path))) continue
-      scanned++
-      if (!allowed.has(rel)) offenders.push(rel)
-    }
-    expect(scanned, "the override census found nothing — it has stopped matching").toBeGreaterThan(1)
+    expect(files.length, "the component census found no files — sourceFiles has stopped matching").toBeGreaterThan(50)
+    const offenders = files
+      .filter((f) => /variant:\s*["'](line|folder|pill)["']/.test(stripComments(read(f.path))))
+      .map((f) => f.path.replace(ROOT + "/", ""))
     expect(
       offenders,
-      `these screens opt out of the one tab shape. A collection's tabs are the ` +
-        `folder; a strip filtering INSIDE a collection, or a record's own top-level ` +
-        `strip, is a line: ${offenders.join(", ")}`
+      `these screens still hard-code a tab variant. The kit draws one shape ` +
+        `now (\`"line"\`, v1.2.28 killed \`folder\`, an earlier round killed ` +
+        `\`pill\`) and \`defaultTabsConfig\` already is it — nothing needs, or ` +
+        `is allowed, to say so again: ${offenders.join(", ")}`
     ).toEqual([])
-  })
-
-  it("tab-shape: nothing asks for a `pill`, which the kit does not draw", () => {
-    const offenders = [
-      ...sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }),
-      ...sourceFiles(join(ROOT, "web-portal", "components"), { extensions: [".tsx"] }),
-    ]
-      .filter((f) => /variant:\s*"pill"/.test(read(f.path)))
-      .map((f) => f.path.replace(ROOT + "/", ""))
-    expect(offenders, `\`pill\` is accepted and silently drawn as a line — say what you mean`).toEqual([])
   })
 })
 
-// TWO FOLDER STRIPS MUST NOT BE STACKED.
+// TWO TAB STRIPS MUST NOT BE STACKED.
 //
-// A folder tab is drawn with feet that attach to the card below it. Nest one
-// inside another and the inner strip's feet come through the outer one's
-// toolbar — which is exactly what happened on a phone the moment the folder
-// became the default, on the steps view switch. Derived rather than remembered:
-// a screen rendering more than one strip has an inner one, and an inner one is
-// a line.
+// A folder tab used to be drawn with feet that attach to the card below it —
+// nest one inside another and the inner strip's feet came through the outer
+// one's toolbar, exactly what happened on a phone the moment the folder
+// became the default, on the steps view switch. SUPERSEDED, v1.2.28: the
+// folder shape that failure mode was ABOUT is retired (tabs-view.tsx's own
+// header has the client's ruling), but the client's own words for this rule
+// were never about feet — "there can never be 2 rows of tabs, no folder
+// tabs, no line tabs. just never" — so two stacked LINE strips are exactly as
+// forbidden as two stacked folder ones were, with no shape-shaped escape
+// hatch. Derived rather than remembered: a screen rendering more than one
+// strip is the thing to catch, full stop, and the only way out is a reasoned,
+// rot-checked exception naming the screen — never a variant written on the
+// inner one, since there is only the one variant left to write.
 describe("a tab strip is not nested inside another one", () => {
-  /** SCREENS THE OWNER HAS RULED STACK TWO FOLDERS ANYWAY. Data, with the
+  /** SCREENS THE OWNER HAS RULED STACK TWO STRIPS ANYWAY. Data, with the
    * ruling that bought each one, rot-checked below so a pin whose screen no
    * longer stacks two strips turns the build red and the list can only shrink.
    *
-   * The rule above it stands and its reason is not stylistic: two folders
-   * stacked put one strip's feet through the other's toolbar, seen on a phone
-   * the moment the default flipped. An entry here is somebody accepting that
-   * cost with their eyes open, not a disagreement about whether it exists. */
+   * The rule above it stands and its reason is not stylistic: two strips
+   * stacked read as a design that does not know its own shape. An entry here
+   * is somebody accepting that cost with their eyes open, not a disagreement
+   * about whether it exists. */
   // EMPTY ON PURPOSE, since 2026-08-31. The one entry this ever held
   // (tickets-collection.tsx, on the owner's 2026-08-28 ruling to keep two
   // folder strips rather than move the inner one into the toolbar) was
@@ -2990,18 +3357,18 @@ describe("a tab strip is not nested inside another one", () => {
   // the screen was redesigned to one strip (the kind/stage tabs; the old
   // All-tickets/Archived strip is now the "Archived" filter in
   // COLLECTION_FILTERS, the same shape Accounts' own archive toggle already
-  // uses) rather than given a `line` inner tab to satisfy the rule below. An
+  // uses) rather than given an inner strip to satisfy the rule below. An
   // entry here again means somebody has re-accepted the stacked-strip cost
   // with their eyes open — which, after this ruling, means asking the client
   // first.
-  const TWO_FOLDERS_OK: Record<string, string> = {}
+  const TWO_STRIPS_OK: Record<string, string> = {}
 
-  it("tab-shape: any screen with two strips gives the inner one a line", () => {
+  it("tab-shape: any screen with two strips is a reasoned exception, never a default", () => {
     // THE SANITY CHECK IS ON FILE ENUMERATION, not on finding an offender.
     // Until 2026-08-31 this counted `<TabsView` occurrences and demanded at
     // least one file with two of them, because tickets-collection.tsx
     // genuinely had two and the count existing was the proof the regex still
-    // matched. That screen is the fix now (see TWO_FOLDERS_OK above), so the
+    // matched. That screen is the fix now (see TWO_STRIPS_OK above), so the
     // client's ruling means the RIGHT number of two-strip screens across the
     // whole app is zero — a census that finds none is the goal, not a broken
     // scan. What a broken scan actually looks like is `sourceFiles` walking
@@ -3013,7 +3380,7 @@ describe("a tab strip is not nested inside another one", () => {
     expect(files.length, "the component census found no files — sourceFiles has stopped matching").toBeGreaterThan(50)
 
     const offenders: string[] = []
-    const staleRulings = new Set(Object.keys(TWO_FOLDERS_OK))
+    const staleRulings = new Set(Object.keys(TWO_STRIPS_OK))
     let scanned = 0
     for (const f of files) {
       // stripComments first (31 Aug 2026) — the toolbar sweep's own
@@ -3025,24 +3392,22 @@ describe("a tab strip is not nested inside another one", () => {
       scanned++
       const rel = f.path.replace(ROOT + "/", "")
       staleRulings.delete(rel)
-      if (rel in TWO_FOLDERS_OK) continue
-      if (!/variant:\s*"line"/.test(src)) offenders.push(rel)
+      if (!(rel in TWO_STRIPS_OK)) offenders.push(rel)
     }
     expect(
       [...staleRulings],
-      "TWO_FOLDERS_OK names screens that no longer stack two strips — delete these"
+      "TWO_STRIPS_OK names screens that no longer stack two strips — delete these"
     ).toEqual([])
     expect(
       scanned,
       "a screen is rendering two <TabsView> strips — the client's ruling is " +
         "\"there can never be 2 rows of tabs … just never\", with no exceptions " +
         "clause, so this must stay zero. Either undo the stacking, or take the " +
-        "ruling back to the client and add a reasoned TWO_FOLDERS_OK line above."
+        "ruling back to the client and add a reasoned TWO_STRIPS_OK line above."
     ).toBe(0)
     expect(
       offenders,
-      `these screens stack two folder strips; the inner one switches a VIEW and takes ` +
-        `\`variant: "line"\`: ${offenders.join(", ")}`
+      `these screens stack two tab strips with no reasoned exception on file: ${offenders.join(", ")}`
     ).toEqual([])
   })
 })
@@ -3051,8 +3416,9 @@ describe("a tab strip is not nested inside another one", () => {
 //
 // The owner's rule (25 Aug 2026): a tab always carries an icon, and the same
 // tab means the same icon on every screen. TabsView enforces the rendering half
-// (TAB_ICONS wins over call sites, a folder tab falls back to the folder glyph
-// rather than shipping bare) — this census enforces the deciding half: a NEW
+// (TAB_ICONS wins over call sites; every tab draws an icon now, the one shape
+// left in the app always has — tabs-view.tsx's header has the client's own
+// 2026-09-02 ruling) — this census enforces the deciding half: a NEW
 // tab value must be given its own line in the vocabulary, so the fallback is a
 // net under a decision and never the decision itself. Derived, not remembered:
 // tab objects are the only shape in either app carrying `badgeVariant`, so the

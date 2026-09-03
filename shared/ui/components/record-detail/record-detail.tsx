@@ -179,8 +179,26 @@
      placeholder, no lock, no dimmed panel. `actions`, `hero`, `panel` and
      `footer` each take a `visible` flag and absence is the whole treatment.
    · The tab strip is STICKY, and a sticky strip must be opaque or the panel
-     reads straight through it. It takes `--background`, the page tone the
-     band already sits on, so the strip and the band are the same paper.
+     reads straight through it. It takes `--surface-raised`, the PANEL's own
+     paper (`--card`) — not `--background`, the page tone the band sits on.
+     A pinned strip's whole job is to occlude rows scrolling under it, and in
+     three spines × two themes `--background` and `--card` are identical in
+     light but a visible step apart in dark, so painting the page tone read
+     as a hole punched in the card the instant the strip went opaque over
+     dark content — the exact failure `--card` over `--background` already
+     ruled out for a field's own fill (GAPS-KIT-BC.md FLD-B5) and for a table
+     row's ground elsewhere in this kit. THIS FILE'S OWN GAPS.md REC-2 ONCE
+     ARGUED THE OPPOSITE ("the strip and the band read as the same paper");
+     that reasoning is superseded, not merely the class name. THE OPACITY AND
+     THE STICKY POSITIONING SIT ON A WRAPPER AROUND `TabsList`,
+     NOT ON `TabsList` ITSELF — CHANGED 2026-09-03, alongside moving
+     `TABS_STRIP_GAP` off the `<Tabs>` root's flex `gap` and onto that SAME
+     wrapper as trailing padding, so the client's "space between tabs and
+     content … even when I scroll down" survives being pinned: a `gap` is a
+     static distance between two siblings and stops meaning anything once one
+     of them goes `position: sticky`, but padding on the box that gets pinned
+     travels with it. See `tabs.tsx`'s own comment on `TABS_STRIP_GAP` for the
+     whole argument.
    · Tabs are `Tabs`. This file writes not one tab class — see the folder-tab
      contradiction logged as GAPS-COL3 REC-1.
    · Only four radii, no px, no hex, no font size. Focus is one global rule
@@ -210,6 +228,7 @@ import {
   TabsCount,
   TabsList,
   TabsTrigger,
+  TABS_STRIP_GAP,
 } from "../tabs/tabs";
 import {
   StatusStepper,
@@ -225,6 +244,17 @@ export interface RecordDetailTab {
   value: string;
   /** What the tab says. */
   label: React.ReactNode;
+  /**
+   * A glyph before the label. Absent by default — this strip has shipped
+   * without one since CH27 — but every OTHER tab strip in the product draws
+   * one, and the client's ruling was that this was an oversight, not a
+   * deliberate variation ("yes, they should have icons ... We will only have
+   * one variation of tabs with icons"). `TabsTrigger` already sizes and
+   * spaces any svg child at the button icon size via `gap-2` (`tabs.tsx`'s
+   * `TRIGGER_BASE`), so this is a pass-through, not a new shape: a call site
+   * that never sets it renders exactly as before.
+   */
+  icon?: React.ReactNode;
   /** A live count beside the label, drawn by `TabsCount`. Zero renders
    *  nothing — `Badge`'s zero law, without reaching for `Badge` itself. */
   count?: number;
@@ -680,31 +710,51 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
 
     const strip =
       visibleTabs.length > 0 ? (
-        <TabsList
-          aria-label={tabsLabel}
-          className={cn(
-            // A sticky strip must be OPAQUE or the panel reads through it. It
-            // takes the page tone, which is the tone the band already sits on,
-            // so the two regions are the same paper. `-mx-*` + `px-*` widens
-            // the opaque band past the strip's own content so a scrolled row
-            // does not show through at the edges.
-            sticky && "sticky top-0 z-10 bg-background",
-          )}
+        /* THE WRAPPER, NOT `TabsList` ITSELF, CARRIES STICKY + OPACITY + THE
+           TRAILING GAP — CHANGED 2026-09-03. A sticky strip must be OPAQUE or
+           the panel reads through it, and opaque means the PANEL's own paper:
+           `bg-surface-raised` (`--card`) — NOT `bg-background`, which was
+           this wrapper's fill until today. `--background` and `--card` are
+           the same #FFFEF9 in light, so the mistake was invisible there, but
+           in dark `--background` is `--kw-unlit-page` #141310 against
+           `--card`'s `--kw-unlit-raised` #26241F — a visible step apart — so
+           a strip painted the page tone read as a hole punched in the card
+           the moment it went opaque over rows scrolling under it. This is
+           the fourth kit-and-app implementation of this exact strip to carry
+           that mistake (`record-chrome.tsx`'s `STICKY_TABS`, `tabs-view.tsx`'s
+           `STICKY_FOLDER_TABS`, and the toolbar rows already fixed it on the
+           app side); this file is the one the app's recipe-driven screens —
+           including its own landing screen — reach directly, so it was still
+           live there until now. `TABS_STRIP_GAP` (`tabs.tsx`) is padding, not a flex `gap`,
+           for the reason its own comment gives — a `gap` between this wrapper
+           and the panel below would stop meaning anything the instant this
+           box goes sticky, and the client asked for the space to survive
+           exactly that. Neither concern sits on `TabsList` itself: its own
+           `LIST_SKIN` hairline is anchored to ITS bottom edge, directly under
+           the tab row, and padding there would drag the rule down into the
+           middle of the new blank space instead of leaving it under the
+           tabs. */
+        <div
+          data-slot="record-detail-strip"
+          className={cn(sticky && "sticky top-0 z-10 bg-surface-raised", TABS_STRIP_GAP)}
         >
-          {visibleTabs.map((item) => (
-            <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
-              {item.label}
-              {/* `line`'s asymmetric count — quiet text at rest, a small
-                  mango circle with primary-ink text on the active tab only —
-                  is `TabsCount`'s own shape (GAPS-RULINGS.md R-4a). Not a
-                  `Badge`: a record's sections stay CH27's underline strip,
-                  and this was the exact place a bare `Badge` had drifted from
-                  that strip's own "quiet count" law before tonight's
-                  ruling gave the active state somewhere to go instead. */}
-              <TabsCount count={item.count} />
-            </TabsTrigger>
-          ))}
-        </TabsList>
+          <TabsList aria-label={tabsLabel}>
+            {visibleTabs.map((item) => (
+              <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
+                {item.icon}
+                {item.label}
+                {/* `line`'s asymmetric count — quiet text at rest, a small
+                    mango circle with primary-ink text on the active tab only —
+                    is `TabsCount`'s own shape (GAPS-RULINGS.md R-4a). Not a
+                    `Badge`: a record's sections stay CH27's underline strip,
+                    and this was the exact place a bare `Badge` had drifted from
+                    that strip's own "quiet count" law before tonight's
+                    ruling gave the active state somewhere to go instead. */}
+                <TabsCount count={item.count} />
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
       ) : null;
 
     return (
@@ -767,16 +817,35 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
         {/* ---- Regions 2 and 3 ------------------------------------------ */}
         {visibleTabs.length > 0 ? (
           <Tabs
-            /* Client ruling E, 2026-08-22: "folder tabs are for main screens,
-               line tabs for detail screens." A record IS the detail screen,
-               so `line` is stated rather than inherited — the frame that
-               draws collections now defaults to `folder`, and a default is
-               not where a ruling should live. Settles REC-1. */
-            variant="line"
+            /* `variant="line"` USED TO BE STATED HERE and is deleted, not
+               moved: under ruling E of 2026-08-22 ("folder tabs are for main
+               screens, line tabs for detail screens") a record had to say
+               which of two shapes it took, because `CollectionFrame`
+               defaulted to the other one. The client retired the folder
+               variant on 2026-09-02 and there is one shape left, so the line
+               is redundant — "I don't want any dead body around". REC-1 stays
+               settled; there is simply nothing left to settle it against. */
             value={tab}
             defaultValue={defaultTab ?? visibleTabs[0].value}
             onValueChange={onTabChange}
-            className="min-w-0 gap-[var(--space-3h)]"
+            /* THE STRIP-TO-PANEL GAP IS NO LONGER THIS ROOT'S `gap` AT ALL —
+               CHANGED 2026-09-03, TWICE THE SAME DAY. First to
+               `TABS_STRIP_GAP` (`tabs.tsx`) in place of this file's own
+               `gap-[var(--space-3h)]` (14) rhythm — the client's live
+               screenshot of a MAIN screen showed the wrong gap and named the
+               fix as a rule to change once, not a number to retune per
+               screen. Then OFF this root entirely: a flex `gap` is a static
+               distance between siblings and stops holding once the STRIP
+               (`strip`, above) goes sticky, which this record's own tab strip
+               always can, so the gap now lives as padding on the wrapper
+               around `TabsList` instead — see that wrapper's own comment and
+               `tabs.tsx`'s comment on `TABS_STRIP_GAP` for the whole
+               argument. `gap-0` CANCELS `Tabs`'s OWN BASE `gap-4` — without
+               it the base default survives untouched (`cn` only drops a
+               utility a caller's className actually contests) and the strip
+               would carry BOTH the wrapper's 20px padding AND the root's
+               16px flex gap, 36px in total rather than the ruled 20. */
+            className="min-w-0 gap-0"
           >
             {strip}
             {visibleTabs.map((item) => (

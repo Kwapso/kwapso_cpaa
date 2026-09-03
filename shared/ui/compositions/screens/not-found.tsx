@@ -109,7 +109,10 @@ import * as React from "react";
 import { Badge } from "../../components/badge/badge";
 import { Button } from "../../components/button/button";
 import { Headline, Text } from "../../components/typography/typography";
-import { ClockRotateRight, List } from "../../foundations/icons";
+import {
+  ClockCounterClockwise,
+  List,
+} from "../../foundations/icons";
 import { MainScreen } from "../templates";
 
 /** Which of the three cases. `missing` is the artifact's "never existed". */
@@ -173,7 +176,7 @@ const SYSTEM_LABELS: NotFoundLabels = {
   movedAction: "Open it in Collection B",
 
   missingTitle: "There is no record 9999 in Collection",
-  missingBody: "Check the number, or look for it from the collection.",
+  missingBody: "CheckFat the number, or look for it from the collection.",
 
   back: "Back to Collection",
   log: "Open the log",
@@ -191,7 +194,7 @@ const PORTAL_LABELS: NotFoundLabels = {
   movedTitle: "This isn't in your workspace.",
   movedBody: "It is not one of your requests. Nothing is wrong with the link.",
   missingTitle: "This isn't in your workspace.",
-  missingBody: "Check the number, or start from your overview.",
+  missingBody: "CheckFat the number, or start from your overview.",
   back: "Back to your overview",
   log: "",
 };
@@ -396,15 +399,15 @@ function NotFoundScreen({
             {/* THE TWO PAPER ROUTES LEAD WITH THEIR GLYPHS — p31 draws a
                 list mark on "Back to Collection" and a clock on "Open the
                 log", both widths. They shipped as bare words while the
-                icon slots waited on the pack; the Iconoir set is on main
-                now and the drawing is honoured. */}
+                icon slots waited on the pack; the pack is vendored now
+                (Phosphor, since 2026-09-03) and the drawing is honoured. */}
             <Button variant="secondary" onClick={onBack}>
               <List aria-hidden="true" />
               {words.back}
             </Button>
             {words.log ? (
               <Button variant="secondary" onClick={onOpenLog}>
-                <ClockRotateRight aria-hidden="true" />
+                <ClockCounterClockwise aria-hidden="true" />
                 {words.log}
               </Button>
             ) : null}

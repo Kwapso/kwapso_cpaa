@@ -30,7 +30,7 @@
 
 import * as React from "react"
 
-import { Link2, Paperclip, X } from "@shared/ui/foundations/icons"
+import { LinkSimple, Paperclip, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
@@ -503,7 +503,7 @@ export function StoryFormDialog({
                   {a.kind === "file" ? (
                     <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
                   ) : (
-                    <Link2 className="text-muted-foreground size-3.5 shrink-0" />
+                    <LinkSimple className="text-muted-foreground size-3.5 shrink-0" />
                   )}
                   <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
                   <Button

@@ -41,8 +41,21 @@ export function LoadMore<T>({
   if ((loaded?.length ?? 0) >= CLIENT_PAGE_ROWS_CAP)
     return (
       <p className="text-muted-foreground text-center text-sm">
-        {t("That's the first")} {CLIENT_PAGE_ROWS_CAP.toLocaleString()}. Search or filter to find
-        what you&apos;re after.
+        {/* ONE WHOLE SENTENCE WITH A NAMED HOLE (R28/R33) — this used to be a
+            translated fragment (`t("That's the first")`), a raw spliced
+            number, then a bare, untranslated English sentence glued on after
+            it: three pieces welded together at render time rather than one
+            unit R28's extractor could ever see, so every non-English reader
+            who reached the row cap on any paged collection (tickets,
+            accounts, contacts, knowledge, meetings, processes, stories, and
+            every nested paged panel) read half the sentence in their own
+            language and half in English. `{n}` is the only shape a
+            translator can reorder the number inside — the same rule this
+            file's own sibling seams (`paged-find.tsx`'s `matches`) already
+            follow. */}
+        {t("That's the first {n}. Search or filter to find what you're after.", {
+          n: CLIENT_PAGE_ROWS_CAP.toLocaleString(),
+        })}
       </p>
     )
   return (

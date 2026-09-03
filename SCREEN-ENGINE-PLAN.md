@@ -4,7 +4,7 @@
 > live docs still cite its sections (SEARCH.md, ROADMAP §Navigation). For how the
 > engine works TODAY, read UI-CONVENTIONS.md + CACHING.md; this file is the *why*.
 
-The blueprint for Brimba's runtime, config-driven screen system (our own lean
+The blueprint for the Kwapso System's runtime, config-driven screen system (our own lean
 "mini-Glide") and the first feature built on it: home + team management
 (members, roles, invites). Decided with the user 2026-06-12/13.
 
@@ -173,7 +173,7 @@ Decided with the user; do not relitigate without them.
   the base inherits them. _UPDATED 2026-08-22: the library was the npm package
   `@kwapso/ui` when this was decided and was vendored into this repo at
   `shared/ui/`. UPDATED AGAIN 2026-08-25, when the vendored kit became a pinned
-  copy of `Kwapso/design`: the config-driven engine BEHAVIOUR now lives
+  copy of `Kwapso/kwapso-ui-ux`: the config-driven engine BEHAVIOUR now lives
   app-side in `shared/web/screen-engine/` (`recipe.ts` + `screen-renderer.tsx`),
   drawing through the kit's parts (`shared/ui/structures/screen-renderer`), so
   the app's engine work happens in `shared/web/screen-engine/` and a kit-part

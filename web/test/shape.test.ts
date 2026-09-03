@@ -146,7 +146,7 @@ describe("INVITE_STATUS", () => {
 
 describe("shapeActivity", () => {
   it("maps each item to { id, description, actor, initials, timestamp }", () => {
-    const [row] = shapeActivity(activity)
+    const [row] = shapeActivity(activity, "en")
     expect(row.id).toBe("a1")
     expect(row.description).toBe("Alaap changed Bo's role to Editor")
     expect(row.actor).toBe("Alaap")
@@ -154,7 +154,7 @@ describe("shapeActivity", () => {
   })
 
   it("leaves actor undefined when actorName is null", () => {
-    const [row] = shapeActivity([{ ...activity[0], actorName: null }])
+    const [row] = shapeActivity([{ ...activity[0], actorName: null }], "en")
     expect(row.actor).toBeUndefined()
   })
 
@@ -164,12 +164,12 @@ describe("shapeActivity", () => {
   // the bespoke `RecordScreen` path already carries — a row here with no
   // `initials` is exactly the second, easy-to-miss avatar surface this app has.
   it("carries the same nameInitials mark the bespoke activity path uses", () => {
-    const [row] = shapeActivity(activity)
+    const [row] = shapeActivity(activity, "en")
     expect(row.initials).toBe("A")
   })
 
   it("still marks the row with a fallback initial when actorName is null", () => {
-    const [row] = shapeActivity([{ ...activity[0], actorName: null }])
+    const [row] = shapeActivity([{ ...activity[0], actorName: null }], "en")
     expect(row.initials).toBe("?")
   })
 })

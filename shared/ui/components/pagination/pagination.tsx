@@ -55,7 +55,10 @@
 
 import * as React from "react";
 
-import { ChevronLeft, ChevronRight } from "../../foundations/icons";
+import {
+  CaretLeft,
+  CaretRight,
+} from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 
 /* ----------------------------------------------------------------------------
@@ -352,7 +355,7 @@ export interface PaginationArrowProps extends Omit<PaginationLinkProps, "isActiv
  *
  * RTL — mirrors. The chevron sits at the inline START of the row, so flexbox
  * moves it to the other side; `rtl:-scale-x-100` turns the mark itself. The
- * glyph is never swapped for `ChevronRight`.
+ * glyph is never swapped for `CaretRight`.
  */
 const PaginationPrevious = React.forwardRef<HTMLAnchorElement, PaginationArrowProps>(
   ({ className, label = "Previous", srLabel = "Previous", size = "default", ...props }, ref) => (
@@ -369,7 +372,7 @@ const PaginationPrevious = React.forwardRef<HTMLAnchorElement, PaginationArrowPr
           survives for the icon-only form (`label={null}`), where a pill with
           nothing in it would otherwise render. */}
       {label === null ? (
-        <ChevronLeft aria-hidden="true" className="rtl:-scale-x-100" />
+        <CaretLeft aria-hidden="true" className="rtl:-scale-x-100" />
       ) : (
         label
       )}
@@ -396,7 +399,7 @@ const PaginationNext = React.forwardRef<HTMLAnchorElement, PaginationArrowProps>
     >
       {/* NAV-B3 — the word alone; the glyph only in the icon-only form. */}
       {label === null ? (
-        <ChevronRight aria-hidden="true" className="rtl:-scale-x-100" />
+        <CaretRight aria-hidden="true" className="rtl:-scale-x-100" />
       ) : (
         label
       )}
@@ -466,7 +469,7 @@ const PaginationEllipsis = React.forwardRef<HTMLSpanElement, PaginationEllipsisP
           it sits OUTSIDE the aria-hidden wrapper so it is not hidden with it. */}
       <span aria-hidden="true" className="inline-flex">
         {/* CH15's own mark is the character, not the glyph: the strip reads
-            `1 2 3 4 5 6 … 24`. `MoreHorizontal` drew three dots inside a
+            `1 2 3 4 5 6 … 24`. `DotsThree` drew three dots inside a
             40 square, which is the same idea at four times the size. */}
         {icon === undefined ? "…" : icon}
       </span>

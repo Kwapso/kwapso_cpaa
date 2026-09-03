@@ -300,7 +300,7 @@ const DEFAULT_LABELS: ImportLabels = {
   stepFile: "The file",
   stepWhat: "What it is",
   stepMatch: "Match the columns",
-  stepCommit: "Check and commit",
+  stepCommit: "CheckFat and commit",
   stepReport: "The report",
   notYetRail: "Nothing is written until the last step. Leaving now loses the mapping, not any records.",
   notYetFooter: "Two columns will be ignored. Nothing is written yet.",
@@ -526,7 +526,7 @@ function ImportScreen({
   step = "match",
   onStepSelect,
   rowCount = 148,
-  formatCommit = (count) => `Check ${count} rows`,
+  formatCommit = (count) => `CheckFat ${count} rows`,
   formatWrite = (count) => `Import ${count} records`,
   formatRows = (count) => `${count} rows`,
   formatStep = (position, total) => `Step ${position} of ${total}`,
@@ -582,7 +582,7 @@ function ImportScreen({
     outcome: "invalid" as const,
   }));
 
-  /* THE NUMBER IS ON THE BUTTON, in both of 27.30's words: "Check 148 rows,
+  /* THE NUMBER IS ON THE BUTTON, in both of 27.30's words: "CheckFat 148 rows,
      then Import 148 records". The report has neither — it is past the write,
      and the only thing left to press is the way out. */
   const commitLabel = written
@@ -605,7 +605,7 @@ function ImportScreen({
        breadcrumb. But `SHELL.md`'s table is the definition, and on all three
        of the differences it names this screen is a main screen: an eyebrow
        and a heading, no identity chip row and no record number, and NO
-       FOOTER. A collection is allowed to drop its folder tabs and its figure
+       FOOTER. A collection is allowed to drop its tabs and its figure
        strip; a record cannot drop its identity. So it is `MainScreen` with
        nothing in the collection slots, and the rail keeps the parent
        collection lit exactly as it does on every other main screen.

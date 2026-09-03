@@ -60,7 +60,10 @@ import {
   type StatusStage,
   type StatusStageState,
 } from "../status-stepper/status-stepper";
-import { Check, TriangleAlert } from "../../foundations/icons";
+import {
+  CheckFat,
+  Warning,
+} from "../../foundations/icons";
 import { ScreenRegister } from "../screen-renderer/screen-renderer";
 
 /**
@@ -418,9 +421,9 @@ const RunSteps = React.forwardRef<HTMLDivElement, RunStepsProps>(
                 className={cn(markClasses, MARK_SKIN[value])}
               >
                 {value === "done" ? (
-                  <Check size={16} aria-hidden="true" />
+                  <CheckFat size={16} aria-hidden="true" />
                 ) : value === "failed" ? (
-                  <TriangleAlert size={16} aria-hidden="true" />
+                  <Warning size={16} aria-hidden="true" />
                 ) : value === "running" ? (
                   /* The kit's ring, at the size that fits a 26 mark.
                      `announce={false}`: the row already says "Running"

@@ -19,7 +19,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Stopwatch } from "@shared/ui/components/stopwatch/stopwatch"
-import { CircleStop, Play } from "@shared/ui/foundations/icons"
+import { StopCircle, Play } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -95,6 +95,29 @@ function badgeName(t: RunningTimer): string {
           : "work"
 }
 
+/** WHAT IS RUNNING RIGHT NOW, as a plain array — this bar's own read, made
+ * reusable rather than duplicated.
+ *
+ * `TimerBar` renders nothing when the array is empty, which is most of the
+ * time, and that used to be the whole story: a container could hand it a slot
+ * and pay nothing for the empty case. It stopped being true when the agency
+ * shell's header BAND became the kit's own element (`ScreenShell`, kit
+ * v1.2.28): the band carries the shell's header padding whether or not
+ * anything is inside it, so "render null" now costs ~90px of empty band above
+ * every screen. `AppShell` asks this first and omits the band entirely.
+ *
+ * IT IS NOT A SECOND REQUEST. `useCached` goes through `loadShared`, which is
+ * keyed and de-duplicates in flight, so this hook and the `TimerBar` beneath
+ * it share one fetch, one cache entry and one live-sync listener (R15 —
+ * `runningTimersKey` is in the registry already). `null` for the team is the
+ * teamless case and reads nothing at all. */
+export function useRunningTimers(teamId: string | null): RunningTimer[] {
+  const timersQ = useCached<RunningTimer[]>(teamId ? runningTimersKey(teamId) : null, () =>
+    contentApi.runningTimers().then((r) => r.timers)
+  )
+  return timersQ.data ?? []
+}
+
 export function TimerBar({
   teamId,
   onNavigate,
@@ -103,12 +126,9 @@ export function TimerBar({
   onNavigate?: (href: string) => void
 }) {
   const t = useT()
-  const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
-    contentApi.runningTimers().then((r) => r.timers)
-  )
   // One tick a second, and only while something is actually running — an interval
   // that keeps firing over an empty bar is a wake-up per second for nothing.
-  const running = timersQ.data ?? []
+  const running = useRunningTimers(teamId)
   const [, tick] = React.useState(0)
   React.useEffect(() => {
     if (running.length === 0) return
@@ -257,7 +277,7 @@ export function RecordTimerButton({
       disabled={busy || disabled}
       onClick={() => void toggle()}
     >
-      {mine ? <CircleStop className="size-3.5" /> : <Play className="size-3.5" />}
+      {mine ? <StopCircle className="size-3.5" /> : <Play className="size-3.5" />}
       {mine ? t("Stop timer") : t("Start timer")}
     </Button>
   )

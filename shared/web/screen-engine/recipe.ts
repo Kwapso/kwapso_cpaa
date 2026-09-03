@@ -124,7 +124,27 @@ export type RecipeNode =
 export interface RecipeTab {
   key: string
   label: string
-  /** lucide icon name (kebab-case), optional. */
+  /**
+   * The tab's glyph, as a kebab-case KIT icon name ("info", "tray",
+   * "clock-counter-clockwise") — a recipe is serialisable data, so it names the
+   * glyph rather than carrying one. Optional, and rarely needed: the renderer
+   * resolves `key` against the shared tab vocabulary (`TAB_ICONS`,
+   * shared/web/screen-engine/tabs-view.tsx) FIRST, so a tab whose key is one
+   * the app already has a glyph for — `overview`, `activity`, `files` — draws
+   * the same one every other strip in the app draws without naming anything.
+   * This is the fallback for a key the vocabulary has never seen.
+   *
+   * IT WAS READ BY NOTHING UNTIL 2026-09-03. `screen-renderer.tsx`'s detail
+   * mapping dropped it on the floor, so every recipe-drawn tab was a bare word
+   * beside strips that drew glyphs — the client's 2026-09-02 ruling ("yes, they
+   * should have icons… we will only have one variation of tabs with icons")
+   * reached the thirteen bespoke screens and not the seven recipe ones.
+   *
+   * AND IT SAID "lucide icon name" UNTIL THE SAME DAY. Lucide left this
+   * codebase on 2026-08-27; the kit draws 1,512 Phosphor glyphs under Phosphor's
+   * own names and nothing else supplies an icon (R39). A name this app cannot
+   * draw resolves to no glyph and the tab keeps its word, rather than throwing.
+   */
   icon?: string
   /** Count/status shown as a pill after the label (e.g. `"12"`, `"3 new"`).
    *  Pre-formatted by the host — the renderer never computes it. Omit for none. */
@@ -142,17 +162,34 @@ export interface RecipeTab {
   block: RecipeBlock
 }
 
-/** Where the detail header pulls its title/subtitle/avatar from (record columns). */
+/** Where the detail header pulls its title/subtitle from (record columns). */
 export interface ScreenHeader {
   title: string
   subtitle?: string
-  /** The column holding the record's picture. Omit and the header draws NO
-   *  avatar at all — not an initials circle: a screen with no picture concept
-   *  should not open with two letters of its own title in a disc. */
+  /**
+   * The column holding the record's picture.
+   *
+   * NO LONGER READ BY THE RENDERER — CLIENT RULING, 2026-09-01, verbatim: "for
+   * now there are no - under no case - images on title. remove it everywhere."
+   * `screen-renderer.tsx` used to build an `<Avatar>` from this column (with an
+   * initials fallback) and hand it to `RecordDetail`'s `mark`; it hands the kit
+   * nothing now, exactly as `web/components/record-chrome.tsx` already did on
+   * the bespoke path.
+   *
+   * The FIELD survives for the same reason record-chrome keeps its own inert
+   * `mark`/`leading`: the recipes that declare it live in another file
+   * (`web/lib/screens.ts` — the team's logo, a member's photo), the ruling says
+   * "for now", and deleting the field would force an edit at every declaring
+   * site to remove an argument that is already doing nothing. A value here
+   * renders nowhere.
+   *
+   * This ruling is about TITLES. A record's face in a list row, a card, a tile
+   * or a picker is untouched (R35) — see `leading` and `image` below.
+   */
   avatar?: string
-  /** How that picture is cropped. Default "circle"; "square" for a logo or
-   *  wordmark, which a circular crop renders unreadable. Ignored when `avatar`
-   *  is omitted (there is nothing to crop). */
+  /** How that picture was cropped: "square" for a logo or wordmark, which a
+   *  circular crop renders unreadable. NO LONGER READ either, for the reason
+   *  `avatar`'s own comment above gives — there is no picture left to crop. */
   avatarShape?: "circle" | "square"
 }
 

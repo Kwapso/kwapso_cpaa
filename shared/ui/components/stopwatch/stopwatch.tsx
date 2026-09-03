@@ -61,7 +61,11 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Clock, CircleStop, Play } from "../../foundations/icons";
+import {
+  Clock,
+  StopCircle,
+  Play,
+} from "../../foundations/icons";
 
 /* The pill. `--space-2h` (10) between the parts; block inset `--space-2` (8);
    the inline start carries `--space-3h` (14) because the glyph needs more air
@@ -326,7 +330,7 @@ const Stopwatch = React.forwardRef<HTMLDivElement, StopwatchProps>(
             )}
           >
             {isRunning ? (
-              <CircleStop size={16} aria-hidden="true" />
+              <StopCircle size={16} aria-hidden="true" />
             ) : (
               <Play size={16} aria-hidden="true" />
             )}

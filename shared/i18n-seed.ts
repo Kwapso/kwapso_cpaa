@@ -1543,7 +1543,11 @@ export const SEED: Catalogue = {
   "No ticket matched.": { de: "Kein Ticket gefunden.", es: "Ningún ticket coincide.", ca: "Cap ticket coincideix."},
   "No type matched.": { de: "Kein Typ gefunden.", es: "Ningún tipo coincide.", ca: "Cap tipus coincideix."},
   "No values match your search or filter.": { de: "Keine Werte passen zu Ihrer Suche oder Ihrem Filter.", es: "Ningún valor coincide con tu búsqueda o filtro.", ca: "Cap valor coincideix amb la teva cerca o filtre."},
-  "No values yet. Add your first above.": { de: "Noch keine Werte. Fügen Sie oben Ihren ersten hinzu.", es: "Aún no hay valores. Añade el primero arriba.", ca: "Encara no hi ha valors. Afegeix el primer a dalt."},
+  // SPLIT FROM "No values yet. Add your first above.", 2026-09-03 (R50) —
+  // this screen's genuinely-empty state moved to `CollectionEmptyState`,
+  // whose own button already says "Add the first" (translated once, as its
+  // own catalogue entry), so this title carries only the first half now.
+  "No values yet.": { de: "Noch keine Werte.", es: "Aún no hay valores.", ca: "Encara no hi ha valors."},
   "No work written down against this ticket yet.": { de: "Es wurde noch keine Arbeit für dieses Ticket festgehalten.", es: "Aún no hay trabajo anotado en este ticket.", ca: "Encara no hi ha feina anotada en aquest ticket."},
   "Nobody here matched.": { de: "Niemand hier passt dazu.", es: "Nadie coincide aquí.", ca: "Aquí no coincideix ningú."},
   "None of this time was logged in the last eight weeks.": { de: "Von dieser Zeit wurde in den letzten acht Wochen nichts erfasst.", es: "Nada de este tiempo se registró en las últimas ocho semanas.", ca: "Res d'aquest temps s'ha registrat en les últimes vuit setmanes."},
@@ -2500,10 +2504,20 @@ export const SEED: Catalogue = {
     es: "Aún no hay herramientas. Añade en qué se ejecutan, para que un paso que reemplace a una pueda restar lo que cuesta.",
     ca: "Encara no hi ha eines. Afegeix en què s'executen, perquè un pas que en substitueixi un pugui restar el que costa.",
   },
-  "No waves yet. A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.": {
-    de: "Noch keine Waves. Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat — zuerst verkaufen, die Sprints darin danach planen.",
-    es: "Aún no hay waves. Una wave es un paquete de sprints que un cliente ha comprado — véndela primero, planifica los sprints dentro de ella después.",
-    ca: "Encara no hi ha waves. Una wave és un paquet de sprints que un client ha comprat — ven-la primer, planifica els sprints dins d'ella després.",
+  // SPLIT INTO TITLE + DESCRIPTION, 2026-09-03 (R50) — waves-screen.tsx's
+  // genuinely-empty state moved from a single sentence to `CollectionEmptyState`
+  // (a bold title, then a separate description), which reads the two halves
+  // through two `t(...)` calls rather than one. The translations below are the
+  // same two halves this entry used to carry combined; nothing was re-thought.
+  "No waves yet.": {
+    de: "Noch keine Waves.",
+    es: "Aún no hay waves.",
+    ca: "Encara no hi ha waves.",
+  },
+  "A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.": {
+    de: "Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat — zuerst verkaufen, die Sprints darin danach planen.",
+    es: "Una wave es un paquete de sprints que un cliente ha comprado — véndela primero, planifica los sprints dentro de ella después.",
+    ca: "Una wave és un paquet de sprints que un client ha comprat — ven-la primer, planifica els sprints dins d'ella després.",
   },
   "Nobody named yet": {
     de: "Noch niemand benannt",

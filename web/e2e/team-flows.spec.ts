@@ -15,7 +15,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 /** A unique email per run so we never collide with throttling or a stale code. */
 function freshEmail(): string {
-  return `e2e+${Date.now()}@swiftstruck.test`
+  return `e2e+${Date.now()}@kwapso.test`
 }
 
 /** Drop a sentinel on window. A full-page reload wipes it; an in-app
@@ -126,7 +126,7 @@ test.describe("team flows (real app)", () => {
 
     // Open the invite dialog (the Invites screen opens it via ?panel=add).
     await page.getByRole("button", { name: /invite/i }).first().click()
-    const inviteEmail = `invitee+${Date.now()}@swiftstruck.test`
+    const inviteEmail = `invitee+${Date.now()}@kwapso.test`
     await page.locator("#invite-email").fill(inviteEmail)
     // A role is required; the dialog defaults to the first non-Admin role.
     await page.getByRole("button", { name: "Send invite" }).click()

@@ -18,10 +18,12 @@
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/ui/components/list/list"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 
 import { useCached } from "@shared/web/store"
 import { delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { ErrorPanel } from "@/components/error-panel"
 import { useT } from "@shared/web/language"
 
 type Sprints = Awaited<ReturnType<typeof delivery.sprints>>["sprints"]
@@ -38,6 +40,29 @@ function dates(s: Sprints[number]): string {
 export function DeliveryBlock() {
   const t = useT()
   const sprintsQ = useCached<Sprints>(cacheKeys.delivery, () => delivery.sprints().then((r) => r.sprints))
+
+  // ERROR AND LOADING COME FIRST — this used to go straight to
+  // `sprintsQ.data ?? []` and treat every one of "still loading", "the read
+  // failed" and "genuinely nothing bought yet" as the same silent nothing.
+  if (sprintsQ.error && !sprintsQ.data)
+    return (
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium">{t("What you bought")}</h2>
+        <ErrorPanel
+          title={t("We couldn't load what you bought.")}
+          description={t("Check your connection and try again.")}
+          onRetry={sprintsQ.refresh}
+        />
+      </section>
+    )
+  if (sprintsQ.loading && !sprintsQ.data)
+    return (
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium">{t("What you bought")}</h2>
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+      </section>
+    )
+
   const sprints = sprintsQ.data ?? []
   // Nothing bought yet renders nothing at all, for the same reason the to-do
   // panel does: an empty card is a card people learn to scroll past.

@@ -1,6 +1,6 @@
 # CONVENTIONS.md, code + comment conventions
 
-The house style of the Brimba server. This is the *how we write code here* companion
+The house style of the Kwapso System server. This is the *how we write code here* companion
 to [ARCHITECTURE.md](ARCHITECTURE.md) (the locked decisions) and [RULES.md](RULES.md)
 (the machine-checked laws). Everything below is grounded in code that already exists,
 where a rule has a canonical file, it's named. A new developer (or an AI agent like

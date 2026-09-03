@@ -414,13 +414,13 @@ import {
 } from "../../components/tooltip/tooltip";
 import { Hint, Text } from "../../components/typography/typography";
 import {
-  ChartNoAxesColumn,
-  ChevronDown,
-  ChevronRight,
-  LibraryBig,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
+  SquaresFour,
+  CaretDown,
+  CaretRight,
+  Books,
+  CaretLineLeft,
+  CaretLineRight,
+  Gear,
 } from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
@@ -720,6 +720,18 @@ export interface RailProps
    * `Isotype` picks its cut from a prop rather than from CSS, so the one
    * decision that cannot be made in the stylesheet is made here. A call site
    * that supplies its own rail node and its own spine passes both.
+   *
+   * THREE VALUES AGAIN, 2026-09-03 — the client's own words, "you know, i
+   * changed my mind. i want to go back to the 3 options (sorry)", after a
+   * day with `ink` and `paper` retired as `"quiet"` and `"mango"`. Restored
+   * rather than re-derived: `ink` gets back its `unlit` cut below, the one
+   * branch the interlude cost this file.
+   *
+   * NOTE THE TWO VOCABULARIES THAT SHARE A WORD. `paper` below is a
+   * `brand.tsx` CUT — which artwork file to load — and it is a different
+   * thing from the `paper` SPINE two lines up, which is a `ScreenShell`
+   * ground. The cut and the spine happen to share a name; neither is derived
+   * from the other.
    */
   spine?: "ink" | "paper" | "mango";
 
@@ -763,6 +775,19 @@ export interface RailProps
    * both already collapsed with no visible toggle, and chapter 15's icon rail
    * carries the only "collapse" word in the document. So the state is always
    * reachable through `collapsed` and the control is opt-in.
+   *
+   * **AND IT STAYS OFF FOREVER NOW, ON A CLIENT APPROVAL OF 2026-09-02.** The
+   * shell draws the collapse control instead — the edge handle on the ground's
+   * leading rim (`screen-shell.tsx`) — so this rail's FOOT holds only the
+   * member chip again, which is what 27.1 and 27.26 draw there. The prop is
+   * left typed and left drawing nothing when it is not asked for, because the
+   * kit is vendored into two applications this repo cannot see and deleting a
+   * prop is a build break for a change that is purely visual. Nothing in this
+   * repo passes it. **Do not turn it on:** two collapse controls for one
+   * state, one of them inside the thing it collapses, is the affordance the
+   * client replaced.
+   *
+   * @deprecated Superseded by `ScreenShell`'s edge handle, 2026-09-02.
    */
   collapsible?: boolean;
   /** The collapse control's names. Verbs, not product words. */
@@ -778,7 +803,7 @@ export interface RailProps
 
    This is the default the shell falls back to, so it is what forty screens
    will draw, so it is the register the kit itself draws on those screens:
-   two groups called Group, four then three entries, Overview first, Settings
+   two groups called Group, four then three entries, Overview first, Gear
    last, the second entry lit. Not one word here is invented and not one is a
    product's.
 
@@ -792,7 +817,7 @@ export interface RailProps
    are the kit's own placeholders, "Collection" five times over, and a
    placeholder word takes a placeholder glyph. Each of the three distinct
    words takes the icon whose NAME in the kit's own set is the same concept —
-   a summary for Overview, a library for Collection, Settings for Settings —
+   a summary for Overview, a library for Collection, Gear for Gear —
    so nothing is coined and nothing is asserted about a real screen. All icon
    ARTWORK in this repo is still placeholder (ICON-LANGUAGE.md: "No glyph has
    been drawn"), so all three render the same rounded square today and what
@@ -804,19 +829,19 @@ const PLACEHOLDER_GROUPS: readonly RailGroup[] = [
     id: "group-1",
     heading: "Group",
     items: [
-      { id: "overview", label: "Overview", icon: <ChartNoAxesColumn aria-hidden="true" /> },
-      { id: "collection-1", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-2", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-3", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
+      { id: "overview", label: "Overview", icon: <SquaresFour aria-hidden="true" /> },
+      { id: "collection-1", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-2", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-3", label: "Collection", icon: <Books aria-hidden="true" /> },
     ],
   },
   {
     id: "group-2",
     heading: "Group",
     items: [
-      { id: "collection-4", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-5", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "settings", label: "Settings", icon: <Settings aria-hidden="true" /> },
+      { id: "collection-4", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-5", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "settings", label: "Settings", icon: <Gear aria-hidden="true" /> },
     ],
   },
 ];
@@ -1110,7 +1135,14 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
        is also the accent law ("charcoal on every accent, no exceptions").
        `unlit` is the always-reversed field the charcoal spine needs in both
        palettes; only `paper` swaps with the theme, and only the paper spine
-       is a ground that actually swaps. */
+       is a ground that actually swaps.
+
+       RESTORED 2026-09-03 ALONGSIDE THE THIRD SPINE. The interlude's own note
+       here explained why the branch could go: quiet's ground follows the
+       palette by definition, so it never needed the reversed cut. Ink is
+       back and so is the reason — it is the one ground that stays dark in
+       BOTH palettes, so a theme-following cut would put black artwork on
+       charcoal. */
     const markField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper";
 
     /* WHETHER THE EXPANDED ROWS DRAW AN ICON COLUMN — one decision for the
@@ -1329,9 +1361,9 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
                         read as a second, unrelated control. */}
                     <span className="min-w-0 truncate">{group.heading}</span>
                     {open ? (
-                      <ChevronDown aria-hidden="true" />
+                      <CaretDown aria-hidden="true" />
                     ) : (
-                      <ChevronRight aria-hidden="true" />
+                      <CaretRight aria-hidden="true" />
                     )}
                   </button>
                 ) : null}
@@ -1370,9 +1402,9 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             )}
           >
             {isCollapsed ? (
-              <PanelLeftOpen aria-hidden="true" />
+              <CaretLineRight aria-hidden="true" />
             ) : (
-              <PanelLeftClose aria-hidden="true" />
+              <CaretLineLeft aria-hidden="true" />
             )}
             {!isCollapsed ? (
               <span className="min-w-0 flex-1 truncate">{collapseLabel}</span>
@@ -1388,7 +1420,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             ink that rung is still the off-beige / raised chip 27.1 and 27.26
             draw at the foot; nothing here picks a colour.
 
-            26.02: "no member list (that lives in Settings)". One chip. */}
+            26.02: "no member list (that lives in Gear)". One chip. */}
         {member !== null && member !== undefined ? (
           <MemberChip member={member} collapsed={isCollapsed} />
         ) : null}

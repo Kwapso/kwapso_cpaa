@@ -143,7 +143,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../sheet/sheet";
-import { Sparkles } from "../../foundations/icons";
+import { Sparkle } from "../../foundations/icons";
 
 /* ============================================================================
    THE RING
@@ -643,7 +643,7 @@ const CopilotOverlay = React.forwardRef<HTMLButtonElement, CopilotOverlayProps>(
                 setOpen(!isOpen);
               }}
             >
-              {launcherIcon ?? <Sparkles />}
+              {launcherIcon ?? <Sparkle />}
             </Button>
           </div>
         ) : null}
@@ -662,7 +662,7 @@ const CopilotOverlay = React.forwardRef<HTMLButtonElement, CopilotOverlayProps>(
                   "[&_svg]:size-[var(--icon-16)]",
                 )}
               >
-                {launcherIcon ?? <Sparkles />}
+                {launcherIcon ?? <Sparkle />}
               </span>
               <SheetTitle className="min-w-0">{title}</SheetTitle>
             </div>
@@ -769,7 +769,7 @@ const CopilotOverlay = React.forwardRef<HTMLButtonElement, CopilotOverlayProps>(
                   className="size-[var(--control-height-dense)] shrink-0 p-0"
                   onClick={ask}
                 >
-                  <Sparkles />
+                  <Sparkle />
                 </Button>
               </div>
             ) : null}

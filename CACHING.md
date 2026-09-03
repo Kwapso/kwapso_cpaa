@@ -1,6 +1,6 @@
 # Caching, the system-wide ruleset (LOCKED 2026-06-15; ROW-LEVEL live-sync added 2026-06-22; agent-modules resources added 2026-06-23)
 
-How Brimba (and every app built on this base) caches data on the client. These
+How the Kwapso System (and every app built on this base) caches data on the client. These
 rules make caching **safe** because the live channel keeps it honest: you never
 sit on stale data, and a cache can never hold something you're not allowed to
 see. Follow them for every new screen and module.

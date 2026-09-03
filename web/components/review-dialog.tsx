@@ -35,7 +35,7 @@ import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { ClipboardCheck, Link as LinkIcon, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
+import { CheckSquare, Link as LinkIcon, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { Button } from "@shared/ui/components/button/button"
@@ -206,7 +206,7 @@ export function ReviewDialog({
       submit={{
         busy: busy,
         disabled: !ready,
-        icon: <ClipboardCheck className="size-4" />,
+        icon: <CheckSquare className="size-4" />,
       }}
     >
       <Field config={noteField} htmlFor="review-note" className={fieldSpacing}>

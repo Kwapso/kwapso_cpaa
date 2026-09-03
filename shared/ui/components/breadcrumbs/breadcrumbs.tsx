@@ -88,14 +88,23 @@ export interface BreadcrumbsProps
 }
 
 /** A crumb, or the gap where several were removed. */
-type Rendered = { kind: "item"; item: BreadcrumbsItem; index: number } | { kind: "gap" };
+export type Rendered =
+  | { kind: "item"; item: BreadcrumbsItem; index: number }
+  | { kind: "gap" };
 
 /**
  * Keep the first crumb, the gap, and the tail — never fewer than the first and
  * the last. `maxItems` counts the crumbs the reader ends up seeing, gap
  * excluded, so `maxItems={3}` on a six-step trail shows root … x y.
+ *
+ * EXPORTED 2026-09-02, for `breadcrumb-folders.tsx` in this same folder. It is
+ * the fold rule of the trail, not of this one drawing of it, and the folder
+ * strip is the second drawing — so it is reached rather than re-derived. It
+ * stays un-exported from the folder's public surface in the sense that
+ * matters: nothing outside `components/breadcrumbs/` imports it, and the two
+ * files that do are the two forms of the same trail.
  */
-function collapse(items: BreadcrumbsItem[], maxItems?: number): Rendered[] {
+export function collapse(items: BreadcrumbsItem[], maxItems?: number): Rendered[] {
   const all: Rendered[] = items.map((item, index) => ({ kind: "item", item, index }));
   if (maxItems === undefined || maxItems < 2 || items.length <= maxItems) return all;
 

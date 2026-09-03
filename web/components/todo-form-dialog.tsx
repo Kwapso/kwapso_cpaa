@@ -17,7 +17,7 @@ import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Send } from "@shared/ui/foundations/icons"
+import { PaperPlaneTilt } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -104,7 +104,7 @@ export function TodoFormDialog({
       submit={{
         busy: busy,
         disabled: !ready,
-        icon: <Send className="size-4" />,
+        icon: <PaperPlaneTilt className="size-4" />,
       }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>

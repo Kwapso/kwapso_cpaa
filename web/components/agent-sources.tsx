@@ -60,9 +60,8 @@ import {
 } from "@shared/ui/components/collapsible/collapsible"
 import type { AgentChatSource } from "@shared/ui/components/agent-chat/agent-chat"
 import {
-  ChevronDown,
-  ExternalLink,
-  SquareArrowOutUpRight,
+  CaretDown,
+  ArrowSquareOut,
 } from "@shared/ui/foundations/icons"
 
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
@@ -139,7 +138,7 @@ export function TurnSources({ evidence, teamId }: { evidence: TurnEvidence; team
       <CollapsibleTrigger className="text-muted-foreground hover:text-foreground text-xs">
         {/* The mark ROTATES rather than swapping glyph — the kit's own
             disclosure behaviour, motion.css §9. */}
-        <ChevronDown className="motion-disclosure-marker size-3.5" aria-hidden />
+        <CaretDown className="motion-disclosure-marker size-3.5" aria-hidden />
         {t("What I read")}
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -227,7 +226,7 @@ function OpenTheRecord({
         href={`/t/${teamId}/${from.recordPath}`}
         className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
       >
-        <SquareArrowOutUpRight className="size-3 shrink-0" aria-hidden />
+        <ArrowSquareOut className="size-3 shrink-0" aria-hidden />
         {t("Open the record")}
       </InAppLink>
     )
@@ -239,7 +238,7 @@ function OpenTheRecord({
       rel="noreferrer noopener"
       className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
     >
-      <ExternalLink className="size-3 shrink-0" aria-hidden />
+      <ArrowSquareOut className="size-3 shrink-0" aria-hidden />
       {t("Open the original")}
     </a>
   )

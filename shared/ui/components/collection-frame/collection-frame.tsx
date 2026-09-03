@@ -3,30 +3,35 @@
    figure strip, tabs, and ONE PANEL holding toolbar, rows and pager
    (1 direct call site).
 
-   CLIENT RULING J2 · 2026-08-22 · override register #11
-   "A folder tab attaches to a panel." Ruling E put the brand folder shape on
-   every main screen, but a folder tab is drawn to be pulled DOWN under a
-   panel by `--folder-tab-overlap` and filled with the panel's own colour —
-   without a panel it is a shape joined to nothing, floating over the frame's
-   ground with a sliver of that ground showing under its foot.
+   CLIENT RULING J2 · 2026-08-22 · override register #11 — HALF SPENT ON
+   2026-09-02, AND THE OTHER HALF MOVED. Read both paragraphs before restoring
+   anything.
 
-   CH27.1 states the region order and the container in one sentence, verbatim:
+   J2 said "a folder tab attaches to a panel", because ruling E had put the
+   brand folder shape on every main screen and a folder tab is drawn to be
+   pulled DOWN under a panel by `--folder-tab-overlap` and filled with the
+   panel's own colour — without a panel it is a shape joined to nothing. THIS
+   FRAME NO LONGER DRAWS A FOLDER TAB. The client retired the variant on
+   2026-09-02 ("the only tabs that we will have are the line tabs because
+   folders will only be used for the breadcrumbs"), so the strip here is a
+   `line` strip, attached to nothing by design, and J2's attachment rule has
+   nothing to govern in this file. It governs
+   `components/breadcrumbs/breadcrumb-folders.tsx` instead, which is the one
+   folder strip left and the only place the overlap is still drawn.
+
+   WHAT SURVIVES J2 HERE IS THE ONE PANEL. CH27.1 states the region order and
+   the container in one sentence, verbatim:
 
        "Figures, folder tabs, then the collection panel — toolbar, rows, pager
         inside it. A collection may drop the figure strip; it may not reorder
         what remains, and filters never sit above the tabs."
 
-   and CH14 says what the tab is doing against it, verbatim:
-
-       "The active one fills the card colour and sits above it; the rest take
-        the quiet #FAF9F7 fill with a secondary label and are clipped by the
-        card edge."
-
-   So the toolbar, the body and whatever pager the body carries are no longer
-   three sibling bands with a gap between them: they are ONE panel,
-   `--surface-panel` at `--radius`, and the tab strip sits on its top edge with
-   NO gap — the strip's own negative block-end margin (`TabsList`, `folder`)
-   rides the panel up over the tabs' feet by exactly `--folder-tab-overlap`.
+   The chapter's word for the strip is stale by one client ruling; its ORDER
+   and its ONE CONTAINER are not. The toolbar, the body and whatever pager the
+   body carries are still not three sibling bands: they are ONE panel,
+   `--surface-panel` at `--radius`. What changed is the seam above it — the
+   strip and the panel take the frame's ordinary band gap now, because a line
+   strip has no feet to hide.
 
    OVERRIDE 15 WAS REVERSED ON 2026-08-23. READ THIS BEFORE CHANGING A FILL.
 
@@ -35,8 +40,10 @@
 
      · 26.04, verbatim: "The page itself is off-beige and every panel on it is
        soft paper: never the other way round."
-     · the active folder tab's fill is `#F7F2EB`, and CH14's rule is that the
+     · the active folder tab's fill was `#F7F2EB`, and CH14's rule is that the
        active tab takes the panel's own fill — so the panel is soft paper.
+       (The folder tab is retired; the reading it produced still stands, and
+       the breadcrumb strip's live tab makes the same argument today.)
      · the client's own screenshots of both doors.
 
    A design-lead flip was made on their instruction to match the kit exactly.
@@ -45,32 +52,22 @@
        off-beige PAGE  →  soft-paper SCREEN CARD  →  off-beige BODY PANE
          →  soft-paper PANEL (this file)  →  off-beige CARDS
 
-   Three things make the tab's join true rather than approximately true, and
-   all three are load-bearing:
-     · The panel is `--surface-panel` because the ACTIVE TAB IS the panel's
-       own fill (CH14, CH27.1). `tabs.tsx` writes that fill as `--card`, so
-       this file rebinds `--card` to `var(--surface-panel)` ON THE STRIP and
-       nowhere else — see the `className` on `Tabs` in the render. Same
-       colour or the join is a lie.
+   Two things keep the panel readable, and both are load-bearing. (There were
+   three; the first was the rebinding that made the folder tab's fill and this
+   panel's fill one colour, and it went with the folder tab on 2026-09-02.)
      · The panel's ground is the BODY PANE, off-beige — the frame's own fill
        at `tone="page"`, which is now the default. In light the panel is
        #F7F2EB and the ground is #FFFEF9; without that ground the panel would
        be invisible and there would be nothing for an inactive tab to be
        clipped against. (Before the reversal these two were the other way
        round, which is what `ScreenShell`'s missing body pane was hiding.)
-     · THE STRIP'S ground is the same off-beige as the pane, so the three
-       papers of CH27.1 are all distinct and all the kit's own hexes: band
-       #FFFEF9, inactive tab #FAF9F7 (`--muted`, whose own comment in
-       tokens.css reads "inactive tabs, idle wells"), active tab and panel
-       #F7F2EB. Override 30 had transposed the last two because there was no
-       off-beige pane for them to stand on; with the pane drawn, the
-       transposition is unnecessary and it is undone here.
      · Nothing is separated by a stroke. There is no `border` here, and no
        hairline either: the panel is told apart from its ground by colour, as
        CH13's subtitle demands ("Colour separates, strokes don't").
 
-   The z-order is chapter 24.3's own three numbers and is shared with
-   `TabsContent`: inactive tab 1, panel 2, active tab 3.
+   The panel keeps chapter 24.3's middle z-index, 2. The 1 and the 3 around it
+   were the inactive and active folder tabs' and are gone from this file; the
+   breadcrumb strip keeps all three.
 
    DESIGN SOURCE
    Kit "Assembled screens → List / collection page", read out of
@@ -112,6 +109,21 @@
        itself is drawn by `gantt.tsx`, which is where CH27.26 is transcribed.
 
    The order is now: search → filters → PERIOD → view switch → actions.
+
+   THE PRECEDENT WAS USED A SECOND TIME ON 2026-09-02, and this is the note
+   that says so rather than leaving a reader to wonder whether `toolbarPanel`
+   was smuggled in. The slot that grew is not inside the toolbar row — it is
+   BETWEEN the toolbar and the rows. CH27.1's sentence fixes the REGIONS
+   ("toolbar, rows, pager inside it"), and the client's ruling of the same day
+   ("the expanded toolbar shoudl not be an overlay, but literaly expand the
+   space") requires a place in flow for what a toolbar control opens. There
+   was none, so hosts were portalling into the panel's body. One named slot,
+   in one fixed position, drawn only when passed — the same three conditions
+   override 28 set. The region order inside the panel is now:
+
+       band → toolbar → TOOLBAR PANEL → rows → pager
+
+   and, as before, the ORDER is the component's and the DRAWING is not.
 
    The same toolbar is drawn again in kit chapter 19 ("Collection views · 24
    view types · one toolbar contract"), where the hairline rule between the
@@ -176,9 +188,9 @@ import {
 } from "../dropdown-menu/dropdown-menu";
 import { Separator } from "../separator/separator";
 import { Spinner } from "../spinner/spinner";
-import { Tabs, TabsCount, TabsList, TabsTrigger } from "../tabs/tabs";
+import { Tabs, TabsCount, TabsList, TabsTrigger, TABS_STRIP_GAP } from "../tabs/tabs";
 import { Title } from "../title/title";
-import { MoreHorizontal } from "../../foundations/icons";
+import { DotsThree } from "../../foundations/icons";
 
 /* ============================================================================
    CollectionRegister — the empty / error / busy notice a collection shows
@@ -428,7 +440,7 @@ const collectionFrameVariants = cva(
         /**
          * THE DEFAULT SINCE THE K1 REVERSAL. Off-beige — the body pane's own
          * tone, and the ground CH27.1 draws the soft-paper collection panel
-         * and its folder tabs against. 26.04: "The page itself is off-beige
+         * against. 26.04: "The page itself is off-beige
          * and every panel on it is soft paper: never the other way round."
          *
          * Measured against the panel at #F7F2EB: 1.103 light, 1.111 dark.
@@ -441,8 +453,8 @@ const collectionFrameVariants = cva(
         /**
          * Soft paper. WAS the default, under ruling K1, and it is now the
          * broken combination rather than the settled one: a soft-paper panel
-         * on a soft-paper ground measures 1.000 in both palettes and the
-         * active folder tab has nothing to be seen against.
+         * on a soft-paper ground measures 1.000 in both palettes and the panel
+         * has nothing to be seen against.
          *
          * Kept as a value, because removing it would change a public prop's
          * accepted set. Do not reach for it: a frame that needs a soft-paper
@@ -497,24 +509,23 @@ const collectionFrameVariants = cva(
 
    CH27.1: "toolbar, rows, pager inside it". One surface, not three bands.
 
-   · `bg-surface-panel` — soft paper, the K1 reversal. CH27.1 gives the active
-     tab "the panel's soft paper (#F7F2EB)" and CH14 gives it "the card
-     colour"; `tabs.tsx` spells that fill `--card`, so the STRIP rebinds
-     `--card` to `var(--surface-panel)` and the two are the same colour again.
-     If they ever stop being the same colour the tab stops being attached and
-     starts being a differently coloured lid.
-   · `rounded-[var(--radius)]` — ruling 03: 24, the one box radius. The tab's
-     own corners are the nine-slice's and are not touched.
-   · `relative z-[2]` — chapter 24.3's middle number, the same one
-     `TabsContent` uses on the folder variant: above an inactive tab (1) so
-     the panel edge clips it, below the active tab (3) so the active one sits
-     on top and its foot disappears under the panel.
+   · `bg-surface-panel` — soft paper, the K1 reversal. CH27.1 and CH14 both
+     argue it from the active folder tab's own fill, which this frame no longer
+     draws; the fill they argued FOR is unchanged, and the breadcrumb strip's
+     live tab now makes the same argument against the screen card.
+   · `rounded-[var(--radius)]` — ruling 03: 24, the one box radius.
+   · `relative z-[2]` — chapter 24.3's middle number. It used to sit between an
+     inactive folder tab (1) and an active one (3); with the folder tab retired
+     there is nothing above or below it here, and it is kept because the panel
+     is still the frame's own painted layer and a caller may drop positioned
+     content on either side of it.
    · The secondary and pill fills re-resolve AGAIN here, because a control in
      the toolbar stands on `--card` and not on the frame's ground. Ruling 01
      is relational, and CH27.1 draws the opposition on this exact toolbar.
    · No `border`, no hairline, no shadow. Colour is the separation (CH13), and
      neither CH27.1 nor CH14 draws a rule or a lift on this panel — CH14's own
-     folder panel is a plain fill at 24. GAPS-J2 J2-4.
+     folder PANEL (`FolderPanel`, which is not retired) is a plain fill at 24.
+     GAPS-J2 J2-4.
    · No `overflow: hidden`. A clipped panel would shave the global focus ring
      off the first control in the toolbar and off the first and last row.
    -------------------------------------------------------------------------- */
@@ -549,13 +560,15 @@ export interface CollectionFrameTab {
   /** What the tab says. A node, so a count or an icon can ride along. */
   label: React.ReactNode;
   /**
-   * A count after the label, drawn by `TabsCount` — CH14's quiet number
-   * (micro, tabular, tertiary ink, never a `Badge`, override 45) when this
-   * frame's tabs are `folder`, or R-4a's asymmetric line count if a caller
-   * passes `tabsVariant="line"`. Zero renders nothing either way.
+   * A count after the label, drawn by `TabsCount` — R-4a's asymmetric line
+   * count: quiet tertiary text at rest, the same round `Badge`-counter fill
+   * this frame's own heading count wears on the ACTIVE tab (mango,
+   * primary-ink text; `size-*` circle clause reversed 2026-09-03 — see
+   * `tabs.tsx`). CH14's alternative quiet number was the FOLDER tab's, and it
+   * left with the folder variant on 2026-09-02. Zero renders nothing.
    */
   count?: number;
-  /** Dead tab: a fill and an ink, never an opacity. */
+  /** Dead tab: an ink and a cursor, never an opacity. */
   disabled?: boolean;
 }
 
@@ -594,18 +607,13 @@ export interface CollectionFrameProps
   defaultValue?: string;
   /** Fires when the reader picks a tab. */
   onValueChange?: (value: string) => void;
-  /**
-   * `folder` (the brand shape) or `line` (the strip under a heading). There
-   * is no third: `pill` was deleted from `Tabs` in review round 1 — it was a
-   * segmented CONTROL wearing a tab's name, and the control is
-   * `toggle-group`.
-   *
-   * DEFAULTS TO `folder` BY CLIENT RULING E (2026-08-22): "folder tabs are for
-   * main screens, line tabs for detail screens." A collection IS a main
-   * screen, so the frame that draws collections takes the brand shape. A
-   * strip inside a record is `RecordDetail`'s, and that one stays `line`.
-   */
-  tabsVariant?: "line" | "folder";
+  /* `tabsVariant` IS GONE — CLIENT RULING, 2026-09-02. "the only tabs that we
+     will have are the line tabs because folders will only be used for the
+     breadcrumbs." It defaulted to `folder` under ruling E of 2026-08-22
+     ("folder tabs are for main screens, line tabs for detail screens"), which
+     that ruling replaces: there is one tab shape now, so a frame has nothing
+     to choose and a prop offering the choice would be a lever with nothing on
+     the other end. `Tabs` draws the strip; this frame states no variant. */
   /** Accessible name for the strip. Undefined leaves it named by the heading. */
   tabsLabel?: string;
 
@@ -615,9 +623,10 @@ export interface CollectionFrameProps
    * The archive tab is the only composition in the kit that draws one:
    * "one extra band saying where you are". The artifact renders it as the
    * FIRST CHILD OF THE PANEL, before the toolbar row — not as a band between
-   * the tab strip and the panel, which ruling J2 makes impossible anyway
-   * (the folder tab's foot rides on the panel's top edge, and anything in
-   * that gap breaks the join).
+   * the tab strip and the panel. That placement was impossible under ruling
+   * J2, when the folder tab's foot rode on the panel's top edge and anything
+   * in the gap broke the join; it is merely wrong now, because CH27.5 draws
+   * the band inside the panel and the artifact is the reference.
    *
    * A placement slot, not a drawing: the frame decides only WHERE it sits.
    * The words, their steps and their inks belong to the composition, which
@@ -670,6 +679,37 @@ export interface CollectionFrameProps
   /** Accessible name for the overflow trigger. */
   moreActionsLabel?: string;
 
+  /**
+   * WHAT A TOOLBAR CONTROL OPENS — BETWEEN THE TOOLBAR AND THE ROWS, IN FLOW.
+   * Added 2026-09-02 on override 28's precedent, which is the second time
+   * that precedent has been used and the reason it was written down.
+   *
+   * CLIENT, 2026-09-02, VERBATIM: "the expanded toolbar shoudl not be an
+   * overlay, but literaly expand the space". A filter panel opened off the
+   * toolbar's own pill has to PUSH THE ROWS DOWN — not float over them, and
+   * not grow the pill it came out of. This frame owns every line of markup
+   * between its toolbar and its body, so until this slot existed there was
+   * nowhere in flow for such a panel to land: the consuming app wrapped the
+   * whole frame in a context provider, published a DOM node as the first
+   * child of the body, and `createPortal`'d the panel into it — roughly 90
+   * lines of app code, all of it to reach a position this component could
+   * simply offer. It offers it.
+   *
+   * A PLACEMENT, NOT A DRAWING, exactly as `band` and `period` are: the frame
+   * decides only WHERE the node sits and gives it the panel's own column gap.
+   * Nothing here styles it, sizes it, or animates it — the control that owns
+   * the panel owns its skin, and a panel that wants to be an overlay should
+   * not be passed here at all.
+   *
+   * NOT `band`, and the two are not interchangeable. `band` is CH27.5's one
+   * line of standing — where you are — and it sits ABOVE the toolbar,
+   * permanently. This is what a toolbar control opened, below the toolbar,
+   * transiently. A composition may have both.
+   *
+   * Drawn only when a node is passed, so no existing call site changes.
+   */
+  toolbarPanel?: React.ReactNode;
+
   /** The body has not arrived. Shows the busy register in place of `children`. */
   loading?: boolean;
   /** The body arrived and is empty. Shows the empty register in place of `children`. */
@@ -696,9 +736,11 @@ export interface CollectionFrameProps
  * TEN STATES
  *  1. default        — heading band, optional figures, optional tabs, then
  *                      ONE panel holding the optional standing band, the
- *                      toolbar, the rows and the pager (CH27.1, ruling J2).
- *                      The active tab is attached to that panel's top edge;
- *                      nothing else is a band.
+ *                      toolbar, whatever a toolbar control has opened, the
+ *                      rows and the pager (CH27.1, ruling J2, and the second
+ *                      use of override 28's precedent). The active tab is
+ *                      attached to that panel's top edge; nothing else is a
+ *                      band.
  *  2. hover          — does not apply to the frame. It is a band; the rows,
  *                      cards and controls inside it carry their own, and a
  *                      whole reacting panel would be noise.
@@ -785,8 +827,6 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
       value,
       defaultValue,
       onValueChange,
-      /* Ruling E: a collection is a main screen, so the brand folder shape. */
-      tabsVariant = "folder",
       tabsLabel,
       band,
       search,
@@ -796,6 +836,7 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
       actions,
       maxActions = 3,
       moreActionsLabel = "More actions",
+      toolbarPanel,
       loading = false,
       empty = false,
       error = false,
@@ -841,7 +882,7 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" aria-label={moreActionsLabel}>
-                <MoreHorizontal />
+                <DotsThree />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">{overflowActions}</DropdownMenuContent>
@@ -900,133 +941,78 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
 
         {figures ? <div data-slot="collection-frame-figures">{figures}</div> : null}
 
-        {/* RULING J2 — the strip and the panel are one region.
+        {/* RULING J2 IS SPENT, AND ITS OTHER HALF SURVIVES ELSEWHERE.
 
-            A `folder` strip carries a negative block-end margin of exactly
-            `--folder-tab-overlap`, so with NO gap here the panel's top edge
-            rides up over the tabs' feet: the active tab's `--card` foot
-            disappears into the panel's own `--card`, and the inactive tabs,
-            a z-index below, are cut off by the panel edge. Any gap at all —
-            the frame's own `gap-5` was 20px of it — leaves a stripe of the
-            frame's ground under the tab and the join is broken.
+            J2 said the strip and the panel are ONE REGION, because a `folder`
+            strip carried a negative block-end margin of exactly
+            `--folder-tab-overlap` and any gap at all left a stripe of ground
+            under the tabs' feet and broke the join. That was true of the
+            folder strip, which this frame no longer draws (client ruling,
+            2026-09-02) — and it is still true of the one thing that does, the
+            breadcrumb folder strip in
+            `components/breadcrumbs/breadcrumb-folders.tsx`, which is where the
+            overlap and the rule about not putting anything in the gap now
+            live.
 
-            A `line` strip is attached to nothing by design (it is a rule
-            under a heading), so it keeps the frame's ordinary band gap. */}
-        <div
-          data-slot="collection-frame-stack"
-          className={cn(
-            "flex min-w-0 flex-col",
-            tabsVariant === "folder"
-              ? "gap-0"
-              : density === "compact"
-                ? "gap-4"
-                : "gap-5",
-          )}
-        >
+            THE STACK NO LONGER SPENDS A `gap` OF ITS OWN — CHANGED 2026-09-03,
+            SAME DAY AS THE NUMBER ITSELF. It used to keep "the frame's
+            ordinary band gap at every density" here, a flex `gap` between
+            this `<Tabs>` wrapper and the panel below. The client then asked
+            for that space to survive scrolling — a strip that pins at the top
+            of a scrolling pane keeps its own box, including any padding, but
+            a flex `gap` is a static distance between two siblings and stops
+            meaning anything the moment one of them goes sticky. So the space
+            moved onto the STRIP's own box: `TABS_STRIP_GAP` is
+            `tabs.tsx`'s exported padding-block-end, on the `<Tabs>` wrapper
+            immediately below (whose only child is `TabsList`, so this is
+            "padding right after the strip" with nothing else inside that
+            box to disturb). This stack is a plain column now; the density
+            variants above still govern the frame's OWN inset and its OTHER
+            gaps (header to figures, figures to this stack), which this join
+            was never about. */}
+        <div data-slot="collection-frame-stack" className="flex min-w-0 flex-col">
           {tabs && tabs.length > 0 ? (
             <Tabs
-              variant={tabsVariant}
               value={value}
               defaultValue={value === undefined ? (defaultValue ?? tabs[0].value) : undefined}
               onValueChange={onValueChange}
               data-slot="collection-frame-tabs"
-              /* OVERRIDE 30 IS UNDONE HERE — THE THREE PAPERS ARE THE KIT'S
-                 OWN AGAIN, BECAUSE THE BODY PANE NOW EXISTS TO STAND THEM ON.
+              className={TABS_STRIP_GAP}
+              /* THE THREE PAPERS THAT USED TO BE RESOLVED HERE ARE GONE WITH
+                 THE FOLDER VARIANT (client ruling, 2026-09-02), AND SO IS THE
+                 WHOLE OVERRIDE 30 / 38 / 39 ARGUMENT THIS BLOCK CARRIED.
 
-                 CH27.1 and CH14 both draw the same three papers and both name
-                 two of the hexes:
+                 What stood here: `--card: var(--surface-panel)` on `Tabs` and
+                 `--surface-panel: var(--muted)` on `TabsList`, two rebindings
+                 that moved the folder shape's active and inactive fills
+                 without editing `tabs.tsx`, plus a `rounded-t-[var(--radius)]
+                 bg-surface-page` band for the strip to stand on. A `line`
+                 strip is a rule under a heading, not a shape standing on a
+                 ground: it has no fill to move, no band to stand on and no
+                 corner to round. All four classes are removed rather than
+                 left inert — an inert rebinding is exactly the kind of thing
+                 the next reader "fixes".
 
-                     band / ground   off-beige   #FFFEF9
-                     inactive tab    "the quiet #FAF9F7 fill"
-                     active tab      "the panel's soft paper (#F7F2EB)"
-
-                 Override 30 transposed the last two, and it had to: the frame
-                 had no off-beige ground of its own, so the strip was the only
-                 band that could be moved, and moving it left the inactive tab
-                 with nothing to be quieter THAN. With `ScreenShell`'s body
-                 pane drawn, the ground IS off-beige and the transposition is
-                 unnecessary. Overrides 38 and 39 were both consequences of it
-                 and both go with it: no tab reads 1.000 against anything now,
-                 in either palette.
-
-                 THE FILLS ARE MOVED BY REBINDING, NOT BY EDITING `tabs.tsx`.
-                 `FOLDER_SHAPE_FILL` paints the inactive shape `--surface-panel`
-                 and the active shape `--card`, so the two names are re-pointed
-                 on the two elements this file owns, and nothing outside the
-                 strip is touched:
-
-                   · ON `Tabs` — `--card: var(--surface-panel)`. Substitution
-                     happens at computed-value time, so `--card` computes to
-                     #F7F2EB HERE and every descendant inherits that literal.
-                     The active tab is therefore the panel's own fill, which is
-                     CH27.1's sentence exactly.
-                   · ON `TabsList` — `--surface-panel: var(--muted)`. `--muted`
-                     is #FAF9F7 in light and its own comment in tokens.css
-                     reads "inactive tabs, idle wells": it is the kit's stated
-                     inactive-tab paper, named. It is set one element LOWER so
-                     it cannot reach the `--card` line above it — that one is
-                     already resolved.
-
-                 Nothing else inside this `Tabs` reads either name: the strip
-                 holds the triggers and nothing else, and the panel is a
-                 sibling, not a child.
-
-                 MEASURED, both palettes, after the change:
-                   light  band #FFFEF9 · inactive #FAF9F7 (1.021)
-                          · active/panel #F7F2EB (1.103 vs band, 1.081 vs inactive)
-                   dark   band #141310 · inactive #2F2D28 (1.611)
-                          · active/panel #1C1B18 (1.111 vs band, 1.450 vs inactive)
-
-                 The dark pair is ordered the other way round from light — the
-                 inactive tab is LIGHTER than the active one there, because no
-                 dark paper exists between #141310 and #1C1B18 and override 30
-                 already measured that a fourth one is arithmetically doomed.
-                 Three distinct, legible papers in dark was preferred to a
-                 faithful ordering with one of them invisible. Recorded on the
-                 register with the K1 reversal.
-
-                 FOLDER ONLY. A `line` strip is a rule under a heading, not a
-                 shape standing on a ground, and it has no fill to move.
-
-                 THE BAND TAKES THE BOX RADIUS AT ITS TOP, and that is not
-                 decoration: the band and the pane behind it are the same
-                 off-beige paper, so a square-cornered band would have given
-                 the collection a square-topped slab where ruling 03 allows one
-                 box radius and no other. Only the two block-start corners; the
-                 block-end pair is the panel's. */
-              className={
-                tabsVariant === "folder"
-                  ? cn(
-                      "rounded-t-[var(--radius)] bg-surface-page",
-                      "[--card:var(--surface-panel)]",
-                    )
-                  : undefined
-              }
+                 The measured figures they produced are not lost. The register
+                 keeps them, and the surviving folder shape — the breadcrumb
+                 strip — restates its own pair and measures them again in
+                 `verify/breadcrumb-folder/`. */
             >
-              <TabsList
-                aria-label={tabsLabel}
-                /* The inactive shape's paper, one element below the line that
-                   resolves the active one. See the block above. */
-                className={
-                  tabsVariant === "folder" ? "[--surface-panel:var(--muted)]" : undefined
-                }
-              >
+              <TabsList aria-label={tabsLabel}>
                 {tabs.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value} disabled={tab.disabled}>
                     {tab.label}
                     {/* OVERRIDE 45 (2026-08-23) — A TAB'S COUNT IS QUIET,
-                        NEVER A BADGE. CH14, the folder chapter's own closing
-                        law, verbatim: "counts are quiet, never badges." This
-                        strip used to shipped a `Badge` on every folder tab,
-                        which is a filled chip inside a tab shape — two boxes
-                        deep, and the one thing the chapter rules out by name.
-                        The quiet number this override fixed it to is now
+                        NEVER A BADGE. This strip used to ship a `Badge` on
+                        every tab, which is a filled chip inside a tab shape —
+                        two boxes deep, and the one thing CH14 ruled out by
+                        name. The quiet number this override fixed it to is now
                         `TabsCount` itself (GAPS-RULINGS.md R-4a), so this
                         frame's own hand-rolled span cannot drift from the
-                        contract a second time the way it drifted the first —
-                        `TabsCount` resolves the right shape for whichever
-                        `tabsVariant` this frame is passed, `folder`'s quiet
-                        number by default. */}
+                        contract a second time the way it drifted the first.
+                        The chapter it cited was the FOLDER chapter and the
+                        folder tab is retired; the override survives it,
+                        because R-4a's line count is not a badge either. */}
                     <TabsCount count={tab.count} />
                   </TabsTrigger>
                 ))}
@@ -1068,6 +1054,31 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
                   />
                 ) : null}
 
+                {/* THIS WRAPPER CARRIES NO `position`, AND THAT IS THE
+                    ANSWER RATHER THAN AN OMISSION — settled 2026-09-02.
+
+                    The question came in as "anything a host puts in `filters`
+                    has nothing to anchor against". It does not need one. The
+                    client's ruling the same day is that a toolbar control's
+                    panel EXPANDS THE SPACE and is not an overlay, so the
+                    place for it is `toolbarPanel` below, in flow — and adding
+                    `relative` here would be publishing the anchor for exactly
+                    the shape the ruling refuses, in the one file a call site
+                    cannot edit. Everything that legitimately floats off a
+                    control in this system is Radix-portalled (`Select`,
+                    `Popover`, `DropdownMenu`, `Tooltip`) and positions itself
+                    against its own trigger with collision detection; a
+                    positioned ancestor is not what any of them read.
+
+                    The wrapper STAYS, though, and does not simply go: it
+                    earns its three utilities. `flex … gap-2` is what lets a
+                    `filters` slot hold more than one control at the chip
+                    measure instead of the toolbar's own `gap-3`; `flex-wrap`
+                    is what lets a long facet row break rather than push the
+                    view switch off the line; `min-w-0` is what lets it shrink
+                    at all inside the toolbar's flex row. Dropping it would
+                    change the layout of every call site to fix a problem
+                    nothing has. */}
                 {filters ? (
                   <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>
                 ) : null}
@@ -1093,6 +1104,16 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
                 {viewSwitch ? <div className="flex items-center">{viewSwitch}</div> : null}
 
                 {actionGroup}
+              </div>
+            ) : null}
+
+            {/* What a toolbar control opened. A sibling of the toolbar and of
+                the body, so it takes the panel column's own gap and PUSHES
+                THE ROWS DOWN — the client's ruling of 2026-09-02, and the
+                whole reason the slot exists. See `toolbarPanel`. */}
+            {toolbarPanel ? (
+              <div data-slot="collection-frame-toolbar-panel" className="min-w-0">
+                {toolbarPanel}
               </div>
             ) : null}
 

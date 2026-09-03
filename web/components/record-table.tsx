@@ -62,7 +62,7 @@
 
 import * as React from "react"
 
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "@shared/ui/foundations/icons"
+import { ArrowDown, ArrowUp, ArrowsDownUp, DotsThree } from "@shared/ui/foundations/icons"
 
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
@@ -253,7 +253,7 @@ export function RecordTable<T extends TableRowData>({
                               <ArrowDown className="size-3.5" />
                             )
                           ) : (
-                            <ArrowUpDown className="size-3.5 opacity-40" />
+                            <ArrowsDownUp className="size-3.5 opacity-40" />
                           )}
                         </button>
                       )}
@@ -300,7 +300,7 @@ export function RecordTable<T extends TableRowData>({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="size-7">
-                            <MoreHorizontal className="size-3.5" />
+                            <DotsThree className="size-3.5" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

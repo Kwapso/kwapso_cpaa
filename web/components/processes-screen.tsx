@@ -152,9 +152,15 @@ export function ProcessesScreen({
         }
       />
     )
-  if (processesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const loaded = processesQ.data
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the heading and the
+  // whole PagedFind toolbar (search/sort/filters) along with the rows.
+  // Fixed the shared way: PagedFind's own `restingLoading` prop (below)
+  // keeps its chrome mounted through the load, and `loaded` here defaults to
+  // `[]` so the rows-region check inside `children` (`rows === null`) is what
+  // swaps to a skeleton instead.
+  const processesLoading = processesQ.data === undefined
+  const loaded = processesQ.data ?? []
   const apps = (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))
 
   return (
@@ -177,6 +183,12 @@ export function ProcessesScreen({
         }}
         sorts={translatedSorts("processes", t)}
         defaultSort={COLLECTION_SORTS.processes.defaultSort}
+        // R50 — the resting read's own row count, before any find.
+        restingEmpty={loaded.length === 0}
+        // 2026-09-03 audit — the resting read's OWN loading state, so
+        // `restingEmpty` (true off the `[]` default above) cannot suppress
+        // the toolbar before the read has actually answered.
+        restingLoading={processesLoading}
         // …and so are the filters. `app` and `archived` were the frame's until
         // 18 Aug 2026, which meant picking an app narrowed the fifty maps in
         // hand — under a badge counting every one of them. `appId` is the door's
@@ -192,7 +204,12 @@ export function ProcessesScreen({
         }
       >
         {(found) => {
-          const rows = found.active ? found.rows : loaded
+          // `processesLoading ? null : loaded` — the resting read is still on
+          // its way, so this reads as "not back yet" the same way a find's
+          // own `found.rows` does, and the skeleton below is drawn for
+          // exactly that reason rather than for a `[]` that would otherwise
+          // look like a genuinely empty collection.
+          const rows = found.active ? found.rows : processesLoading ? null : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
           const data = shapeProcessesList(rows)
           const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)

@@ -21,7 +21,7 @@ import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { CheckCheck, Pencil, RotateCcw } from "@shared/ui/foundations/icons"
+import { Checks, PencilSimple, ArrowCounterClockwise } from "@shared/ui/foundations/icons"
 
 import {
   SprintFormDialog,
@@ -259,7 +259,7 @@ export function SprintDetailScreen({
         {
           key: "edit",
           label: t("Edit"),
-          icon: <Pencil className="size-3.5" />,
+          icon: <PencilSimple className="size-3.5" />,
           disabled: busy,
           onSelect: () => setEditOpen(true),
         },
@@ -269,9 +269,12 @@ export function SprintDetailScreen({
   return (
     <RecordScreen
       mark={kindMark}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `sprint`), client ruling 2026-08-31.
-      eyebrow={t("Sprint")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       recordNumber={sprint.ref || undefined}
       collectionLabel={kindWord}
       // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
@@ -315,9 +318,9 @@ export function SprintDetailScreen({
               {busy ? (
                 <Spinner />
               ) : sprint.completedAt ? (
-                <RotateCcw className="size-3.5" />
+                <ArrowCounterClockwise className="size-3.5" />
               ) : (
-                <CheckCheck className="size-3.5" />
+                <Checks className="size-3.5" />
               )}
               {sprint.completedAt ? t("Reopen") : t("Complete")}
             </Button>

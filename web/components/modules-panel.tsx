@@ -45,7 +45,8 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -123,6 +124,24 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     else await tenancy.createAppModule({ appId, ...input })
   }
 
+  // A FAILED READ SAYS SO. Without this, the rows fall back to `[]` and the
+  // empty state renders as if the app genuinely had no modules — inviting a
+  // duplicate create on top of whatever is actually there once the fetch
+  // recovers (client-org-panel.tsx carries the same guard).
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("That didn't load. Refresh the page, and tell us if it keeps happening.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+
   if (q.loading && !q.data)
     return (
       <div className="space-y-2">
@@ -133,8 +152,9 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     )
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col">
       <ToolbarRow
+        empty={modules.length === 0}
         search={
           modules.length > 0 && (
             <>
@@ -201,7 +221,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                   only the pencil icon") — no more `sm:not-sr-only` reveal. */}
               {canEdit ? (
                 <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
-                  <Pencil className="size-3.5" />
+                  <PencilSimple className="size-3.5" />
                 </Button>
               ) : null}
               {canSwitchOff ? (

@@ -38,7 +38,11 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { imageVariants } from "../image/image";
-import { Loader2, Play, TriangleAlert } from "../../foundations/icons";
+import {
+  CircleNotch,
+  Play,
+  Warning,
+} from "../../foundations/icons";
 
 export interface VideoProps
   extends Omit<React.ComponentPropsWithoutRef<"video">, "className"> {
@@ -99,7 +103,7 @@ export interface VideoProps
  *                      `aria-busy` announced. The poster stays behind it.
  *  7. empty          — no `src` and no <source> children: the quiet frame,
  *                      holding its box. `hideWhenEmpty` collapses it instead.
- *  8. error          — the failure register: `TriangleAlert` over `errorLabel`
+ *  8. error          — the failure register: `Warning` over `errorLabel`
  *                      in secondary ink, announced once via `role="img"`.
  *  9. selected       — does not apply. Selection belongs to the collection.
  * 10. read-only      — always, in the sense that matters: this component never
@@ -277,7 +281,7 @@ const Video = React.forwardRef<HTMLVideoElement, VideoProps>(
             aria-label={loadingLabel}
             className="absolute inset-0 grid place-content-center"
           >
-            <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+            <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
           </span>
         ) : null}
 
@@ -291,7 +295,7 @@ const Video = React.forwardRef<HTMLVideoElement, VideoProps>(
               "bg-surface-quiet px-4 text-center",
             )}
           >
-            <TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />
+            <Warning size={20} aria-hidden="true" className="text-ink-tertiary" />
             <span aria-hidden="true" className="text-caption text-ink-secondary">
               {errorLabel}
             </span>

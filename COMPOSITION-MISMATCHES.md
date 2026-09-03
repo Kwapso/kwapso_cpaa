@@ -224,7 +224,7 @@ seventeen `[!]` verdicts under three conditions a first read had missed:
    a feature we don't have **unless you don't pass the prop that turns it
    on**," and nobody had checked.
 2. **The kit is no longer fixed.** The owner has granted permission to fix
-   genuine bugs in Kwapso/design upstream, tag, and re-import — never to
+   genuine bugs in Kwapso/kwapso-ui-ux upstream, tag, and re-import — never to
    hand-edit `shared/ui/` directly (hash-pinned; that turns the build red),
    and never to reshape the aesthetic. Where a composition's own behaviour
    (not its data shape) was the blocker, that changes what "mismatch" means:

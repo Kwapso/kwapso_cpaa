@@ -46,6 +46,22 @@
             "env": {
                 "DEV_API_ORIGIN": "https://kwapso-portal-staging.kwapso.workers.dev"
             }
+        },
+        {
+            "_": "The design system's own demo, from the SIBLING repo Kwapso/kwapso-ui-ux (../kwapso-design). Not part of this workspace \u2014 run from here only to look at the kit.",
+            "name": "kwapso-ui-kit-demo",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "--prefix",
+                "../kwapso-design",
+                "run",
+                "dev",
+                "--",
+                "--port",
+                "5301",
+                "--strictPort"
+            ],
+            "port": 5301
         }
     ]
 }

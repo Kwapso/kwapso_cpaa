@@ -61,7 +61,7 @@
    `--surface-page` are the same hex in light, `#FFFEF9`, so the band measured
    1.000 against the pane and was not an object at all. `SHELL.md`'s nesting
    is body pane → soft-paper PANEL → cards, and the bands are the cards. The
-   panel is drawn; no toolbar and no folder tab come with it, because none is
+   panel is drawn; no toolbar and no tab come with it, because none is
    passed, which is right — ch27.41 says this list takes "no queue mechanics
    at all", and it has no subsets to cut.
 
@@ -668,7 +668,7 @@ export interface PortalHomeProps
   /** The reader may see them. `false` renders NOTHING (ch24.6). */
   deliveriesVisible?: boolean;
 
-  /* ---- REGION 2 · the folder tabs, WHICH ARE NOT HERE -------------------
+  /* ---- REGION 2 · the tabs, WHICH ARE NOT HERE -------------------------
      RULING D7-4's second difference, and it is an absence rather than a
      prop set to false: CH27.1 lets a screen drop the middle region and the
      portal has no folders. There is no `tabs` prop to pass. */
@@ -934,7 +934,7 @@ function PortalHome({
          a collection this screen does not have. */
       /* THE PANEL IS DRAWN, because one of the three bands is a raised card
          and a raised card on off-beige measures 1.000. See this file's
-         header. No toolbar and no folder tab come with it: none is passed,
+         header. No toolbar and no tab come with it: none is passed,
          which is ch27.41's "no queue mechanics at all". */
       state={state}
       body={bands}

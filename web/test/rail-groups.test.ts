@@ -67,10 +67,41 @@ describe("the group fold rides the kit's own Rail composition", () => {
 })
 
 describe("and the RAIL collapse is a different control, untouched", () => {
-  it("keeps its own key and its own button", () => {
+  it("keeps its own key, and is still threaded to whatever draws the control", () => {
     expect(SHELL, "the owner's words: don't break that").toMatch(/ss-sidebar-collapsed/)
     expect(SHELL).toMatch(/persistCollapsed/)
-    expect(SHELL).toMatch(/PanelLeftOpen|PanelLeftClose/)
+    // THE CONTROL ITSELF IS THE KIT'S SINCE 2026-09-02, AND IT HAS NO GLYPH.
+    // This used to assert `PanelLeftOpen|PanelLeftClose` — the two chevrons of
+    // the app's own floating half-in-half-out toggle. `ScreenShell` (kit
+    // v1.2.28) draws the collapse as a 3px edge handle whose whole affordance
+    // is WHERE it stands (the column's outer rim when open, its inner edge when
+    // shut), and the kit says why there is no glyph in as many words: one does
+    // not fit in three pixels. So a check for an icon name is now a check that
+    // the app has NOT adopted the kit's control.
+    //
+    // WHAT IS ASSERTED INSTEAD IS THE THING THAT CAN ACTUALLY BREAK. The shell
+    // holds the collapsed state and drives only the rail it built itself; this
+    // app hands it a rail NODE, so the value has to go down and every change
+    // has to come back, or the handle draws open for ever while the column
+    // beside it narrows. Both halves, plus the thread into the app's own rail.
+    expect(SHELL, "the shell must be told which way the rail is").toMatch(
+      /railCollapsed=\{collapsed\}/
+    )
+    expect(SHELL, "…and every press of its handle must come back here to be persisted").toMatch(
+      /onRailCollapsedChange=\{persistCollapsed\}/
+    )
+    expect(SHELL, "…and the app's own rail must be told too — the shell cannot reach inside a node").toMatch(
+      /collapsed=\{collapsed\}/
+    )
+  })
+
+  it("does not draw a second collapse control beside the kit's handle", () => {
+    // Two controls for one decision is what the adoption removed. The app's own
+    // toggle was the only thing in this file that drew either chevron, so their
+    // absence is the honest proof it is gone.
+    expect(SHELL, "the kit's edge handle is the one collapse control now").not.toMatch(
+      /PanelLeftOpen|PanelLeftClose/
+    )
   })
 })
 

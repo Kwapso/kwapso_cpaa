@@ -54,7 +54,7 @@ import { cn } from "@shared/ui/lib/utils"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
-import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
+import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
@@ -141,13 +141,13 @@ export function NoAccess() {
 
 export function NotFound() {
   const t = useT()
-  return <StateLine icon={SearchX}>{t("That screen doesn't exist.")}</StateLine>
+  return <StateLine icon={MagnifyingGlass}>{t("That screen doesn't exist.")}</StateLine>
 }
 
 export function LoadError({ what }: { what: string }) {
   const t = useT()
   return (
-    <StateLine icon={TriangleAlert} tone="destructive">
+    <StateLine icon={Warning} tone="destructive">
       {t("Couldn't load {what}.", { what })}
     </StateLine>
   )
@@ -159,49 +159,48 @@ export function LoadError({ what }: { what: string }) {
  * rounds + clips its own row-group, so the hover/selected highlight follows the
  * corners here just like the library demo (UI-GAPS #12, shipped).
  *
- * `attached`: this box sits directly under a FOLDER tab strip (`SectionWithCreate`'s
- * `folderTabs`, on a call site that has NOT flipped to `useKitPanel` — a bespoke
- * body like a month grid or a grouped list that never touches `CollectionFrame`,
- * so it has no toolbar of its own to draw the kit's `relative z-[2]` for it).
- * The kit's own two panels that DO attach to a folder strip — `TabsContent`
- * (tabs/tabs.tsx) and `CollectionFrame` (components/collection-frame/
- * collection-frame.tsx) — both carry `relative z-[2] bg-surface-panel`, the
- * middle number in chapter 24.3's three: below the active tab's `z-3`, above
- * an inactive tab's `z-1`, so an inactive tab is "clipped by the card edge" as
- * ch14 puts it. This box already carries `bg-surface-panel` (`Card`'s own
- * `default` variant) but never `position`/`z-index` — a plain static box paints
- * BELOW any positioned sibling regardless of that sibling's z-index, folder tab
- * strip included, so with no stacking context of its own EVERY tab (inactive
- * ones too) painted in front of it. `attached` is the one class that was
- * missing, not a new colour or a new component.
+ * SUPERSEDED, v1.2.28 — this box used to carry an `attached` prop, kept in
+ * full below rather than deleted, same discipline shared/spine.ts uses for an
+ * overturned argument:
  *
- * `attached` ALSO ADDS A LITTLE EXTRA HEADROOM AT THE TOP — client ruling,
- * 1 Sep 2026: "great work in the main screen, however I'd like a bit of 'body
- * of the folder' like space between the tab and the scrollable list." This is
- * a DIFFERENT gap from the zero one `SectionWithCreate`'s `folderTabs` column
- * and `PagedFind`'s own root both keep with NO `gap-*` class: that outer gap
- * has to stay exactly zero, because the folder strip's negative
- * `--folder-tab-overlap` margin needs its ACTUAL next sibling to melt into —
- * "16 - 17.02 leaves ONE pixel of overlap where seventeen were meant: the tabs
- * float, their feet show" (`SectionWithCreate`'s own `folderTabs` doc). This
- * `pt-6` is entirely INSIDE that same card, below the overlap and below the
- * seam where the active tab's fill already reads as continuous with the
- * panel — it makes the fold itself no less flush, it only gives the fold's
- * own body more air before the first row, the way a real folder's paper has
- * some depth before whatever is filed inside it starts. Scoped to `attached`
- * only: a `CollectionCard` with no folder strip above it (there are a few)
- * keeps the plain, even `p-4` it always had — nothing about its own top asked
- * for more room. */
-export function CollectionCard({
-  children,
-  attached = false,
-}: {
-  children: React.ReactNode
-  attached?: boolean
-}) {
+ * "`attached`: this box sits directly under a FOLDER tab strip
+ * (`SectionWithCreate`'s `folderTabs`, on a call site that has NOT flipped to
+ * `useKitPanel` — a bespoke body like a month grid or a grouped list that
+ * never touches `CollectionFrame`, so it has no toolbar of its own to draw
+ * the kit's `relative z-[2]` for it). The kit's own two panels that DO attach
+ * to a folder strip — `TabsContent` (tabs/tabs.tsx) and `CollectionFrame`
+ * (components/collection-frame/collection-frame.tsx) — both carry `relative
+ * z-[2] bg-surface-panel`, the middle number in chapter 24.3's three: below
+ * the active tab's `z-3`, above an inactive tab's `z-1`, so an inactive tab
+ * is "clipped by the card edge" as ch14 puts it. This box already carries
+ * `bg-surface-panel` (`Card`'s own `default` variant) but never
+ * `position`/`z-index` — a plain static box paints BELOW any positioned
+ * sibling regardless of that sibling's z-index, folder tab strip included,
+ * so with no stacking context of its own EVERY tab (inactive ones too)
+ * painted in front of it. `attached` is the one class that was missing, not
+ * a new colour or a new component.
+ *
+ * `attached` ALSO ADDED A LITTLE EXTRA HEADROOM AT THE TOP — client ruling,
+ * 1 Sep 2026: 'great work in the main screen, however I'd like a bit of "body
+ * of the folder" like space between the tab and the scrollable list.' [...]
+ * it only gives the fold's own body more air before the first row, the way a
+ * real folder's paper has some depth before whatever is filed inside it
+ * starts."
+ *
+ * THE KIT'S OWN FOLDER TAB — the `z-[1]`/`z-[3]` feet this prop was reaching
+ * over, and the `--folder-tab-overlap` pull the extra headroom was making
+ * room for — is gone (tabs-view.tsx's own header has the client's 2026-09-02
+ * ruling that killed it). A line tab draws no positioned feet and overlaps
+ * nothing, so nothing below it needs a stacking context to survive them, and
+ * "the fold's own body" is a shape this app no longer draws. Both halves of
+ * `attached` were reaching over a mechanism that has since been deleted, so
+ * the prop went with it rather than being kept as a no-op two call sites
+ * would still be passing for no reason — every `CollectionCard` gets the
+ * plain, even `p-4` it always had. */
+export function CollectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card className={cn(attached && "relative z-[2]")}>
-      <CardContent className={cn("p-4", attached && "pt-6")}>{children}</CardContent>
+    <Card>
+      <CardContent className="p-4">{children}</CardContent>
     </Card>
   )
 }
@@ -273,11 +272,10 @@ export function AddButton({
  * of claiming the rest of this row and pushing `actions` onto a line of its
  * own — the same two-row shape one level down. `filters` is NOT wrapped here,
  * and that is deliberate rather than an omission: `FilterBar`
- * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own chip
- * cluster in exactly that non-growing box internally, and its OPEN panel is
- * `position: absolute` against this track's `relative` — so a wrapper here
- * would add a second identical box round the chips and a narrower anchor
- * under the panel, and buy nothing. See the `{filters}` slot below.
+ * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own pill in
+ * exactly that non-growing box internally, so a wrapper here would add a
+ * second identical box round it and buy nothing. See the `{filters}` slot
+ * below.
  *
  * FIVE NAMED SLOTS, NOT A HARDCODED ROW. Each is independently optional (a
  * caller with no facets passes no `filters`, exactly as one with no search
@@ -285,24 +283,82 @@ export function AddButton({
  * site's — the same discipline the kit's own contract keeps. `view` was
  * added 2026-09-01, first reached by Apps' Tiles/List switch (apps-screen.tsx)
  * — CH27.13's own order (search, filters, view switcher, actions) is why it
- * sits between `sort` and `actions` rather than anywhere else. */
+ * sits between `sort` and `actions` rather than anywhere else.
+ *
+ * `empty` IS A SIXTH SLOT, AND IT IS NOT OPTIONAL (R50 — "once again, when
+ * empty collection no toolbar at all — fix everywhere and set as a rule",
+ * the client's own words, 2026-09-03, about a Time tab whose toolbar had
+ * shrunk to a lone floating "+"). R48 already made every OTHER slot here
+ * answer "does this collection have rows" — apps-screen.tsx gates `search`/
+ * `filters`/`sort`/`view` on `appsQ.data.length > 0` — but `actions` (the
+ * create button) kept its own, separate gate, usually just a permission
+ * check (`canCreate && <AddButton…/>`), because nothing FORCED it to agree
+ * with the other four. It escaped on this exact screen, on Sprints, on
+ * Deliverables, on Modules, on the client-org panels, on Wave sprints and on
+ * Work logs — seven call sites answering R48's question for search and never
+ * asking it for the button beside it. A per-slot convention that only some
+ * slots follow is not a rule, so the row itself now asks the one question
+ * that matters and answers it for every slot at once: pass the same boolean
+ * the search gate already computes — the collection's own RAW row count
+ * being zero, before any search or filter narrows it, never "zero results
+ * for this question" — and the WHOLE row disappears, the create button
+ * included, leaving the collection's own `CollectionEmptyState` (or
+ * `SectionWithCreate`'s published action) to carry "Add the first" alone.
+ * Required, not optional with a safe default: an optional prop a caller can
+ * forget is exactly how the create button kept escaping the search gate
+ * next to it. See `web/test/rules.test.ts`'s `empty-toolbar` census and
+ * `EMPTY_TOOLBAR_EXEMPT` for the few call sites that answer this
+ * differently, each with its own reason on file. */
 export function ToolbarRow({
+  empty,
   search,
   filters,
+  toolbarPanel,
   sort,
   view,
   actions,
   className,
 }: {
+  /** R50's own gate, and the only one this component trusts: true when the
+   * collection has ZERO rows before any search or filter narrows it — the
+   * exact boolean the search slot's own `data.length > 0` gate already
+   * computes, never "zero results for the current question" (that stays a
+   * per-slot decision, e.g. a `narrowed` no-results sentence rendered
+   * beside a still-visible search box). True suppresses the WHOLE row,
+   * including `actions`, regardless of what the other props are — a caller
+   * cannot pass `empty={false}` by omission the way an optional prop would
+   * let it. See this function's own header comment for why. */
+  empty: boolean
   /** A search box, or any other left-aligned control. Omitted where the tab
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
    * Triage) — the row is then the actions alone. */
   search?: React.ReactNode
-  /** The active-facet chips + "+ filter" affordance (`FilterBar`), between
-   * `search` and `sort` — the same position the design kit's own toolbar
-   * contract fixes (search → filters → … → actions). Omitted wherever a
-   * screen has no facets, exactly like `search`. */
+  /** The "Filter" pill — `useFilterBar`'s own `pill`, between `search` and
+   * `sort`, the same position the design kit's own toolbar contract fixes
+   * (search → filters → … → actions). Omitted wherever a screen has no
+   * facets, exactly like `search`. It says a COUNT and never the filters
+   * themselves (client ruling, 2 Sep 2026); its open panel is `toolbarPanel`
+   * below, never a sibling of this pill inside the track. */
   filters?: React.ReactNode
+  /** THE FILTER PILL'S OPEN PANEL — `useFilterBar`'s own `panel`, rendered as
+   * a real sibling BENEATH the track rather than floating over it (client
+   * ruling, 2 Sep 2026, third pass: "the expanded toolbar shoudl not be an
+   * overlay, but literaly expand the space"). It takes real space and pushes
+   * the collection down. Its PRESENCE also decides the merged container's own
+   * radius (client ruling, 2026-09-03, fourth pass, below): the track no
+   * longer carries its own fill or shape, so the panel's height feeds no box
+   * model but this column's, and the column's shape is chosen by
+   * `Boolean(toolbarPanel)` rather than measured from anything. The three
+   * passes that got here — a flex-sibling panel inside the pill (a giant
+   * oval), an absolutely-positioned one (floated over the rows), and an
+   * in-flow one with a visible seam between two same-toned boxes (read as a
+   * second toolbar) — are written up in `filter-bar.tsx`'s header. Named
+   * after the kit's own `CollectionFrame` `toolbarPanel` prop (v1.2.27),
+   * which draws the identical placement for a kit-panel collection; this is
+   * the same placement for the app's own bespoke row. `undefined`/`null`
+   * draws nothing, which is the pill closed or a caller with no facets at
+   * all — and it is also what keeps the container a pill. */
+  toolbarPanel?: React.ReactNode
   /** The sort control, after `filters` and before the pinned-right
    * `actions` — a `SortControl`, typically. Omitted wherever a screen has
    * nothing to sort by. */
@@ -322,57 +378,123 @@ export function ToolbarRow({
   actions?: React.ReactNode
   className?: string
 }) {
+  // NEVER TOOLBAR ON EMPTY COLLECTION (R50) — checked FIRST and unconditionally,
+  // before any slot is even looked at, so a truthy `actions` (the one slot every
+  // recurrence of this bug shared) cannot keep the row alive on its own.
+  if (empty) return null
   if (!search && !filters && !sort && !view && !actions) return null
+
+  // ── ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, SUPERSEDING THE
+  // "COLUMN" SHAPE ABOVE. Verbatim: "what this is doing is creating a new
+  // card underneath... it kind of creates a second toolbar. This is not the
+  // behaviour I want. I want it to look together, so merge this with the
+  // main toolbar so that it's one single background or container, more like
+  // expand behaviour rather than open-a-new-one behaviour."
+  //
+  // The column above got the OVERLAY question right (the panel is in normal
+  // flow, pushes the collection down, never floats) and got THIS question
+  // wrong: the track and the panel were two `bg-background` boxes with a
+  // `gap-2` between them — same tone, same fill, visibly separate, which
+  // reads as exactly the "second card" she is describing. Two boxes of the
+  // identical colour with air between them is not "one piece of furniture"
+  // no matter what either one is filled with.
+  //
+  // THE FIX IS THE SAME SHAPE THE HISTORY ABOVE ALREADY WARNS AGAINST
+  // REPEATING, READ THE OTHER WAY ROUND. Pass one's bug was letting the
+  // panel's own height feed the TRACK's `rounded-pill` — a shape computed
+  // FROM content, which stretched into an oval the moment the content grew
+  // tall. The fix here is NOT "put the panel back inside the pill" (that is
+  // pass one); it is "give the pill's own fill and radius to the OUTER
+  // column instead of the inner row, and pick the radius EXPLICITLY off
+  // whether a panel is open — never off how tall anything measures." A
+  // radius chosen by `Boolean(toolbarPanel)` cannot stretch: it is one of
+  // exactly two fixed values (R31), swapped by a boolean, not computed from
+  // a box's own height the way a browser's own `rounded-pill` corner radius
+  // is. `rounded-pill` (999px) collapsed, `rounded-[var(--radius)]` (24px,
+  // the OTHER of the two radii this codebase allows) expanded — never a
+  // third number, and never the two at once.
+  //
+  // WHAT MOVED: `bg-background` and the radius left the inner row (the
+  // "track") and now sit on THIS outer div — the only element that paints a
+  // fill at all. The track keeps its own padding/gap so its controls still
+  // sit where they did; the panel (`filter-bar.tsx`'s own div) lost its
+  // OWN `bg-background`/`rounded-[var(--radius)]` for the identical reason —
+  // a filled, rounded box nested one level inside another filled, rounded
+  // box of the same colour is the double-box shape CLAUDE.md's own
+  // `useKitPanel` note calls "the broken combination". One fill, one shape,
+  // for both rows — no gap between them either, because a gap is the seam
+  // she is naming.
+  const expanded = Boolean(toolbarPanel)
   return (
     <div
+      data-slot="toolbar-row-column"
       className={cn(
-        // THE TRACK — client, 1 Sep 2026, pointing at her own reference
-        // artifact: every control sits inside ONE visibly distinct pill,
-        // a step lighter than the panel it's drawn on (`bg-background`
-        // against the card's own `bg-surface-panel`), not floating loose
-        // chips on the panel's bare paper. `rounded-pill` at the row's own
-        // height reads as the same stadium shape every other pill in this
-        // app already uses; the inline-start padding is slightly deeper
-        // than the others so the search icon doesn't sit flush on the seam.
-        // `relative` — `filter-bar.tsx`'s own open panel anchors to THIS box
-        // via `position: absolute`/`top-full` (2 Sep 2026, second pass: a
-        // flex-sibling panel fed its own tall height into this pill's
-        // `rounded-pill`, drawing a giant oval; absolute positioning keeps
-        // the panel's height out of this box's model no matter how tall it
-        // gets, and `relative` here is what its `top-full`/`inset-x-0`
-        // measure against). See `filter-bar.tsx`'s header for the full
-        // account.
-        "relative flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
-        className
+        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (client,
+        // dark mode, Apps screen: "the background of tabs is wrong. should be
+        // same as background of content body"). `bg-background` and
+        // `bg-[var(--surface-raised)]` happen to be the same colour in LIGHT
+        // mode, which is how this shipped looking right — dark mode split
+        // them apart (`--background` → `--kw-unlit-page` #141310,
+        // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
+        // genuinely different near-black tones), and this row's card-toned
+        // surroundings suddenly sat on the wrong one of the two.
+        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
+        // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
+        // reads as the same stadium pill every other toolbar control in this
+        // app wears; expanded switches to the box radius so a tall facet
+        // panel never has to fit inside a 999px curve.
+        expanded ? "rounded-[var(--radius)]" : "rounded-pill",
+        // THE GAP TO WHATEVER COMES NEXT — R49, `--toolbar-content-gap`
+        // (web/app/globals.css). Baked into the row's OWN root rather than
+        // left for a call site to add, exactly as `--tab-content-gap` is
+        // baked into the tab strip's own box rather than a sibling's margin:
+        // a call site that ALSO wraps this row in a gapped column is paying
+        // the same gap twice, which is how five different numbers
+        // (7.5/11.25/15/22.5px) ended up doing the identical job across the
+        // app's fourteen call sites. This is the ONLY place that number is
+        // spent now — see web/test/rules.test.ts's `toolbar-content-gap`.
+        "mb-[var(--toolbar-content-gap)]"
       )}
     >
-      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-          like in your atifact": her reference artifact's search element is
-          `flex: 1 1 auto`, not a fixed width, so it is what pushes
-          filters/sort/view/actions to the track's far edge rather than
-          leaving them clustered right after a narrow box. `flex-1` here does
-          that job regardless of what width class the search element itself
-          carries (a caller's own `w-full` fills this box; one still asking
-          for a fixed width would be overridden by this wrapper's own basis
-          the same way `filters` below already normalizes a `w-full` child –
-          see PagedFind's note on why a wrapped `w-full` child sizes to the
-          wrapper and not the row). */}
-      {search && (
-        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
-      )}
-      {/* `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`) renders its
-          chip cluster inline here — a normal flex child, wrapped in its own
-          non-growing box internally, same as every other slot on this row —
-          and its OPEN panel out of flow entirely (`position: absolute`,
-          anchored to this div's own `relative` above), so `{filters}` bare is
-          correct for both: the chip cluster takes its place in the row like
-          any other node, and the panel simply isn't part of this flexbox's
-          layout math at all once it's open. A caller passing anything OTHER
-          than `<FilterBar>` here still works unchanged. */}
-      {filters}
-      {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
-      {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      <div
+        data-slot="toolbar-row-track"
+        className={cn(
+          // THE TRACK — client, 1 Sep 2026, pointing at her own reference
+          // artifact: every control sits in one visibly distinct row; the
+          // inline-start padding is slightly deeper than the others so the
+          // search icon doesn't sit flush on the seam. No fill and no radius
+          // of its own any more — both now belong to the merged container
+          // above, which is the whole point of this pass.
+          "flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4",
+          className
+        )}
+      >
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": her reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it is what pushes
+            filters/sort/view/actions to the track's far edge rather than
+            leaving them clustered right after a narrow box. `flex-1` here does
+            that job regardless of what width class the search element itself
+            carries (a caller's own `w-full` fills this box; one still asking
+            for a fixed width would be overridden by this wrapper's own basis
+            the same way `filters` below already normalizes a `w-full` child –
+            see PagedFind's note on why a wrapped `w-full` child sizes to the
+            wrapper and not the row). */}
+        {search && (
+          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
+        )}
+        {/* `useFilterBar`'s own `pill` (`shared/web/screen-engine/filter-bar.tsx`)
+            renders inline here — a normal flex child, wrapped in its own
+            non-growing box internally, same as every other slot on this row.
+            Its OPEN panel is a SEPARATE value, `toolbarPanel` below — not
+            folded into this slot, which is exactly the shape a `ReactNode`
+            prop could not enforce back when one component drew both. */}
+        {filters}
+        {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
+        {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {toolbarPanel}
     </div>
   )
 }
@@ -390,6 +512,7 @@ export function SectionWithCreate({
   aboveCard,
   folderTabs,
   useKitPanel,
+  empty,
   children,
 }: {
   show: boolean
@@ -406,20 +529,25 @@ export function SectionWithCreate({
   /** Content shown between the create row and the boxed collection, OUTSIDE the
    * card — e.g. the Tickets My/All raiser strip (it scopes the list, not part of it). */
   aboveCard?: React.ReactNode
-  /** A FOLDER tab strip, drawn flush against the top of the collection card.
+  /** A collection's own tab strip, drawn flush against the top of the
+   * collection card — `FolderTabStrip`, ./tabs-view, whose name predates and
+   * outlasted the shape it once drew (see that type's own doc).
    *
-   * It is a slot of its own rather than more `aboveCard`, and the reason is one
-   * number. The kit's folder strip already pulls itself down by
-   * `--folder-tab-overlap` (17.02) so the panel below covers the tabs' cut
-   * feet — chapter 14's join, and the whole of why the active tab reads as
-   * attached. `aboveCard` sits in a `gap-4` column, and 16 - 17.02 leaves ONE
-   * pixel of overlap where seventeen were meant: the tabs float, their feet
-   * show, and the shape reads as broken rather than as a folder. So this slot
-   * renders in a column of its own with no gap at all, and the decision lives
-   * here once instead of as a negative margin at every call site.
-   *
-   * Only a `variant: "folder"` strip belongs here. A `line` strip has no feet
-   * to hide and wants the gap.
+   * SUPERSEDED IN PART, v1.2.28. It was a slot of its own rather than more
+   * `aboveCard` for one number: the kit's folder strip pulled itself down by
+   * `--folder-tab-overlap` (17.02) so the panel below covered the tabs' cut
+   * feet — chapter 14's join, and the whole of why the active tab read as
+   * attached — and `aboveCard`'s own `gap-4` column would have left ONE
+   * pixel of overlap where seventeen were meant: the tabs floating, their
+   * feet showing. That mechanism is gone with the folder shape itself
+   * (tabs-view.tsx's header has the client's 2026-09-02 ruling that killed
+   * it) — a line tab pulls nothing down and has no feet to hide. The slot
+   * still renders in a column of its own, but the SPACE below the strip
+   * stopped being this column's business on 2026-09-03: the client ruled that
+   * a main screen's tabs must clear their content the way a detail screen's
+   * already did, so that gap is `--tab-content-gap`, carried by the strip
+   * itself in `renderFolderTabs` and read by a detail screen's
+   * `--record-tab-gap` too. One number, one owner, both halves of the app.
    *
    * TABS ALONE — never the row's action buttons beside it, and now that is the
    * SHAPE of the prop, not a rule about how to fill it. An earlier fix the
@@ -453,21 +581,36 @@ export function SectionWithCreate({
    * session, not two create controls for the same act.
    */
   useKitPanel?: boolean
+  /** R50 — never toolbar (create button included) on an empty collection.
+   * Every CURRENT call site passes `folderTabs` or `useKitPanel`, so this
+   * header's own `showCreateInHeader` row below never actually draws today
+   * (the tab strip's own `<ToolbarRow>`, or the kit panel's `isEmptyState`
+   * gate, already answer R50 for those). Optional, defaulting to `false`,
+   * for exactly that reason — it costs no existing call site anything — but
+   * it is here so the NEXT screen that uses this header's own create button
+   * (neither `folderTabs` nor `useKitPanel`) cannot reintroduce the lone-"+"
+   * bug this file's `ToolbarRow` was fixed out of. Pass the same "does this
+   * collection have any rows yet" boolean `ToolbarRow`'s own `empty` prop
+   * takes. */
+  empty?: boolean
   children: React.ReactNode
 }) {
-  const Icon = icon === "plus" ? Plus : Mail
+  const Icon = icon === "plus" ? Plus : Envelope
   const showSecondary = secondary?.show ?? false
   const showDownload = download?.show ?? false
   // See `useKitPanel` above: the panel's own toolbar carries the create
   // control, so the header row's copy of it would be a second mango for
-  // one act. `folderTabs` suppresses it for the same reason a folder strip's
-  // OWN row is never where this button belongs any more (client ruling,
-  // 2026-08-31) — the call site draws it itself, in its own toolbar.
-  const showCreateInHeader = show && !useKitPanel && !folderTabs
+  // one act. `folderTabs` suppresses it for the same reason a collection's
+  // own tab strip is never where this button belongs any more (client ruling,
+  // 2026-08-31) — the call site draws it itself, in its own toolbar. `empty`
+  // is R50's own reason: a genuinely empty collection names its next act
+  // through `CollectionEmptyState`'s "Add the first" alone, never a second
+  // mango in this header too.
+  const showCreateInHeader = show && !useKitPanel && !folderTabs && !empty
   const hasActions = showCreateInHeader || showSecondary || showDownload
   // THE ACTION BUTTONS (Export/Import/New) THEMSELVES, wherever the row below
   // ends up putting them — the buttons are decided once, here; only their ROW
-  // changes shape depending on whether there is a folder strip to share it
+  // changes shape depending on whether there is a tab strip to share it
   // with (see the return below).
   const actionButtons = hasActions ? (
     <>
@@ -479,7 +622,7 @@ export function SectionWithCreate({
       )}
       {showSecondary && secondary && (
         <Button variant="secondary" onClick={secondary.onClick} className="gap-1">
-          <Upload className="size-4" />
+          <UploadSimple className="size-4" />
           {secondary.label}
         </Button>
       )}
@@ -495,16 +638,11 @@ export function SectionWithCreate({
       {showCreateInHeader && <AddButton label={label} onClick={onCreate} icon={<Icon className="size-4" />} />}
     </>
   ) : null
-  // `attached`: a folder strip sits directly above this box (`folderTabs`) and
-  // this call site has NOT flipped to `useKitPanel` — `CollectionCard` is
-  // standing in for the kit's own `relative z-[2]` panel (`TabsContent` /
-  // `CollectionFrame`), so it has to carry that stacking itself or every tab,
-  // active or not, paints in front of it. See `CollectionCard`'s own doc.
-  const collection = useKitPanel ? (
-    children
-  ) : (
-    <CollectionCard attached={Boolean(folderTabs)}>{children}</CollectionCard>
-  )
+  // `CollectionCard` no longer takes an `attached` prop (v1.2.28 — see its own
+  // doc): the stacking it used to carry over a folder strip's cut feet has
+  // nothing left to carry over, a line tab paints no positioned feet at all.
+  const collection = useKitPanel ? children : <CollectionCard>{children}</CollectionCard>
+
   return (
     <div className="flex flex-col gap-4">
       {/* NO STRIP TO SHARE A ROW WITH — the actions keep the plain row above
@@ -516,9 +654,18 @@ export function SectionWithCreate({
         <div className="flex flex-wrap justify-end gap-2">{actionButtons}</div>
       )}
       {aboveCard}
-      {/* No gap: the folder strip's own negative margin IS the join — the tab
-          row has to be the ACTUAL next sibling of the card for its
-          pulled-down feet to melt into it. */}
+      {/* NO `gap-*` HERE, AND IT IS NOT A DECISION ABOUT SPACE ANY MORE. This
+          column exists to hold the strip and the card OUT of the outer
+          `gap-4` above, and until 2026-09-03 that was the whole point: the
+          strip sat flush against its card, a deliberate zero written out here,
+          in `paged-find.tsx` and in `tickets-collection.tsx` — three copies of
+          one number. It was load-bearing while a folder tab pulled itself down
+          into its panel by `--folder-tab-overlap`; that shape is gone
+          (tabs-view.tsx's header, 2026-09-02 ruling), so the zero had stopped
+          protecting anything and was simply eating the space the client then
+          asked for. The gap lives on the STRIP now, once, in
+          `renderFolderTabs` — so this column stays gapless on purpose and must
+          not grow one, or the same number gets two owners again. */}
       <div className="flex flex-col">
         {/* TABS ALONE (client ruling, 2026-08-31, correcting the same day's
             earlier fix which shared this line with the row's action buttons):

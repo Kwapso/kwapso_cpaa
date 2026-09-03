@@ -1,5 +1,5 @@
 "use client"
-import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/foundations/icons"
+import { Prohibit, GitBranch, ListNumbers, Plus } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 
 // Process detail — one map at /processes/<id>, as a tabbed record (Law R2):
@@ -60,7 +60,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { useConfirm, type Confirm } from "@shared/web/use-confirm"
 import { Comments } from "@shared/ui/components/comments/comments"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import type {
   ClientRole,
@@ -104,7 +104,8 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
 
 
@@ -121,7 +122,7 @@ export function ProcessDetailScreen({
   teamId: string
   processId: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // WHICH VERSION IS BEING READ. `null` is "the current one", which is what the
   // record cache holds and what every live ping is about — so the default costs
   // no extra read and stays row-level live. Choosing an older one reads a slice
@@ -477,9 +478,12 @@ export function ProcessDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={process.name} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `process`), client ruling 2026-08-31.
-      eyebrow={t("Process")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
       // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
       // remember. not only for meetings, but everywhere." This used to repeat
@@ -508,7 +512,7 @@ export function ProcessDetailScreen({
         <>
           {canEdit && (
             <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
               {t("Edit")}
             </Button>
           )}
@@ -570,7 +574,7 @@ export function ProcessDetailScreen({
                       size="sm"
                       onClick={() => setAuditOpen(true)}
                     >
-                      <Pencil className="size-3.5" />
+                      <PencilSimple className="size-3.5" />
                       {t("Change the date")}
                     </Button>
                   )}
@@ -623,7 +627,7 @@ export function ProcessDetailScreen({
                               size="sm"
                               onClick={() => void unlink(l.id)}
                             >
-                              <Ban className="size-3.5" />
+                              <Prohibit className="size-3.5" />
                               <span className="sr-only sm:not-sr-only">{t("Disconnect")}</span>
                             </Button>
                           )}
@@ -702,11 +706,11 @@ export function ProcessDetailScreen({
                           )}
                         </span>
                         <span className="text-muted-foreground block text-xs">
-                          {new Date(v.createdAt).toLocaleDateString()}
+                          {formatDate(v.createdAt, lang)}
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
                         </span>
                       </span>
-                      <ListOrdered className="text-muted-foreground size-4 shrink-0" />
+                      <ListNumbers className="text-muted-foreground size-4 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -718,9 +722,21 @@ export function ProcessDetailScreen({
               <Comments
                 items={(commentsQ.data?.comments ?? []).map((c) => ({
                   id: c.id,
-                  author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-                  body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
-                  timestamp: new Date(c.createdAt).toLocaleDateString(),
+                  // THREE SENTENCES THAT SHIPPED IN ENGLISH TO EVERY READER,
+                  // on BOTH front doors — this map and the client portal's own
+                  // (web-portal/components/impact-screen.tsx) are a three-line
+                  // clone of each other, and all three strings were bare
+                  // literals in both. R28/R33 missed them because they sit in
+                  // an object-literal property position rather than one of the
+                  // seven the extractor's walk reads. The "why" line takes a
+                  // named hole rather than gluing a translated fragment onto
+                  // `c.body`: a fragment plus a value is the one shape a
+                  // translator cannot reorder.
+                  author: c.createdByName ?? (c.fromStaff ? t("Your team") : t("A colleague")),
+                  body: c.explainsStepKey
+                    ? t("Why a step takes longer, {reason}", { reason: c.body })
+                    : c.body,
+                  timestamp: formatDate(c.createdAt, lang),
                 }))}
                 composer="inline"
                 onSend={

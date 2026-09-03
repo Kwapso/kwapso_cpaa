@@ -6,19 +6,22 @@
 // were lucide's, and they were safe because `kitIcon` fell back to lucide's
 // runtime `DynamicIcon` for anything the kit had not drawn.
 //
-// On 2026-08-27 the kit's art became the Iconoir pack. Thirty-seven of the
-// sixty-two stored names exist in Iconoir under a different spelling or not at
-// all, and the fallback meant every one of them kept quietly rendering LUCIDE
-// art — next to Iconoir art, on the same strip, with `npm run check` green.
-// That is the failure this file exists to make impossible: the fallback is
-// deleted, an unresolvable name draws NOTHING, and a name that draws nothing
-// turns the build red HERE rather than appearing as a hole on a screen.
+// On 2026-08-27 the kit's art became the Iconoir pack, and on 2026-09-03 it
+// became Phosphor (client ruling — see shared/ui/foundations/icons/
+// ATTRIBUTION.md). Both times, some fraction of the stored names existed
+// under the new pack's spelling or not at all, and the lucide fallback (now
+// deleted) used to mean a name like that kept quietly rendering LUCIDE art —
+// next to the new pack's art, on the same strip, with `npm run check` green.
+// That is the failure this file exists to make impossible: an unresolvable
+// name draws NOTHING, and a name that draws nothing turns the build red HERE
+// rather than appearing as a hole on a screen.
 //
-// The alias table (shared/web/screen-engine/icon-names.ts) is rot-checked in
-// both directions, the way the UI laws' exemption lists are: an alias whose
-// target the kit does not draw is broken, and an alias for a name the kit
-// already spells correctly is dead weight that will drift from the glyph it
-// shadows. So the list can only shrink.
+// NO ALIAS TABLE any more (2026-09-03 client ruling, verbatim: "i don't want
+// to keep translating — i want to be able to go on the website from phosphor
+// and give you the name there"). Every name this file censuses IS a name on
+// phosphor.dev, PascalCased by `kitExportName`
+// (shared/web/screen-engine/icon-names.ts) — nothing sits between the two any
+// more, so there is nothing left here to rot-check in a second direction.
 
 import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
@@ -28,7 +31,7 @@ import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { iconComponent } from "@shared/web/screen-engine/icon"
-import { ICON_ALIASES, kitExportName } from "@shared/web/screen-engine/icon-names"
+import { kitExportName } from "@shared/web/screen-engine/icon-names"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const KIT_ICONS = join(ROOT, "shared", "ui", "foundations", "icons")
@@ -116,6 +119,17 @@ function vocabulary(): Map<string, string> {
   const conceptCount = table(pages, "CONCEPT_ICON", "CONCEPT_ICON")
   expect(conceptCount, "CONCEPT_ICON went missing or unreadable").toBeGreaterThan(10)
 
+  // THE FOURTH TABLE — same `key: "value"` shape as the two above, and
+  // invisible to the generic `icon: "…"` walk below for the same reason they
+  // would be if they were not given their own `table()` call: the field name
+  // here is the KNOWLEDGE KIND ("note", "ticket", "account" …), never the
+  // literal word "icon". Missed for weeks under a green build — three of its
+  // names (`note`, `file`, `article`) resolved to nothing on screen while
+  // this census reported zero unresolved names, because it never read them.
+  const shape = read(join(ROOT, "web", "components", "deep-link", "shape.tsx"))
+  const knowledgeKindCount = table(shape, "export const KNOWLEDGE_KIND_ICON", "KNOWLEDGE_KIND_ICON")
+  expect(knowledgeKindCount, "KNOWLEDGE_KIND_ICON went missing or unreadable").toBeGreaterThan(10)
+
   for (const f of [
     ...sources(join(ROOT, "web", "components")),
     ...sources(join(ROOT, "web", "lib")),
@@ -145,26 +159,8 @@ describe("the icon vocabulary", () => {
     expect(
       unresolved,
       `${unresolved.length} icon name(s) resolve to nothing and would render a HOLE:\n${unresolved.join("\n")}\n\n` +
-        `Add a line to ICON_ALIASES in shared/web/screen-engine/icon-names.ts, or use a name the kit draws.`
+        `Use a name the kit actually draws — read it off phosphor.dev — there is no alias table to bridge it any more.`
     ).toEqual([])
-  })
-
-  it("icon-vocabulary: no alias is broken, and none is dead weight", () => {
-    const broken: string[] = []
-    const dead: string[] = []
-    for (const [name, target] of Object.entries(ICON_ALIASES)) {
-      const pascal = kitExportName(name)
-      if (!drawn.has(pascal)) broken.push(`  "${name}" → "${target}" — the kit draws no ${pascal}`)
-      // The alias exists because the kit spells it differently. If the kit ALSO
-      // draws the app's own spelling, the alias is shadowing a real glyph.
-      const own = name
-        .split("-")
-        .map((p) => p.replace(/^([0-9]*)([a-z])/, (_, d, c: string) => d + c.toUpperCase()))
-        .join("")
-      if (drawn.has(own)) dead.push(`  "${name}" — the kit draws ${own} itself; delete the alias`)
-    }
-    expect(broken, `broken alias(es):\n${broken.join("\n")}`).toEqual([])
-    expect(dead, `dead alias(es):\n${dead.join("\n")}`).toEqual([])
   })
 
   it("icon-vocabulary: every name actually RESOLVES to a component at runtime", () => {

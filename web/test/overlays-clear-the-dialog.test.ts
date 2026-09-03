@@ -108,7 +108,7 @@ describe("a portalled surface clears the dialog it opens from", () => {
       under,
       "these portal to the document root and sit UNDER the dialog line, so " +
         "inside a dialog they render behind it and every click lands on the " +
-        "dialog. Raise them to the anchored layer in Kwapso/design and re-sync.",
+        "dialog. Raise them to the anchored layer in Kwapso/kwapso-ui-ux and re-sync.",
     ).toEqual([])
   })
 

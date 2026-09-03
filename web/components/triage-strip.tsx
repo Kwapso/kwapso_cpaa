@@ -16,7 +16,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { AlarmClock, UserCheck } from "@shared/ui/foundations/icons"
+import { Alarm, UserCheck } from "@shared/ui/foundations/icons"
 
 import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
@@ -66,7 +66,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
         )}
         {triage.total > 0 && (
           <span className="text-destructive ml-2 flex items-center gap-1">
-            <AlarmClock className="size-3.5" />
+            <Alarm className="size-3.5" />
             {/* ONE SENTENCE, ONE ENTRY. It used to be `{n} waiting to be read`
                 followed by a template for the oldest one — three fragments a
                 translator could not reorder and two of them not in the catalogue

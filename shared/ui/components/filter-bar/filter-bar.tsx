@@ -1,6 +1,6 @@
 /* ============================================================================
-   FilterBar · RangeFacet · SearchableFacet — the narrowing controls
-   (1 direct call site on the bar).
+   FilterBar · RangeFacet · SearchableFacet · CompactFacet — the narrowing
+   controls (1 direct call site on the bar).
 
    DESIGN SOURCE
    · design-mothership/specimens/_fragments/t11.css → `.kw-chip`,
@@ -12,8 +12,11 @@
      `--btn-secondary-fill` by client ruling 2026-09-02 — see `CHIP_ADD`'s own
      header — so this chapter's 26-tall raised pill is carried for the
      padding and the remove-control drawing only, not for the height or the
-     fill. "+ Filter" is the same chip, and that is the drawing "Clear
-     filters" reuses.
+     fill. "Clear filters" reuses that same chip drawing. "+ Filter" NO
+     LONGER DOES: under the second half of the same ruling it took
+     `SelectTrigger`'s inline padding, type step and weight, and it is now
+     the one control in this file drawn as a toolbar pill rather than as a
+     chip. `CHIP_ADD`'s own header carries the four measures and the reason.
    · design-mothership/specimens/_fragments/t11-gaps.md → T11-4 records that
      the chip's end padding is unstated and that `--space-1` was the choice.
      Carried, not re-decided.
@@ -25,14 +28,22 @@
    · design-mothership/specimens/_fragments/t9.css → `.kw-search` for the
      facet's own search pill, and the chapter-9 field skin for the range
      fields.
-   · components/primitives/select/select.tsx and dropdown-menu — an option row
-     in this system is `rounded-pill px-3 py-[var(--space-2h)]` on `--accent`.
-     Matched rather than re-drawn.
+   · components/select/select.tsx and dropdown-menu — an option row in this
+     system is `rounded-pill px-3 py-[var(--space-2h)]` on `--accent`. Matched
+     rather than re-drawn. `select.tsx` is also this file's source for two
+     things it does not draw itself: `CHIP_ADD`'s toolbar measures and
+     `CompactFacet`'s closed field, both of which take
+     `selectTriggerVariants` rather than a copy of its numbers.
+   · components/popover/popover.tsx — chapter 12's floating surface, which is
+     what `CompactFacet` opens. This file draws no surface of its own.
    Everything left open is in GAPS-G.md (FLT-1 … FLT-7).
 
    THE LAW THIS FILE OBEYS
    · Chips and facet pills take `--radius-pill`. Marks take `--radius-select`
-     (6). Nothing here takes a fifth radius.
+     (6). Nothing here takes a fifth radius. `CompactFacet`'s open panel is at
+     `--radius` (24) and is not an exception to that: it is not a control, it
+     is chapter 12's floating SURFACE, and the radius is `PopoverContent`'s
+     own — this file does not name it.
    · A chip here is NEUTRAL — `--btn-secondary-fill`, the same paper
      `ViewSwitch` and `SortControl`'s field stand on, and `--btn-secondary-
      label` ink — so it may carry nothing coloured. Ruling 26 forbids an edge
@@ -65,8 +76,9 @@
    keyboard, and costs no chrome. GAPS-G.md FLT-1.
 
    RENDERING CONTEXT
-   `"use client"`. Two of the three components hold state and all three attach
-   handlers.
+   `"use client"`. Three of the four components hold state and all four attach
+   handlers; `CompactFacet` additionally renders Radix Popover, which is a
+   client component in its own right.
    ========================================================================= */
 
 "use client";
@@ -75,7 +87,16 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { Check, Loader2, Search, SearchX, TriangleAlert, X } from "../../foundations/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "../popover/popover";
+import { selectTriggerVariants } from "../select/select";
+import {
+  CheckFat,
+  CaretDown,
+  CircleNotch,
+  MagnifyingGlass,
+  Warning,
+  X,
+} from "../../foundations/icons";
 
 /* ============================================================================
    Shared pieces
@@ -163,19 +184,56 @@ const CHIP_LABEL_INTERACTIVE =
    the dash, and this ruling is the client overriding it. What stands now is
    `ViewSwitch`'s own drawing: `--control-height-button` (40) tall,
    `--btn-secondary-fill` solid, no hairline, `--btn-secondary-hover` on
-   hover, `--btn-secondary-label` ink — the same pill as every other chip in
-   this file and the same pill `SortControl`'s field wears.
+   hover, `--btn-secondary-label` ink — the same pill `SortControl`'s field
+   wears.
+
+   AND THE FOUR THAT WERE MISSED — SAME RULING, SETTLED 2026-09-02 ON
+   STAGING. The client's words the second time, verbatim: "the filter
+   button-pill it's still differnet than the other 2. fix and uniform it".
+   The pass above moved four properties (height, fill, label ink, hover) and
+   stopped; the reader in front of the toolbar could still tell the three
+   pills apart. Measured off this file and `select.tsx`, what was left:
+
+       inline padding   12 (`px-3`)            →  18 (`--space-4h`)
+       type step        12 (`--text-badge`)    →  14 (`--text-sm`)
+       leading          1  (`leading-none`)    →  1.45 (`--text-sm`'s own)
+       weight           inherited (300 / 400)  →  500 (`--font-weight-medium`)
+
+   The first two and the leading are `selectTriggerVariants`' own base line —
+   `px-[var(--space-4h)]`, `text-sm` — which is what `SortControl`'s field and
+   `ViewSwitch` are both drawn through; the weight is the one property
+   `ViewSwitch` overrides that trigger with, and it is taken from there for
+   the same reason the height was.
+
+   `leading-none` IS REMOVED RATHER THAN RESTATED AS 1.45. `text-sm` already
+   carries `--text-sm--line-height`, and the `leading-none` sitting on top of
+   it was the whole reason this pill's string was set solid where the other
+   two were not. Naming the leading again would be a second copy of a number
+   the type step already owns.
+
+   THIS IS NOW THE ONE PILL IN THIS FILE THAT IS NOT BADGE TYPE, and that is
+   a decision, not an oversight left behind. `filterChipVariants` — a
+   removable facet chip, and the "Clear filters" control that shares its
+   drawing — STAYS at `--text-badge` with `px-3`: those are CH11's `.kw-chip`,
+   drawn at badge type in the fragment cited at the top of this file, and the
+   ruling names "the filter button-pill" against "the other 2", which is this
+   slot against `SortControl` and `ViewSwitch`. A chip is not one of the
+   other 2, and re-deciding CH11 would need its own ruling. The consequence,
+   stated rather than hidden: a bar drawn with chips AND this slot puts a
+   14/500 pill beside 12/inherited ones. Logged on the register
+   (manifest.json → notDelivered, "A chip row that mixes the toolbar pill's
+   type step with CH11's").
 
    Symmetrical padding, because unlike a removable chip there is no control to
    hold off the inline end. The ink no longer drops a tier on its own — it is
    the same `--btn-secondary-label` as the rest of the family, which is what
    "the same pill aspect exactly" asks for; the slot still reads as "not yet
-   set" because it is the only chip with no remove control and no facet name,
-   not because of a fainter ink. */
+   set" because it is the only pill in the row with no remove control and no
+   facet name, not because of a fainter ink. */
 const CHIP_ADD = [
   "inline-flex h-[var(--control-height-button)] shrink-0 items-center gap-1",
-  "cursor-pointer appearance-none rounded-pill whitespace-nowrap px-3",
-  "text-badge leading-none",
+  "cursor-pointer appearance-none rounded-pill whitespace-nowrap px-[var(--space-4h)]",
+  "text-sm font-[var(--font-weight-medium)]",
   "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
   "enabled:hover:bg-[var(--btn-secondary-hover)]",
   "transition-colors duration-[var(--duration-colour)] ease-kwapso",
@@ -255,12 +313,122 @@ function FacetRegister({
   );
 }
 
-/** A facet's own heading. Caption step, secondary ink — the register's tier. */
-function FacetLabel({ id, children }: { id: string; children: React.ReactNode }) {
+/**
+ * A facet's own heading. Caption step, secondary ink — the register's tier.
+ *
+ * EXPORTED SINCE 2026-09-02, and the export is the point rather than a
+ * convenience. It was private, so a consuming app that had to compose a facet
+ * this file did not ship wrote `className="text-caption text-ink-secondary"`
+ * out by hand beside the ones that do — two classes, in a second place, free
+ * to drift the day either tier moves. `CompactFacet` closes most of the
+ * reason that composition existed; the export closes the rest.
+ *
+ * `id` is optional: it is only needed when something is pointing at this
+ * heading with `aria-labelledby`, which is how all three facets here use it.
+ */
+function FacetLabel({
+  id,
+  className,
+  children,
+}: {
+  id?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <span id={id} className="text-caption text-ink-secondary">
+    <span id={id} className={cn("text-caption text-ink-secondary", className)}>
       {children}
     </span>
+  );
+}
+
+/* One option row, shared by `SearchableFacet`'s always-open list and
+   `CompactFacet`'s panel. ONE DRAWING, so the two lists cannot diverge — the
+   compact facet is the same list behind a trigger, and a second copy of these
+   five lines would have been the first place that stopped being true.
+
+   The system's option row: pill, 12 inline, 10 block, on `--accent`.
+   `select.tsx`'s `selectItemClasses` is the same recipe for a Radix menu row,
+   and is deliberately NOT reused here: it hovers off `data-[highlighted]`,
+   which Radix writes and a plain `<button>` never carries, so importing it
+   would have given these rows no hover at all.
+
+   NOT `[font:inherit]`: Tailwind emits that arbitrary property AFTER the
+   named utilities in the bundle, so the shorthand was silently overriding the
+   `text-sm` below — the option row measured 15px (the surrounding type) in
+   the live demo. Preflight already gives a <button> `font: inherit`;
+   `text-sm` then owns the step. */
+const FACET_OPTION_ROW = [
+  "flex w-full cursor-pointer appearance-none items-center gap-[var(--space-2h)]",
+  "rounded-pill border-0 bg-transparent px-3 py-[var(--space-2h)]",
+  "text-start text-sm text-foreground",
+  "enabled:hover:bg-accent",
+  "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+];
+
+/** `.kw-search` at the dense height: the raised, borderless pill.
+ *
+ *  Shared by `SearchableFacet`, which always draws one, and `CompactFacet`,
+ *  which draws one only when it is `searchable`. The two `data-slot` names are
+ *  passed in rather than fixed here, so every selector that already addressed
+ *  `searchable-facet-search` / `searchable-facet-query` still does. */
+function FacetSearch({
+  slot,
+  querySlot,
+  value,
+  onValueChange,
+  label,
+  state,
+  disabled = false,
+  readOnly = false,
+}: {
+  slot: string;
+  querySlot: string;
+  value: string;
+  onValueChange: (next: string) => void;
+  label: string;
+  state: "default" | "readOnly" | "disabled";
+  disabled?: boolean;
+  readOnly?: boolean;
+}) {
+  return (
+    <div
+      data-slot={slot}
+      data-focus-shell=""
+      className={cn(
+        "flex min-w-0 items-center gap-[var(--space-2h)]",
+        "h-[var(--control-height-dense)] rounded-pill px-3",
+        state === "default"
+          ? "bg-[var(--surface-raised)] text-foreground shadow-sm"
+          : "bg-hair-faint shadow-none",
+        state === "disabled" && "text-ink-disabled",
+      )}
+    >
+      <MagnifyingGlass size={16} aria-hidden="true" className="text-ink-tertiary" />
+      <input
+        type="search"
+        data-slot={querySlot}
+        /* The bare node inside the pill shell: the ring belongs to the
+           shell, which is the shape the reader sees (review 1A · fix 4). */
+        data-focus-proxy=""
+        value={value}
+        disabled={disabled}
+        readOnly={readOnly}
+        data-readonly={readOnly ? "true" : undefined}
+        tabIndex={readOnly ? -1 : undefined}
+        aria-label={label}
+        placeholder={label}
+        onChange={(event) => onValueChange(event.currentTarget.value)}
+        className={cn(
+          "h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0",
+          "text-sm font-[var(--font-weight-light)] text-inherit",
+          "placeholder:text-muted-foreground",
+          "[&::-webkit-search-cancel-button]:appearance-none",
+          "[&::-webkit-search-decoration]:appearance-none",
+          disabled && "cursor-not-allowed",
+        )}
+      />
+    </div>
   );
 }
 
@@ -314,6 +482,42 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
   /** The add slot's label. Visible AND announced. Translatable; the kit's
    *  English is the artifact's own "+ filter". */
   addFilterLabel?: string;
+  /**
+   * A count riding beside `addFilterLabel`, inside the same slot — an
+   * additive node, never a replacement for the label. ADDED because a
+   * consuming app's own count (an active-facet total) had nowhere to go but
+   * folded into `addFilterLabel`'s plain string, which cannot carry `Badge`'s
+   * mango counter geometry (`size="counter"`: `h-5 min-w-5 px-2`,
+   * `rounded-pill`) — the same shape `TabsCount`'s active state and
+   * `CollectionFrame`'s own heading count already wear, ruled the one count
+   * shape in the system (GAPS-RULINGS.md R-4a, reversed 2026-09-03). Nothing
+   * here draws that shape itself: a caller hands it a real `<Badge count={n}
+   * variant="default" />` (or nothing) and this file only places it. Optional
+   * and additive — omitted, the slot is byte-identical to before. */
+  addFilterBadge?: React.ReactNode;
+  /**
+   * ANNOUNCE-ONLY. Wires `aria-expanded` on the "+ filter" trigger; it does
+   * NOT open or close anything and this file renders no panel of its own.
+   *
+   * THE CONSUMING APP OWNS THE OPEN/CLOSED STATE, ON PURPOSE, NOT BY
+   * OVERSIGHT. `showAdd`'s picker used to be this component's to draw, and
+   * the app pulled that state out so the pill and its panel could merge
+   * into one container — a client ruling — leaving `onAddFilter` as a bare
+   * "something happened" callback with nowhere for the state to come back
+   * in. Without this prop the trigger had a state (open or closed, held by
+   * the app) with no way to say so, which is a closed-loop toggle that
+   * never announces its own loop closing: `aria-expanded` MUST reflect the
+   * true state of the thing it controls, and there was no true state on
+   * this side of the boundary to read.
+   *
+   * OPTIONAL, AND IT DOES NOT TOUCH RENDERING. Omitted, `aria-expanded` is
+   * not written at all — not `"false"`, absent — so a call site that has
+   * not wired this yet gets a button byte-identical to today's. This is
+   * the same shape `onAddFilter` itself already uses: a prop that only
+   * changes what is announced, layered onto a slot an app may or may not
+   * have adopted yet.
+   */
+  addFilterExpanded?: boolean;
   /** The generic remove label, combined with each chip's own text. */
   removeLabel?: string;
   /**
@@ -387,6 +591,8 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
       clearLabel = "Clear filters",
       onAddFilter,
       addFilterLabel = "+ filter",
+      addFilterBadge,
+      addFilterExpanded,
       removeLabel = "Remove filter",
       formatRemoveLabel,
       label = "Filters",
@@ -493,9 +699,16 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
                 type="button"
                 data-slot="filter-bar-add"
                 onClick={onAddFilter}
+                aria-expanded={addFilterExpanded}
                 className={cn(CHIP_ADD)}
               >
                 {addFilterLabel}
+                {/* ADDITIVE — see `addFilterBadge`'s own doc. `CHIP_ADD`
+                    already carries `gap-1` between its children, the same
+                    space a tab keeps before `TabsCount`, so this needs no
+                    margin of its own. Omitted, this button is byte-identical
+                    to before. */}
+                {addFilterBadge}
               </button>
             ) : null}
 
@@ -818,7 +1031,7 @@ function defaultFilterOption(option: FacetOption, query: string): boolean {
  *                      no options at all is the same register as no matches,
  *                      because to the reader they are the same event —
  *                      "there is nothing here to pick".
- *  8. error          — `TriangleAlert` over `errorLabel`, in place of the list.
+ *  8. error          — `Warning` over `errorLabel`, in place of the list.
  *  9. selected       — a filled mark at `--radius-select` on
  *                      `--surface-inverse`, `aria-selected` on the row.
  * 10. read-only      — `readOnly`: rows announce their state and refuse the
@@ -907,49 +1120,23 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
       >
         <FacetLabel id={labelId}>{label}</FacetLabel>
 
-        {/* `.kw-search` at the dense height: the raised, borderless pill. */}
-        <div
-          data-slot="searchable-facet-search"
-          data-focus-shell=""
-          className={cn(
-            "flex min-w-0 items-center gap-[var(--space-2h)]",
-            "h-[var(--control-height-dense)] rounded-pill px-3",
-            state === "default"
-              ? "bg-[var(--surface-raised)] text-foreground shadow-sm"
-              : "bg-hair-faint shadow-none",
-            state === "disabled" && "text-ink-disabled",
-          )}
-        >
-          <Search size={16} aria-hidden="true" className="text-ink-tertiary" />
-          <input
-            type="search"
-            data-slot="searchable-facet-query"
-            /* The bare node inside the pill shell: the ring belongs to the
-               shell, which is the shape the reader sees (review 1A · fix 4). */
-            data-focus-proxy=""
-            value={currentQuery}
-            disabled={disabled}
-            readOnly={readOnly}
-            data-readonly={readOnly ? "true" : undefined}
-            tabIndex={readOnly ? -1 : undefined}
-            aria-label={searchLabel}
-            placeholder={searchLabel}
-            onChange={(event) => handleQuery(event.currentTarget.value)}
-            className={cn(
-              "h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0",
-              "text-sm font-[var(--font-weight-light)] text-inherit",
-              "placeholder:text-muted-foreground",
-              "[&::-webkit-search-cancel-button]:appearance-none",
-              "[&::-webkit-search-decoration]:appearance-none",
-              disabled && "cursor-not-allowed",
-            )}
-          />
-        </div>
+        {/* `.kw-search` at the dense height. One drawing, shared with
+            `CompactFacet` — see `FacetSearch`. */}
+        <FacetSearch
+          slot="searchable-facet-search"
+          querySlot="searchable-facet-query"
+          value={currentQuery}
+          onValueChange={handleQuery}
+          label={searchLabel}
+          state={state}
+          disabled={disabled}
+          readOnly={readOnly}
+        />
 
         {error ? (
           <FacetRegister
             slot="searchable-facet-error"
-            icon={<TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />}
+            icon={<Warning size={20} aria-hidden="true" className="text-ink-tertiary" />}
           >
             {errorLabel}
           </FacetRegister>
@@ -958,7 +1145,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
             slot="searchable-facet-loading"
             busy
             icon={
-              <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+              <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
             }
           >
             {loadingLabel}
@@ -966,7 +1153,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
         ) : visible.length === 0 ? (
           <FacetRegister
             slot="searchable-facet-empty"
-            icon={<SearchX size={20} aria-hidden="true" className="text-ink-tertiary" />}
+            icon={<MagnifyingGlass size={20} aria-hidden="true" className="text-ink-tertiary" />}
           >
             {emptyLabel}
           </FacetRegister>
@@ -994,18 +1181,9 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
                   disabled={rowDisabled}
                   onClick={() => toggle(option)}
                   className={cn(
-                    // The system's option row: pill, 12 inline, 10 block.
-                    // NOT `[font:inherit]`: Tailwind emits that arbitrary
-                    // property AFTER the named utilities in the bundle, so the
-                    // shorthand was silently overriding the `text-sm` below —
-                    // the option row measured 15px (the surrounding type) in
-                    // the live demo. Preflight already gives a <button>
-                    // `font: inherit`; `text-sm` then owns the step.
-                    "flex w-full cursor-pointer appearance-none items-center gap-[var(--space-2h)]",
-                    "rounded-pill border-0 bg-transparent px-3 py-[var(--space-2h)]",
-                    "text-start text-sm text-foreground",
-                    "enabled:hover:bg-accent",
-                    "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+                    // The system's option row. One drawing, shared with
+                    // `CompactFacet` — see `FACET_OPTION_ROW`.
+                    FACET_OPTION_ROW,
                     rowDisabled && "cursor-not-allowed text-ink-disabled",
                     readOnly && !rowDisabled && "cursor-default",
                   )}
@@ -1029,7 +1207,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
                         : "shadow-[var(--hairline-strong)] bg-background",
                     )}
                   >
-                    {isSelected ? <Check size={12} /> : null}
+                    {isSelected ? <CheckFat size={12} /> : null}
                   </span>
 
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
@@ -1053,4 +1231,478 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
 
 SearchableFacet.displayName = "SearchableFacet";
 
-export { FilterBar, RangeFacet, SearchableFacet, filterChipVariants, facetFieldVariants };
+/* ============================================================================
+   CompactFacet
+
+   FLT-C2 · ADDED 2026-09-02, AND THE GAP IT CLOSES COST A FEATURE.
+
+   This file shipped two facets and neither of them is short. `SearchableFacet`
+   is ALWAYS EXPANDED — heading, search pill, and every option as its own
+   checkbox row — and `RangeFacet` is two numeric fields. A toolbar or a filter
+   panel that wants ONE SHORT FIELD reading "Any client" had nothing to reach
+   for, so the consuming app composed one out of the kit's `Select`: a
+   `SelectTrigger` over `SelectItem`s, with `FacetLabel`'s two classes written
+   out again beside it because `FacetLabel` was private to this file.
+
+   WHAT THAT COST, MEASURED. A `Select` scrolls and takes type-ahead; it does
+   not SEARCH. The app's Waves screen filters 131 clients, and the moment the
+   facet became a compact select those 131 became a plain scroll — the one
+   thing `SearchableFacet`'s search pill existed to prevent. Neither of this
+   file's two facets could be both short and searchable, so the app had to
+   pick one, and picking "short" is what dropped the search.
+
+   So the compact facet IS optionally searchable, and that is the whole design:
+   a trigger the size of `SortControl`'s field, over the same filtered list
+   `SearchableFacet` already draws. `searchable` defaults to FALSE — a facet
+   over eight words does not need a search field, and drawing one there would
+   be a control that never earns its keystroke.
+
+   WHAT IT REUSES RATHER THAN REDRAWS, and why each:
+   · `selectTriggerVariants` (select.tsx) for the closed field. Not "the same
+     measurements as" — literally the same recipe the sort and view pills are
+     drawn through, so a compact facet standing beside them cannot drift from
+     them the way `CHIP_ADD` did.
+   · `FACET_OPTION_ROW` and `FacetSearch`, both shared with `SearchableFacet`
+     in this file. The compact facet is that facet's list behind a trigger; it
+     is not a second list.
+   · `FacetRegister` for busy / empty / failed, so the three registers read the
+     same inside the panel as they do in the open facet.
+   · `PopoverContent` for the panel — the kit's one floating surface (ch12:
+     "Overlay shadow, 24px radius, no blur"), at the TRIGGER'S width instead of
+     chapter 12's fixed 300, because a facet panel wider or narrower than the
+     field it drops out of reads as a different control. That is the same rule
+     `SelectContent` states as `min-w-[var(--radix-select-trigger-width)]`.
+
+   ONE VALUE, NOT A SET, AND THAT IS THE DECISION.
+   `SearchableFacet` is multi-select and stays that way. A COMPACT facet shows
+   its value IN ITS TRIGGER, and a trigger holding a set has to summarise it —
+   "3 selected", or a truncated list of names. That is a wording the kit has
+   not been given and would be inventing, and CH11's answer to "several values
+   are on" is the chip row this bar already draws. So: one value or none, and
+   `null` is the resting state the `anyLabel` row returns to. The multi-select
+   compact case is logged on the register rather than guessed at.
+
+   IT IS A FIELD, NOT A TOOLBAR PILL, AND IT KEEPS CH09'S WEIGHT. The closed
+   field is 14/300 — `selectTriggerVariants`' own step, measured 13.125px at
+   weight 300 on the verify harness's 15px root. It does NOT take the 500 that
+   `CHIP_ADD`, `SortControl` and `ViewSwitch` were just brought to: that 500
+   is `ViewSwitch`'s override, and the client's ruling behind it names the
+   toolbar's own three controls. A facet is not one of them — it lives in the
+   panel the Filter pill OPENS, which is where both surfaces put it — and
+   giving a field the button weight because it happens to be short would put
+   CH09's step back in play for every other field in the system.
+   `size="dense"` exists for exactly that placement: a column of facets inside
+   a panel, where a stack of 44s is a tall panel.
+
+   NOT A COMBOBOX, deliberately. The trigger is a disclosure button and the
+   panel holds a `listbox`; it does not claim `role="combobox"` the way
+   `SelectTrigger` does. A combobox's own field IS the text input, and here
+   the text input is a SEARCH over the options, not the value — announcing the
+   two as one control would tell a screen-reader reader that typing sets the
+   facet, which it does not. The list is the same `role="listbox"` of buttons
+   `SearchableFacet` draws, so the two facets are the same shape to assistive
+   technology as well as to the eye.
+   ========================================================================= */
+
+export interface CompactFacetProps
+  extends Omit<React.ComponentPropsWithoutRef<"div">, "onChange" | "defaultValue"> {
+  /** The facet's heading. Translatable. */
+  label?: string;
+  /**
+   * Draw no visible heading — the facet is then named to assistive technology
+   * by `label` alone. For a compact field standing IN a toolbar row, where a
+   * caption stacked over a 44 pill would make it two rows tall.
+   */
+  hideLabel?: boolean;
+  /** Everything that can be picked. */
+  options?: FacetOption[];
+  /** Controlled value. `null` is the facet turned off. */
+  value?: string | null;
+  /** Uncontrolled starting value. Off by default. */
+  defaultValue?: string | null;
+  /** Fires with the chosen option's `value`, or `null` when the facet is turned off. */
+  onValueChange?: (value: string | null) => void;
+  /**
+   * What the closed field says while nothing is chosen — the kit's own example
+   * is "Any client". Tertiary ink, exactly as a select's placeholder is.
+   * Translatable.
+   */
+  placeholder?: string;
+  /**
+   * The row that TURNS THE FACET OFF, at the head of the list. Defaults to
+   * `placeholder`, because "Any client" is the same sentence in both places.
+   * Pass `null` to draw no such row — for a facet that has no off.
+   */
+  anyLabel?: string | null;
+  /**
+   * Draw the search pill above the list. OFF by default; turn it on for a
+   * list long enough that scrolling it is the problem.
+   */
+  searchable?: boolean;
+  /** Controlled query, for a facet whose options are fetched per keystroke. */
+  query?: string;
+  defaultQuery?: string;
+  onQueryChange?: (query: string) => void;
+  /** The search field's accessible name AND its placeholder. Translatable. */
+  searchLabel?: string;
+  /** Shown when nothing matches. Translatable. */
+  emptyLabel?: string;
+  /** Busy. Translatable label announced with the spinner. */
+  loading?: boolean;
+  loadingLabel?: string;
+  /** The options could not be fetched. */
+  error?: boolean;
+  errorLabel?: string;
+  /** Same contract as `SearchableFacet`'s: pass `() => true` when already filtered. */
+  filterOption?: (option: FacetOption, query: string) => boolean;
+  /** How tall the list may get before it scrolls. A CSS length. */
+  maxHeight?: string;
+  /**
+   * The closed field's height. `default` is `--control-height-input` (44), the
+   * height every `SelectTrigger` in the system stands at — including the sort
+   * and view pills. `dense` is `--control-height-dense` (32), for a facet
+   * inside a filter panel where a column of 44s is a tall panel.
+   */
+  size?: "default" | "dense";
+  /** Which edge of the trigger the panel lines up with. */
+  align?: "start" | "center" | "end";
+  disabled?: boolean;
+  /**
+   * A value the reader may see and not change. Drawn as `disabled` — which is
+   * `SelectTrigger`'s own stated answer (its state 10: "a value the user may
+   * not change is `disabled`"), and this facet does not invent a second one
+   * for the same field.
+   */
+  readOnly?: boolean;
+  /** Controlled open state, for a panel a composition drives itself. */
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+/**
+ * A compact, optionally-searchable, single-value facet: one short field, and
+ * the same filtered list `SearchableFacet` draws, behind it.
+ *
+ * TEN STATES
+ *  1. default        — heading (unless `hideLabel`), then the closed field:
+ *                      `selectTriggerVariants`' pill with the chosen option's
+ *                      words, or the placeholder in tertiary ink.
+ *  2. hover          — does not apply to the FIELD. CH09 draws a field at
+ *                      rest, at focus and disabled and no hover for any of
+ *                      them (override 42), and this field is drawn through
+ *                      the very recipe that records it. The option ROWS
+ *                      hover, to `--accent`, never mango.
+ *  3. focus-visible  — NOT here. tokens.css §8 rings the trigger at its pill
+ *                      radius, the search field's shell at its own, and each
+ *                      option row at the row's. This file adds none.
+ *  4. active/pressed — does not apply. The press OPENS the panel, and the
+ *                      panel is the response — the same reasoning
+ *                      `SelectTrigger` records. Open takes the ink hairline
+ *                      focus takes, which `selectTriggerVariants` already
+ *                      draws off `data-[state=open]`.
+ *  5. disabled       — `--hair-faint` fill, `--ink-disabled` label and
+ *                      chevron, and the WEAK 8% edge against the resting
+ *                      field's 20% (override 42). A fill and an ink.
+ *  6. loading        — the spinner register in place of the list, announced
+ *                      politely. The trigger stays operable and the search
+ *                      field stays usable: the query is the reader's own text
+ *                      and no server is filling it in.
+ *  7. empty          — no options and no matches are the same register, for
+ *                      the same reason `SearchableFacet` gives: to the reader
+ *                      they are one event, "there is nothing here to pick".
+ *                      A facet with nothing chosen is NOT empty — that is the
+ *                      placeholder, and it is a resting state.
+ *  8. error          — `Warning` over `errorLabel`, in place of the
+ *                      list, inside the panel where the reader can retry.
+ *  9. selected       — the chosen option's words replace the placeholder in
+ *                      the field and go to primary ink; its row carries the
+ *                      tick at the reading end and `aria-selected`. One row
+ *                      at a time — see the header.
+ * 10. read-only      — `readOnly`: drawn as `disabled`, per the prop.
+ *
+ * THREE BREAKPOINTS
+ *  mobile / tablet / desktop — UNCHANGED in shape. The field takes its width
+ *  from whatever holds it and the panel takes its width from the field, so
+ *  the control is already as narrow as its container at every size; the panel
+ *  is additionally capped by the width and height Radix measured, which is
+ *  what keeps it on screen at 320. The list's own cap is `maxHeight`,
+ *  defaulting to the same 14rem `SearchableFacet` uses — about six rows,
+ *  which clears the keyboard on a phone.
+ *
+ * RTL — safe. The tick trails and the chevron is placed by `justify-between`
+ * rather than by a side; Radix mirrors the panel's alignment from `dir`.
+ */
+const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
+  (
+    {
+      className,
+      label = "Filter",
+      hideLabel = false,
+      options = [],
+      value,
+      defaultValue,
+      onValueChange,
+      placeholder = "Any",
+      anyLabel,
+      searchable = false,
+      query,
+      defaultQuery = "",
+      onQueryChange,
+      searchLabel = "Search",
+      emptyLabel = "Nothing matches",
+      loading = false,
+      loadingLabel = "Loading…",
+      error = false,
+      errorLabel = "These options could not be loaded",
+      filterOption = defaultFilterOption,
+      maxHeight = "14rem",
+      size = "default",
+      align = "start",
+      disabled = false,
+      readOnly = false,
+      open,
+      defaultOpen,
+      onOpenChange,
+      ...props
+    },
+    ref,
+  ) => {
+    const reactId = React.useId();
+    const labelId = `${reactId}-label`;
+    const listId = `${reactId}-list`;
+
+    const [uncontrolledValue, setUncontrolledValue] = React.useState<string | null>(
+      () => defaultValue ?? null,
+    );
+    const valueControlled = value !== undefined;
+    const selected = valueControlled ? value : uncontrolledValue;
+
+    const [uncontrolledQuery, setUncontrolledQuery] = React.useState(defaultQuery);
+    const queryControlled = query !== undefined;
+    const currentQuery = queryControlled ? query : uncontrolledQuery;
+
+    const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen ?? false);
+    const openControlled = open !== undefined;
+    const isOpen = openControlled ? open : uncontrolledOpen;
+
+    /* One inert state, resolved once. `readOnly` reaches the same skin as
+       `disabled` — see the prop — so the field has one closed drawing and not
+       two that have to agree. */
+    const inert = disabled || readOnly;
+    const fieldState = inert ? "disabled" : "default";
+
+    const visible = React.useMemo(
+      () => options.filter((option) => filterOption(option, currentQuery)),
+      [options, filterOption, currentQuery],
+    );
+
+    /* The chosen option's WORDS, from the options themselves. When the option
+       has gone away under a live facet the field falls back to the
+       placeholder rather than to the raw value — a facet must not name a
+       stored id at the reader (the same hazard `FilterBar`'s chips carry a
+       `label` for). */
+    const chosen = selected === null ? undefined : options.find((o) => o.value === selected);
+
+    const setOpen = (next: boolean) => {
+      if (!openControlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    };
+
+    const commit = (next: string | null) => {
+      if (!valueControlled) setUncontrolledValue(next);
+      onValueChange?.(next);
+      setOpen(false);
+    };
+
+    const handleQuery = (next: string) => {
+      if (!queryControlled) setUncontrolledQuery(next);
+      onQueryChange?.(next);
+    };
+
+    /* The off row's words default to the placeholder's: "Any client" is the
+       same sentence whether the field is saying it or the list is offering
+       it. `null` suppresses the row for a facet that has no off. */
+    const offLabel = anyLabel === undefined ? placeholder : anyLabel;
+
+    const row = (
+      key: string,
+      isSelected: boolean,
+      onPick: () => void,
+      children: React.ReactNode,
+      count?: number,
+      rowDisabled?: boolean,
+    ) => (
+      <button
+        key={key}
+        type="button"
+        role="option"
+        data-slot="compact-facet-option"
+        aria-selected={isSelected}
+        aria-disabled={rowDisabled || undefined}
+        disabled={rowDisabled}
+        onClick={onPick}
+        className={cn(
+          FACET_OPTION_ROW,
+          rowDisabled && "cursor-not-allowed text-ink-disabled",
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{children}</span>
+
+        {/* A count that is zero is not drawn — the kit never shows a "0". */}
+        {count !== undefined && count > 0 ? (
+          <span className="shrink-0 text-badge tabular-nums text-ink-tertiary">{count}</span>
+        ) : null}
+
+        {/* The tick at the reading end, which is how `SelectItem` marks the
+            chosen row — NOT the checkbox mark `SearchableFacet` draws. That
+            box says "several of these may be on"; this facet holds one. */}
+        <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
+          {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
+        </span>
+      </button>
+    );
+
+    return (
+      <div
+        ref={ref}
+        data-slot="compact-facet"
+        data-state={inert ? (disabled ? "disabled" : "readOnly") : "default"}
+        role="group"
+        aria-labelledby={hideLabel ? undefined : labelId}
+        aria-label={hideLabel ? label : undefined}
+        aria-busy={loading || undefined}
+        className={cn("flex min-w-0 flex-col gap-2", className)}
+        {...props}
+      >
+        {hideLabel ? null : <FacetLabel id={labelId}>{label}</FacetLabel>}
+
+        <Popover open={isOpen} onOpenChange={setOpen}>
+          <PopoverTrigger
+            data-slot="compact-facet-trigger"
+            disabled={inert}
+            data-readonly={readOnly ? "true" : undefined}
+            aria-readonly={readOnly || undefined}
+            aria-invalid={error || undefined}
+            className={cn(
+              selectTriggerVariants({ state: error ? "error" : "default" }),
+              /* The one measure this facet sets over the trigger's own.
+                 `dense` is for a column of facets in a panel; the default is
+                 the 44 every other field in the system stands at. */
+              size === "dense"
+                ? "h-[var(--control-height-dense)]"
+                : "h-[var(--control-height-input)]",
+            )}
+          >
+            {/* Tertiary ink while nothing is chosen — the same thing
+                `data-[placeholder]` does on a real select, said in JS because
+                Radix is not the one rendering this value. */}
+            <span className={cn("min-w-0 truncate text-start", chosen ? undefined : "text-muted-foreground")}>
+              {chosen ? chosen.label : placeholder}
+            </span>
+            <CaretDown
+              aria-hidden="true"
+              className="size-[var(--icon-button)] shrink-0"
+            />
+          </PopoverTrigger>
+
+          <PopoverContent
+            data-slot="compact-facet-panel"
+            align={align}
+            /* Chapter 12's surface, sized by `selectContentClasses`' OWN
+               stated rule rather than by chapter 12's fixed 300: never
+               narrower than the field it drops out of, free to grow to its
+               longest option, and capped by the width Radix measured. A facet
+               panel narrower than its field reads as a different control, and
+               one pinned to the field truncates the account names these
+               facets exist to hold.
+
+               And the floating layer's `--space-2h` inset rather than the
+               confirm panel's 20, because this panel holds pill rows that
+               carry their own — the same pair, for the same reason. */
+            className={cn(
+              "w-auto min-w-[var(--radix-popover-trigger-width)]",
+              "p-[var(--space-2h)]",
+            )}
+          >
+            {searchable ? (
+              <FacetSearch
+                slot="compact-facet-search"
+                querySlot="compact-facet-query"
+                value={currentQuery}
+                onValueChange={handleQuery}
+                label={searchLabel}
+                state="default"
+              />
+            ) : null}
+
+            {error ? (
+              <FacetRegister
+                slot="compact-facet-error"
+                icon={<Warning size={20} aria-hidden="true" className="text-ink-tertiary" />}
+              >
+                {errorLabel}
+              </FacetRegister>
+            ) : loading ? (
+              <FacetRegister
+                slot="compact-facet-loading"
+                busy
+                icon={
+                  <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+                }
+              >
+                {loadingLabel}
+              </FacetRegister>
+            ) : visible.length === 0 ? (
+              <FacetRegister
+                slot="compact-facet-empty"
+                icon={<MagnifyingGlass size={20} aria-hidden="true" className="text-ink-tertiary" />}
+              >
+                {emptyLabel}
+              </FacetRegister>
+            ) : (
+              <div
+                id={listId}
+                data-slot="compact-facet-list"
+                role="listbox"
+                aria-label={label}
+                style={{ maxHeight }}
+                className={cn("flex flex-col gap-1 overflow-y-auto", searchable && "mt-2")}
+              >
+                {/* The off row leads the list, which is where every "Any …"
+                    row in the system sits: the way back to no filter is above
+                    the filters, not hunted for at the end of 131 of them. */}
+                {offLabel === null
+                  ? null
+                  : row("__any__", selected === null, () => commit(null), offLabel)}
+
+                {visible.map((option) =>
+                  row(
+                    option.value,
+                    selected === option.value,
+                    () => commit(option.value),
+                    option.label,
+                    option.count,
+                    option.disabled,
+                  ),
+                )}
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  },
+);
+
+CompactFacet.displayName = "CompactFacet";
+
+export {
+  FilterBar,
+  RangeFacet,
+  SearchableFacet,
+  CompactFacet,
+  FacetLabel,
+  filterChipVariants,
+  facetFieldVariants,
+};

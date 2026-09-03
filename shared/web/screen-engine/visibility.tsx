@@ -3,7 +3,7 @@
 // Visibility — the runtime for config-driven show/hide. ENGINE-PRIVATE.
 //
 // This is the OLD library's rules-based hook, moved here when the library was
-// replaced by the design kit (shared/ui, Kwapso/design). It survives because
+// replaced by the design kit (shared/ui, Kwapso/kwapso-ui-ux). It survives because
 // it is BEHAVIOUR: `useIsVisible(config)` evaluates the config's visibility
 // RULES against the row/user/app context. The kit ships a hook of the same
 // name in controls/visibility, and it answers a DIFFERENT question — viewport

@@ -61,9 +61,15 @@
      · THE VISUAL OPTION CARD IS BUILT NOW — `AppearanceOptionGroup`, below,
        drawn to 26.05's "How an option panel is built" with override 33's 1px
        ring, and exported so `onboarding.tsx` renders 27.14's step 2 from the
-       same block. The Sidebar (spine) group — client ruling D3, mango
-       default by override 56 — ships beside Theme and Scale, which p16 drew
-       and this screen previously omitted entirely.
+       same block. The Background (spine) group — mango default by override
+       56, and THREE options again since the client's ruling of 2026-09-03
+       ("you know, i changed my mind. i want to go back to the 3 options
+       (sorry)") reversed the 2026-09-02 cut of D3's three to Mango and Quiet
+       — ships beside Theme and Scale, which p16 drew and this screen
+       previously omitted entirely. Renamed from "Sidebar" to "Background" on
+       client instruction once the fill it picks stopped being confined to
+       the rail and started painting the whole screen; that renaming stands
+       and is untouched by the spine-count reversal.
 
    RENDERING CONTEXT
    `"use client"`. `FormScreen` builds the submit handler during its render.
@@ -96,8 +102,13 @@ export interface SettingsValues {
   /** Paper, unlit, or the device's own setting. */
   theme: string;
   /**
-   * The rail's spine — ink, paper or mango. Client ruling D3 put the three
-   * in Settings · Appearance and override 56 makes mango the default.
+   * The window's fill — `ink`, `paper` or `mango`, painted behind the rail,
+   * the floating content card's own ground, and everything else behind the
+   * app. Client ruling D3 put the group in Settings · Appearance, the ruling
+   * of 2026-09-02 cut it from three options to two, the ruling of 2026-09-03
+   * put the three back, and override 56 makes mango the default. Labelled
+   * "Background" (renamed from "Sidebar" once the fill stopped being
+   * confined to the rail).
    */
   spine: string;
   /** Which root scale the interface is read at. */
@@ -123,10 +134,13 @@ export interface SettingsRouteProps
      screen is in the navbar; a detail screen has breadcrumbs." Settings is in
      the navbar. It has no breadcrumb, no record, no identity chip row, no
      number pill and no charcoal footer, so nothing about it is a detail
-     screen — and `SHELL.md`'s "Record sub-views and Settings" sentence, which
-     puts Settings on the underline strip, is an exception ON THE TAB AXIS
-     ONLY and not a reclassification. `MainScreen` takes `tabsVariant="line"`
-     for exactly this screen and no other.
+     screen. `SHELL.md`'s "Record sub-views and Settings" sentence, which put
+     Settings on the underline strip, WAS an exception on the tab axis only
+     and never a reclassification; since 2026-09-02 it is not even that —
+     the client retired the folder tab variant, `MainScreen` has no
+     `tabsVariant` to take, and the underline strip is the only strip. The
+     paragraph is kept because the classification it argues for is what puts
+     this route on `MainScreen` at all.
 
      Before this the route returned `FormScreen surface="page"`, which is a
      bare `div` with `gap-6` on it: no page, no screen card, no rail and no
@@ -207,7 +221,7 @@ const SECTION_LABELS: Record<SettingsSectionId, string> = {
 
 const FIELD_LABELS: Record<keyof SettingsValues, string> = {
   theme: "Theme",
-  spine: "Sidebar",
+  spine: "Background",
   scale: "Scale",
   weekStart: "Sprint starts on",
   notifyAssigned: "A ticket is assigned to me",
@@ -219,7 +233,7 @@ const FIELD_LABELS: Record<keyof SettingsValues, string> = {
 
 const FIELD_HELP: Partial<Record<keyof SettingsValues, string>> = {
   theme: "Three choices, and the machine’s is one of them.",
-  spine: "The spine can be ink, paper or mango. The rest of the app does not change.",
+  spine: "Three looks for the whole app, not just the rail.",
   scale: "How large the type and the rows sit. Applies to every screen, not just type.",
   weekStart: "Sets the sprint boundary and the week a figure is counted in.",
   notifyClientReply: "Only on accounts you own.",
@@ -258,11 +272,11 @@ const THUMB =
 const ThumbBars = ({ strong, faint }: { strong: string; faint: string }) => (
   <span className="flex min-w-0 flex-1 flex-col gap-1.5 p-[0.6875rem] min-[45rem]:gap-2 min-[45rem]:p-[0.8125rem]">
     <span
-      className="h-[0.4375rem] w-[64%] rounded-full min-[45rem]:h-2 min-[45rem]:w-[66%]"
+      className="h-[0.4375rem] w-[64%] rounded-pill min-[45rem]:h-2 min-[45rem]:w-[66%]"
       style={{ background: strong }}
     />
     <span
-      className="h-[0.3125rem] w-[88%] rounded-full min-[45rem]:h-1.5"
+      className="h-[0.3125rem] w-[88%] rounded-pill min-[45rem]:h-1.5"
       style={{ background: faint }}
     />
   </span>
@@ -302,24 +316,29 @@ export const ThemePicture = ({ tone }: { tone: "light" | "dark" | "system" }) =>
   );
 };
 
-/** The spine pictures: the rail column in its three fills, rows beside it.
-    Token-drawn, as the kit's own markup draws them, and from the SPINE'S OWN
-    tokens — `--spine-ink-fill` and `--spine-paper-fill` are what the real
-    rail paints in either palette, so the picture cannot drift from the thing
-    it depicts. The ground is `--surface-page`, the paper the real rail
-    stands on (in light it is the kit's drawn #FFFEF9; in dark, `--card`
-    would render the paper rail invisible on itself). The bars are the
-    foreground at the kit's .30 and .12. */
+/** The spine pictures: the rail column in each of its fills, rows beside it.
+    Token-drawn, as the kit's own markup draws them.
+
+    IT STAMPS `data-spine` AND READS `--spine-fill`, RATHER THAN NAMING A
+    TOKEN PER SPINE. The 2026-09-02 cut from three spines to two proved why:
+    the OLD version of this component switched on the name and reached for
+    `--spine-ink-fill` / `--spine-paper-fill` directly, which meant editing it
+    in three places just to follow a token rename. Stamping the attribute the
+    real screen stamps (`ScreenShell` puts `data-spine` on the screen root)
+    makes the picture resolve through tokens.css §7b itself — the SAME
+    cascade the real rail paints from — so it is correct by construction and
+    cannot drift from the thing it depicts. THE 2026-09-03 REVERSAL PROVES IT
+    THE OTHER WAY: going from two spines back to three touched this file not
+    at all, beyond the type one line down.
+
+    The ground is `--surface-page`, the paper the real rail stands on (in
+    light it is the kit's drawn #FFFEF9; in dark, `--card` would render the
+    ink or paper rail invisible on itself). The bars are the foreground at
+    the kit's .30 and .12, and stay outside the rail, so the spine rebind
+    reaches the column and nothing else. */
 export const SpinePicture = ({ spine }: { spine: "ink" | "paper" | "mango" }) => (
-  <span className={cn(THUMB, "bg-surface-page")} aria-hidden="true">
-    <span
-      className={cn(
-        THUMB_RAIL,
-        spine === "ink" && "bg-[var(--spine-ink-fill)]",
-        spine === "paper" && "bg-[var(--spine-paper-fill)]",
-        spine === "mango" && "bg-primary",
-      )}
-    />
+  <span className={cn(THUMB, "bg-surface-page")} aria-hidden="true" data-spine={spine}>
+    <span className={cn(THUMB_RAIL, "bg-[var(--spine-fill)]")} />
     <ThumbBars
       strong="color-mix(in srgb, var(--foreground) 30%, transparent)"
       faint="color-mix(in srgb, var(--foreground) 12%, transparent)"
@@ -559,27 +578,57 @@ const THEMES: readonly AppearanceOption[] = [
   },
 ];
 
-/* p16's Sidebar group, previously MISSING FROM THIS SCREEN ENTIRELY — and it
-   is client-ruled territory twice over: D3 ("offer teh threee!") put all
-   three spines in Settings · Appearance, and override 56 makes MANGO the
-   default. The captions are 26.05's own. */
+/* p16's Background group. CLIENT RULING, 2026-09-03: BACK TO THREE, verbatim
+   "you know, i changed my mind. i want to go back to the 3 options (sorry)."
+   This reverses the 2026-09-02 cut of D3's three (Ink, Paper, Mango) to two
+   (Mango and Quiet); override 56 still makes MANGO the default, unaffected
+   by either ruling.
+
+   INK IS NOT A THIRD TASTE OPTION BESIDE TWO — IT IS THE WHOLE REASON THREE
+   CAME BACK. Her words, on why: "my goal is that in light i can choose to
+   have a 'dark' background option." Appearance (above, on this same screen)
+   decides whether the app reads light or dark; this group decides the
+   colour behind everything; Ink is what lets a workspace on the LIGHT theme
+   still show a DARK window. That is a real capability, not a mood, and the
+   description below says so in plain words instead of naming a token.
+
+   RENAMED FROM "Sidebar" TO "Background", CLIENT INSTRUCTION (verbatim: "on
+   settings, we need to rename that last section — it's no longer the sidebar
+   but the ground/background you choose the word"), AND THIS RENAMING STANDS
+   — it is untouched by the spine-count reversal. The fill this group picks
+   paints the ground behind the whole screen — the rail, the space around
+   the floating content card, everything behind the app — so a caption that
+   said "sidebar", or "spine", would be describing a scope the choice no
+   longer has.
+
+   THE COPY IS REWRITTEN HERE, NOT REVERTED. The pre-cut three described
+   FILLS — "Charcoal spine, mango active row.", "Soft-paper spine, the quiet
+   one." — token language dressed as a caption, banned once "Sidebar" became
+   "Background" and doubly wrong for Ink now: this is a group of THREE
+   colours again, not two, so a returning reader cannot lean on "the other
+   one" to fill in what a name does not say. Each line below states what
+   living with the choice is like — no token names, no "spine" (the field is
+   labelled Background and that is the word the reader has) — kept to Mango's
+   own two-clause length and the room's plain, sentence-case voice; a bright
+   colour, a light calm one, and a dark one that does not ask you to change
+   your theme to get it. */
 const SPINES: readonly AppearanceOption[] = [
   {
     value: "ink",
     label: "Ink",
-    description: "Charcoal spine, mango active row.",
+    description: "A dark background of its own, whatever your light or dark setting is.",
     picture: <SpinePicture spine="ink" />,
   },
   {
     value: "paper",
     label: "Paper",
-    description: "Soft-paper spine, the quiet one.",
+    description: "A calm, light background that lets the work stand out.",
     picture: <SpinePicture spine="paper" />,
   },
   {
     value: "mango",
     label: "Mango",
-    description: "Full brand spine, charcoal active row.",
+    description: "Warm colour behind the whole app. Easy to find your place.",
     picture: <SpinePicture spine="mango" />,
   },
 ];

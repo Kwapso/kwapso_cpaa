@@ -2,7 +2,7 @@
 
 // ThemeProvider — Layer 0, now a passthrough. The old library's provider
 // wrapped next-themes, which wrote a `.dark` CLASS on <html>. The design kit
-// (shared/ui, Kwapso/design) keys every token off `data-theme` instead, and
+// (shared/ui, Kwapso/kwapso-ui-ux) keys every token off `data-theme` instead, and
 // its ModeToggle owns the attribute + localStorage("theme") itself — the
 // kit's own header rules next-themes OUT (its "system" state writes a
 // concrete attribute, which would stop `:root:not([data-theme="light"])`

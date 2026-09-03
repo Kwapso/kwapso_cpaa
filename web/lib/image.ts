@@ -10,7 +10,18 @@
 // classic <img> + object URL decode, which is slower but succeeds where the
 // modern path gives up. Only if BOTH fail do we surface an error.
 
-export const MAX_UPLOAD_BYTES = 25_000_000 // pre-downsize guard: a sane phone photo
+import { KNOWLEDGE_FILE_MAX_BYTES } from "@shared/workers/limits"
+
+// PRE-DOWNSIZE GUARD: a sane phone photo, before the canvas ever runs. This
+// used to be its own `25_000_000` (decimal) — a 1.2 MB window (25,000,000 vs
+// 26,214,400) in which the browser refused a file the server, checking the
+// same cap in binary, would have accepted. `KNOWLEDGE_FILE_MAX_BYTES` is
+// `shared/workers/limits.ts`'s own name for the one number this app already
+// teaches on every other upload door (its own comment says so); it is pure
+// constants with no imports, so importing it here costs the browser bundle
+// nothing, and `web/components/access-tokens.tsx` already reaches into the
+// same file for `MCP_TOKEN_TTL_DAYS`. One cap, read once, never retyped.
+export const MAX_UPLOAD_BYTES = KNOWLEDGE_FILE_MAX_BYTES
 
 /** Decode via the fast path, falling back to an <img> element. */
 async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {

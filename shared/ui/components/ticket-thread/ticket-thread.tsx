@@ -91,7 +91,10 @@ import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../avatar/avatar";
 import { Badge } from "../badge/badge";
 import { Skeleton } from "../skeleton/skeleton";
-import { Paperclip, SendDiagonal } from "../../foundations/icons";
+import {
+  Paperclip,
+  PaperPlaneTilt,
+} from "../../foundations/icons";
 import { Checkbox } from "../checkbox/checkbox";
 import { ScreenRegister } from "../screen-renderer/screen-renderer";
 
@@ -222,7 +225,7 @@ export interface TicketThreadProps
   internalLabel?: string;
   /* -- 27.10's CARD composer ------------------------------------------------
      "The composer is a soft-paper card at the bottom of the thread with the
-     internal switch, the audience line, and a round Send furthest right —
+     internal switch, the audience line, and a round PaperPlaneRight furthest right —
      the send glyph alone, no label. There is no paperclip anywhere in chat."
      Passing `onInternalChange` OR `audience` turns the pill composer into
      that card; without either, chapter 22's pill ships unchanged, which is
@@ -627,7 +630,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
         {composer && (onInternalChange !== undefined || audience !== undefined) ? (
           /* 27.10's composer — a soft-paper CARD, not the pill: the field on
              top; below it the internal switch chip, the audience line in
-             words, and a round mango Send carrying the glyph alone. The kit:
+             words, and a round mango PaperPlaneRight carrying the glyph alone. The kit:
              sheet, radius 24, 14×16 padding, 12 between the rows; chip 32
              tall on the card fill; send 40×40. No paperclip — "a message is
              text, files live on the record." */
@@ -695,7 +698,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                   audience === undefined || audience === null ? "ms-auto" : "",
                 )}
               >
-                <SendDiagonal size={14} aria-hidden="true" />
+                <PaperPlaneTilt size={14} aria-hidden="true" />
               </button>
             </div>
           </form>

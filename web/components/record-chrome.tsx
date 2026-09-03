@@ -8,7 +8,7 @@
 // first and none drew the last, which is how the same record type ended up with
 // six buttons on one screen and a two-line title on another.
 //
-//   RecordActionsMenu — the three-dot overflow (B1/B2). Net-new: `MoreHorizontal`
+//   RecordActionsMenu — the three-dot overflow (B1/B2). Net-new: `DotsThree`
 //                       appeared ZERO times in this repo before 17 Aug 2026, so
 //                       every action a record had was a visible button.
 //   RecordHeader      — the header band (D2). Transparent, so the ambient field
@@ -21,8 +21,17 @@
 //                       (see "the footer" section below, fixed 2026-08-31).
 //
 // The two sticky layers do not fight: the shell owns z-20 (L6) and everything
-// here takes z-10. `--shell-top` is published by app-shell — the mobile bar's own
-// height, zero on desktop — so a record pins UNDER the app bar, not behind it.
+// here takes z-10, so the phone's app bar still passes over both.
+//
+// THEY PIN TO THE CARD'S BODY NOW, NOT TO THE WINDOW (kit v1.2.28, 2026-09-02).
+// `ScreenShell` draws the page `h-dvh overflow-hidden` and makes the card's
+// body its one scroller, so `top-0` here is the top of the PANE — which is
+// below the phone's app bar already, and below the breadcrumb strip and the
+// header band on every width. That is why nothing in this file offsets itself
+// by `--shell-top` any more: the offset existed because the document was the
+// scroller and the bar floated over its top edge, and neither half of that
+// sentence is true. `--shell-top` is still published by app-shell and is now
+// read by exactly one thing, the shell's own inset for that bar.
 
 import * as React from "react"
 
@@ -35,7 +44,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
-import { MoreHorizontal } from "@shared/ui/foundations/icons"
+import { DotsThree } from "@shared/ui/foundations/icons"
 
 import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
 import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/states"
@@ -51,30 +60,33 @@ import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 import { defaultTabsConfig, type TabsConfig } from "@shared/web/screen-engine/tabs-view"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"
-import { useCondensedTitle, CondensedTitleBar, usePublishCondensedHeight } from "@/components/condensed-title"
 
 /* -------------------------- the record tab strip --------------------------
-   Client ruling, 2026-08-31, verbatim: "Detail screens are using the
-   folder-tab design, but that style belongs to main screens only. Detail
-   screens should use the line (underline) tabs." Concrete case: the App
-   detail screen (Overview / Sprints / Stories / Stakeholders) was drawing
-   folder tabs, because every detail screen's own `TabsView` config spreads
+   SUPERSEDED, v1.2.28 — the ruling this constant was built to enforce no
+   longer has an opposite to enforce against. Client ruling, 2026-08-31,
+   verbatim, kept for the record: "Detail screens are using the folder-tab
+   design, but that style belongs to main screens only. Detail screens should
+   use the line (underline) tabs." Concrete case: the App detail screen
+   (Overview / Sprints / Stories / Stakeholders) was drawing folder tabs,
+   because every detail screen's own `TabsView` config spread
    `defaultTabsConfig` (tabs-view.tsx) with no `variant` override, and that
-   default is `"folder"` — correct for a COLLECTION's own strip (a main
-   screen switching between records, or between collections), wrong for a
-   RECORD's own top-level strip switching between the SAME record's sections.
-   `RecordDetail`'s own internal tab prop already draws `variant="line"` for
-   exactly this reason (record-detail.tsx: "client ruling E … a record IS the
-   detail screen, so `line` is stated rather than inherited"); every detail
-   screen in this app hands its tabs to `RecordScreen`'s `children` instead
-   (see this file's own header, "THE TABS GO IN panel, NOT tabs"), so that kit
-   default never reached them. ONE constant, spread by every record's own
-   tabsConfig, is the fix — not a per-file `variant: "line"` written twelve
-   times, which is how the folder default drifted onto every one of them in
-   the first place. A strip that filters WITHIN one collection (Open/Done,
-   Overdue/List/Calendar) is a different case and keeps `defaultTabsConfig`
-   untouched — this constant is only for a RECORD's own section strip. */
-export const RECORD_TABS_CONFIG: TabsConfig = { ...defaultTabsConfig, variant: "line" }
+   default was `"folder"` then — correct for a COLLECTION's own strip, wrong
+   for a RECORD's own top-level strip. ONE constant, spread by every record's
+   own tabsConfig, was the fix — not a per-file `variant: "line"` written
+   twelve times, which is how the folder default drifted onto every one of
+   them in the first place.
+
+   The kit killed the folder shape entirely on 2026-09-02 (tabs-view.tsx's own
+   header has the client's words), so `defaultTabsConfig` is `"line"` now too
+   — there is no longer a wrong default to escape, and this constant is
+   therefore identical to `defaultTabsConfig` by value. It stays as its own
+   name rather than being deleted in favour of the shared one: fourteen detail
+   screens already import it BY NAME as "the record's own tab config," which
+   is a real distinction even though the two constants currently agree — a
+   future main-screen ruling that changes `defaultTabsConfig` again should not
+   have to hunt down twelve detail screens that were quietly relying on the
+   collection default matching the record one by coincidence. */
+export const RECORD_TABS_CONFIG: TabsConfig = { ...defaultTabsConfig }
 
 /* ------------------------------ the overflow ------------------------------ */
 
@@ -142,7 +154,7 @@ export function RecordActionsMenu({
           className="shrink-0"
           aria-label={t("More actions")}
         >
-          <MoreHorizontal className="size-4" />
+          <DotsThree className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -272,6 +284,7 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
     actor: item.actor,
     initials: item.initials,
     time: item.timestamp,
+    dateTime: item.dateTime,
   }))
 }
 
@@ -346,8 +359,8 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * THE TABS GO IN `panel`, NOT `tabs`. `RecordDetail` carries a tab strip of its
  * own and draws it only when `tabs` is non-empty (record-detail.tsx:681, :761), so
  * handing it our `children` as the panel gives exactly ONE strip — the app's
- * `TabsView`, which is already kit-drawn and already knows folder from line. Two
- * strips on one screen is the defect this lane exists to remove, not to move.
+ * `TabsView`, which is kit-drawn throughout. Two strips on one screen is the
+ * defect this lane exists to remove, not to move.
  *
  * THE EYEBROW COMES BACK, NARROWER — CLIENT RULING, 2026-08-31, REFINING
  * OVERRIDE 73 RATHER THAN REVERSING IT. Reviewing the live detail pages again,
@@ -404,14 +417,21 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * here or in the condensed bar — see the two props' own doc comments below
  * for why the signature keeps them anyway.
  *
- * THE CONDENSED BAR NO LONGER DISAGREES WITH THIS ONE — same ruling,
- * verbatim: "for the detail replicate the main: turn the breadcrumb + title
- * in eyebrow title. do not include image nor pills." A detail screen's
- * condensed bar now hands `CondensedTitleBar` only `eyebrow` and `title`,
- * dropping the `pills` it briefly carried — the exact shape `CollectionHeading`
- * (the main screen's own header) already used, so the two callers finally
- * agree and `CondensedTitleBar` itself no longer has a `pills` (or `mark`)
- * prop to disagree with (condensed-title.tsx).
+ * AND THERE IS NO CONDENSED BAR TO DISAGREE WITH ANY MORE — CLIENT RULING,
+ * 2026-09-03, verbatim: "when I scroll down, the whole compressed title is
+ * useless, so remove that. When I scroll down, what is at the top should be
+ * only the tabs, if there are tabs, on the same line as the whole eyebrow."
+ * `condensed-title.tsx` is deleted: the smaller stand-in header that appeared
+ * once this full one scrolled out of view, the `useIsVisible` trigger that
+ * watched the title, and the measured `--record-tabs-top` clearance it
+ * published for `STICKY_TABS` to sit under. `STICKY_TABS` now pins at `top-0`
+ * — the strip and nothing above it. THIS IS WHAT KILLS THE `eyebrow` PROP
+ * TOO: that bar was its one remaining reader (see the prop's own doc, below,
+ * for the whole of why it had survived this file's own "no eyebrow, anywhere"
+ * ruling), so it went with it, and with it the kit gap this file used to log
+ * — `RecordChrome`'s dropped `eyebrow` slot is no longer a hole this app
+ * needs filled, because this app no longer draws an eyebrow on either kind of
+ * screen.
  *
  * MECHANICALLY: `eyebrow` is dropped from the node this file builds for the
  * kit's `title` slot (never rendered in the full header again), and the
@@ -720,7 +740,6 @@ const IDENTITY_ROW =
    more. */
 
 export function RecordScreen({
-  eyebrow,
   recordNumber,
   collectionLabel,
   chips,
@@ -767,29 +786,25 @@ export function RecordScreen({
    * `leading={<RecordMark …/>}`) left untouched.
    */
   leading?: React.ReactNode
-  /**
-   * The bare record-TYPE word — "App", "Account", "Ticket". The glossary's own
-   * term for the concept (`shared/glossary.ts`), never a screen-invented
-   * synonym (R34).
+  /*
+   * NO `eyebrow` PROP — DELETED 2026-09-03, unlike `mark`/`leading` above.
    *
-   * REMOVED FROM THE FULL HEADER, PERMANENTLY — CLIENT RULING, 2026-09-01,
-   * against a real screenshot of a Ticket detail screen: no eyebrow anywhere
-   * on a detail screen's full header, full stop, because the breadcrumb above
-   * it already says the same thing ("Tickets · Kids training missing from the
-   * website menu"). This reverses "THE EYEBROW COMES BACK, NARROWER" (this
-   * file's header) rather than refining it — that ruling's own reasoning (a
-   * bare eyebrow reads as "what kind of record is this") is now answered by
-   * the breadcrumb instead, so the eyebrow is redundant, not merely
-   * relocated. The PROP survives on this signature, and every call site keeps
-   * passing it, because `CondensedTitleBar` below is a SEPARATE header (the
-   * small sticky bar that appears once scrolled past this one) with its OWN
-   * spec, reached only after scrolling — and that bar keeps an eyebrow even
-   * though this full header does not (it dropped its own `pills`, the other
-   * thing it briefly carried, the same day — condensed-title.tsx). Do not
-   * delete this prop or its call sites while chasing "no eyebrow, anywhere"
-   * — the condensed bar is the one remaining, intentional reader of it.
+   * The 2026-09-01 ruling had already taken the eyebrow out of the FULL
+   * header ("no eyebrow anywhere on a detail screen's full header, full stop,
+   * because the breadcrumb above it already says the same thing"), and the
+   * prop survived that ruling for exactly ONE reason, stated in its own doc at
+   * the time: the condensed sticky bar was a SEPARATE header with its own
+   * spec, and it still drew an eyebrow. The client deleted that bar on
+   * 2026-09-03 (this file's header, "AND THERE IS NO CONDENSED BAR TO
+   * DISAGREE WITH ANY MORE"), which left the prop with no reader at all — not
+   * an inert value like `mark`, which every call site still passes and
+   * `RecordMark` still draws elsewhere, but thirteen translated words
+   * (`eyebrow={t("Ticket")}`, `t("Sprint")`, `t("Account")`…) rendering
+   * nowhere on any screen. So the prop and all thirteen call sites went
+   * together. The record-TYPE word a person needs is still on screen: the
+   * breadcrumb above this header says it, which is the whole reasoning the
+   * 2026-09-01 ruling stood on.
    */
-  eyebrow?: React.ReactNode
   /** The reference a person quotes on the phone. Drawn as the charcoal chip,
    * now ABOVE the title (client ruling, 2026-09-01, reversing "below the
    * title" below): "the black chip is always the ID". */
@@ -798,7 +813,17 @@ export function RecordScreen({
    * beside the ID. "add a chip for Padelbase like in the example". Pass a
    * clickable node (an `InAppLink` or a `Button variant="link"` wrapped around
    * the label) to make it a real cross-reference — `Badge` draws whatever node
-   * it is given, so nothing about the chip itself needs to change for that. */
+   * it is given, so nothing about the chip itself needs to change for that.
+   *
+   * THE RECORD-TYPE WORD IS STILL NOT A CHIP. Seven `*-detail.tsx` files carry
+   * a "NO `collectionLabel`" note quoting the client's 2026-08-31 correction
+   * ("thats not a tg but the eyebrow remember"), each explaining that the type
+   * word was already said by the eyebrow directly above. The eyebrow is gone
+   * (2026-09-03, this file's header), and those notes are kept as the record of
+   * a ruling that did NOT change with it: the breadcrumb above this header says
+   * the type now, so passing `t("Task")`/`t("Meeting")`/… here would still be
+   * the same word twice on one screen. Do not read the missing eyebrow as a
+   * vacancy this chip should fill. */
   collectionLabel?: React.ReactNode
   /**
    * Anything else that belongs on the identity row — a status word, "Archived",
@@ -891,11 +916,12 @@ export function RecordScreen({
   errorAction?: React.ReactNode
 }) {
   const { t, lang } = useLanguage()
-  // THE CONDENSED STICKY TITLE (see condensed-title.tsx). `titleRef` watches
-  // the real title block below — the moment it scrolls out of the viewport,
-  // `condensed` flips and the small stand-in takes the sticky slot above the
-  // tab strip instead.
-  const { titleRef, condensed } = useCondensedTitle<HTMLSpanElement>()
+  // NOTHING WATCHES THIS TITLE ANY MORE. It used to carry a `titleRef` for the
+  // condensed stand-in bar's `useIsVisible` trigger (condensed-title.tsx,
+  // deleted 2026-09-03 — this file's header has the client's ruling), so the
+  // title block below is a plain node again and this screen scrolls its own
+  // header away with nothing taking its place. The tab strip is the only
+  // thing that pins (`STICKY_TABS`, below, now `top-0`).
 
   // THE FULL HEADER'S ORDER, REVERSED — CLIENT RULING, 2026-09-01, against a
   // real screenshot of a Ticket detail screen. New order, top to bottom: the
@@ -1030,9 +1056,9 @@ export function RecordScreen({
   // a same-size echo of the control gap one level down.
   const titleBlock =
     identityChips === undefined && subtitleLine === null ? (
-      <span ref={titleRef} className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+      <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     ) : (
-      <span ref={titleRef} className="flex min-w-0 flex-col">
+      <span className="flex min-w-0 flex-col">
         {identityChips !== undefined ? (
           <span className="mb-[var(--space-4)]">{identityChips}</span>
         ) : null}
@@ -1042,36 +1068,17 @@ export function RecordScreen({
         </span>
       </span>
     )
-  // THE CONDENSED BAR'S OWN HEIGHT, MEASURED — not a fixed token any more.
-  // Even now that the condensed bar carries only `eyebrow` and `title` (see
-  // `CondensedTitleBar`'s own doc, condensed-title.tsx), a longer translated
-  // eyebrow word or a title long enough to wrap can still change its line
-  // count, which is not knowable until the browser has laid it out.
-  // `usePublishCondensedHeight` measures the bar's own node and publishes it
-  // to `--record-tabs-top`, which `STICKY_TABS` reads (falling back to `0px`
-  // while not condensed).
-  const condensedBarRef = React.useRef<HTMLDivElement>(null)
-  usePublishCondensedHeight("--record-tabs-top", condensed, condensedBarRef)
   return (
     // `display: contents` — a real DOM node, so this component's children
     // become direct flex items of whatever this component's own caller
     // renders it into (every `*-detail.tsx`'s `flex flex-col gap-6`), exactly
     // as if `RecordChrome` were still the sole child.
     <div className="contents">
-      {/* NO `mark`, NO `pills` — CLIENT RULING, 2026-09-01: "for the detail
-          replicate the main: turn the breadcrumb + title in eyebrow title.
-          do not include image nor pills." The condensed bar used to be handed
-          `headerMark` and `identityChips` too (a separate, later-reversed
-          ruling the same day gave it both); `CondensedTitleBar` no longer
-          even HAS those two props (condensed-title.tsx), so this call is the
-          same shape `CollectionHeading` already uses for the main screen's
-          own condensed bar — eyebrow and title, nothing else. */}
-      <CondensedTitleBar
-        ref={condensedBarRef}
-        eyebrow={eyebrow}
-        title={title}
-        condensed={condensed}
-      />
+      {/* NO CONDENSED STAND-IN HEADER — client ruling, 2026-09-03: "when I
+          scroll down, the whole compressed title is useless, so remove that."
+          A `<CondensedTitleBar>` used to be the first thing this component
+          rendered; the file that drew it is deleted, and the tab strip below
+          is now the only thing a scrolled record screen pins. */}
       <RecordChrome
         className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS} ${TITLE_ACTIONS_SPLIT}`}
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
@@ -1188,7 +1195,18 @@ const TITLE_ACTIONS_SPLIT =
  * root (an ancestor of both), and each rule below just reads them. */
 const RECORD_TABS_GEOMETRY =
   "[--record-tab-strip-h:calc(var(--space-3)_+_var(--space-3)_+_0.125rem_+_(var(--text-sm)_*_var(--text-sm--line-height))_-_1px)] " +
-  "[--record-tab-gap:var(--space-5)]"
+  // THE GAP IS NOT THIS SCREEN'S TO CHOOSE ANY MORE — client ruling,
+  // 2026-09-03: "there needs to be space between the tabs and the start of the
+  // container. This is already correct on detail screens … Go and uniform
+  // that … change the rule and you apply it everywhere." This was
+  // `var(--space-5)` written out here, and a main screen's own strip was
+  // written with a deliberate ZERO at three call sites — two independent
+  // decisions where the client sees one. `--tab-content-gap` is that one
+  // decision (declared in `web/app/globals.css`), read here and by
+  // `STICKY_FOLDER_TABS` (shared/web/screen-engine/tabs-view.tsx). The value
+  // is unchanged, so a detail screen looks exactly as it did; what changed is
+  // that a main screen can no longer disagree with it.
+  "[--record-tab-gap:var(--tab-content-gap)]"
 
 /** PUSHES THE PANEL CARD DOWN, OUT OF THE FLOATING STRIP'S WAY. Sibling fix to
  * `STICKY_TABS`, applied on `RecordScreen`'s own root (reaches the kit's
@@ -1274,19 +1292,18 @@ const PANEL_BELOW_TABS =
  * own horizontal ladder, never the header-shaped problem the vertical side
  * was.
  *
- * CHANGELOG — the flush-cap shape a FOLDER-variant strip still wants,
- * preserved here as a pointer rather than a second unused export: cancel the
- * panel's inset on three sides (`-mx -mt px pt`, matching `CardContent`'s
- * own ladder exactly, not overshooting) and take the panel's own top radius
- * (`rounded-t-[var(--radius)]`), so the strip reads as a cap flush with the
+ * CHANGELOG, SUPERSEDED v1.2.28 — the flush-cap shape a FOLDER-variant strip
+ * used to want, kept here as a historical pointer rather than a second unused
+ * export, back when the folder shape existed to want it: cancel the panel's
+ * inset on three sides (`-mx -mt px pt`, matching `CardContent`'s own ladder
+ * exactly, not overshooting) and take the panel's own top radius
+ * (`rounded-t-[var(--radius)]`), so the strip read as a cap flush with the
  * card underneath, cut clean from the soft-paper body below it. No record
- * screen hands a folder-variant strip through here today — a main/collection
- * screen's own folder strip already has its OWN way to draw exactly that
- * attachment (`web/components/deep-link/screen-bits.tsx`'s
- * `SectionWithCreate` `folderTabs` slot, `CollectionCard
- * attached={Boolean(folderTabs)}`) — so reach for that seam rather than
- * rebuilding the escape trick here if a record's own strip ever needs the
- * folder shape.
+ * screen ever hands a folder-variant strip through here — there is no such
+ * variant left to hand (tabs-view.tsx's own header has the client's
+ * 2026-09-02 ruling that killed it), and `CollectionCard`'s own `attached`
+ * prop, the seam this paragraph used to point a future reader at, went with
+ * it.
  *
  * TWO MORE FIXES, 2026-09-01, BOTH IN THE SAME `-mx`/`px` PAIR ABOVE.
  *
@@ -1307,26 +1324,142 @@ const PANEL_BELOW_TABS =
  *     the screenshot. So the restore is now `px-1`, matching the header at
  *     every breakpoint (the header's own inset never grows at `lg`, so
  *     neither does this) rather than the card's own responsive ladder.
- * 2 · THE ROW NO LONGER STRETCHES PAST ITS OWN TABS. `[role=tablist]` is a
- *     flex child of `<Tabs>` (`flex flex-col`, tabs.tsx — no `items-start`),
- *     so with nothing of its own saying otherwise it STRETCHES to the full
- *     cross-axis width of whatever it sits in — which, once escaped by
- *     `-mx-6`/`-mx-[space-7]` above, is the CARD's own full outer width, not
- *     the strip's own content. A record with fewer tabs than that width
- *     (any of them, and worse the more tabs fall short) got a large, blank,
- *     unstyled rectangle immediately after its last tab — reachable,
- *     hoverable, and drawing nothing, which is exactly the "mis-sized empty
- *     container" a screenshot of the App detail screen's own long strip
- *     (FluClinic: twelve tabs, still short of a wide desktop's width) showed
- *     sitting where a toolbar might otherwise go. `self-start` is the whole
- *     fix — it opts this one flex child out of the column's default stretch,
- *     back to sizing itself off its own tabs, the same as `max-w-full` +
- *     `overflow-x-auto` already assumed it did. */
+ * 2 · THE ROW NO LONGER STRETCHES PAST ITS OWN TABS — `self-start`, AND
+ *     SUPERSEDED BY AN EXPLICIT WIDTH, 2026-09-03 (STICKY_TABS's own comment,
+ *     below, has the full story — this paragraph is kept for why `self-start`
+ *     was reached for in the first place). `[role=tablist]` is a flex child
+ *     of `<Tabs>` (`flex flex-col`, tabs.tsx — no `items-start`), so with
+ *     nothing of its own saying otherwise it STRETCHES to the full cross-axis
+ *     width of whatever it sits in — which, once escaped by `-mx-6`/
+ *     `-mx-[space-7]` above, is the CARD's own full outer width, not the
+ *     strip's own content. A record with fewer tabs than that width (any of
+ *     them, and worse the more tabs fall short) got a large, blank, unstyled
+ *     rectangle immediately after its last tab — reachable, hoverable, and
+ *     drawing nothing, which is exactly the "mis-sized empty container" a
+ *     screenshot of the App detail screen's own long strip (FluClinic: twelve
+ *     tabs, still short of a wide desktop's width) showed sitting where a
+ *     toolbar might otherwise go. `self-start` fixed THAT complaint — it
+ *     opted this one flex child out of the column's default stretch, back to
+ *     sizing itself off its own tabs — but it over-corrected: sizing to
+ *     CONTENT is exactly as short of the card's true edge as sizing to
+ *     un-escaped `max-w-full` was, just for a different reason, and it is
+ *     what the client's next round of screenshots caught (STICKY_TABS's own
+ *     comment). `self-start` is gone from the class list below; an explicit,
+ *     escape-compensated `width` replaces it and covers both complaints at
+ *     once — see that comment for the measurements. */
+/* THE STRIP PINS AT THE PAGE'S OWN TOP EDGE — `top-0`, 2026-09-03. It used to
+ * read `--record-tabs-top`, a MEASURED clearance the condensed stand-in title
+ * published for it (a `ResizeObserver` on that bar, because a translated word
+ * could change its line count), so the strip sat under the bar rather than
+ * over it. The client deleted the bar — "when I scroll down, what is at the
+ * top should be only the tabs, if there are tabs" — so there is nothing left
+ * above the strip to clear, and the variable that carried the clearance went
+ * with the file that published it. */
+/* THE GAP IS PART OF THE PINNED STRIP'S OWN PAINTED BOX — 2026-09-03,
+ * measured in a browser, not reasoned. It used to be the flex `gap` between
+ * `[role=tablist]` and its `TabsContent` sibling on the `<Tabs>` root
+ * (`gap-[calc(var(--space-6)_+_var(--record-tab-gap))]`), which is the same
+ * mistake `STICKY_FOLDER_TABS` made with a margin and for the same reason: a
+ * flex gap is FLOW, and the strip pinned inside it is not. `bg-background`
+ * paints the tablist's own border box and nothing else, so the moment the
+ * strip pinned, the `--record-tab-gap` band below it stopped being covered by
+ * anything and the panel's own rows scrolled straight through it. Measured on
+ * this file's own harness at 1440x900, scrolled 500px: the strip's painted
+ * bottom sat at y=42.4 and a probe row spanned y=3.2-44.7 — 2.3px of a row
+ * showing directly under the tabs, with the next row's top 9.8px below them
+ * instead of the 18.75px the gap is worth. The client's own words are what
+ * this fails: "make sure to maintain the space between tabs and content on all
+ * screens, even when I scroll down."
+ *
+ * WHY A BORDER AND NOT `pb-`, WHICH IS WHAT THE COLLECTION STRIP USES. The two
+ * strips pin DIFFERENT ELEMENTS. `STICKY_FOLDER_TABS` pins the `<Tabs>` ROOT
+ * (a collection strip hands `TabsView` no `renderPanel`, so the root holds the
+ * tablist and nothing else), and a root carries no mark of its own — padding
+ * there is free. This one pins `[role=tablist]` ITSELF, because only the
+ * tablist may escape the card (`-mx`/`-mt` below) while `TabsContent` stays
+ * inside it. And the kit draws the line strip's baseline rule as an INSET
+ * shadow on the tablist (`shadow-[inset_0_-0.0625rem_0_var(--border)]`,
+ * tabs.tsx) — an inset shadow paints at the PADDING box's edge, so
+ * `pb-[var(--record-tab-gap)]` drags the rule 18.75px down, away from the tabs
+ * it underlines. Measured, both: with `pb-` the tablist's box bottom moved
+ * 42.4 -> 61.2 while the triggers stayed at 43.4. A BOTTOM BORDER extends the
+ * BORDER box instead — painted, part of the pinned element, and outside the
+ * padding box the inset rule is clipped to — so the band is covered at every
+ * scroll position and the baseline stays welded to the tabs. Same value, same
+ * property owner (`--record-tab-gap`, itself `--tab-content-gap`), one seam.
+ *
+ * The flex gap drops by exactly what the border added, so nothing moves at
+ * rest: the tablist's margin box is now `--record-tab-gap` taller, and the
+ * room `TabsContent` needs to still land at the card's ordinary inset is
+ * `--space-6`/`--space-7` alone. Verified at rest before and after — the
+ * panel's top and the triggers' bottom are unchanged to 0.2px.
+ *
+ * THE STRIP'S OWN BOX NOW SPANS THE FULL WIDTH — CLIENT BUG, 2026-09-03,
+ * TWO REPORTS, VERBATIM: "the shape of the folder tab shoudl be behind the
+ * body, if not when i scroll down look what happens in my screenshots - its
+ * overlapping nad cuts the content" and "also when scrolling the tabs shoudl
+ * take all the width." A SECOND screenshot, on a Sprint detail screen
+ * ("FluClinic-SPR0007", three tabs), showed the identical shape: the strip
+ * stopping well short of the card's own right edge, with what looked like a
+ * second panel's text bleeding through past it — same component, same class,
+ * proving this was never page-specific.
+ *
+ * ROOT CAUSE, MEASURED (kwapso-design `verify/record-tab-strip/`, a harness
+ * built from the kit's real `Card`/`Tabs`/`TabsList` against this exact class
+ * string, before and after, at rest and scrolled): `self-start` sizes
+ * `[role=tablist]` to its own TAB CONTENT, not to its container — correct for
+ * "don't stretch," wrong for "cover the row you sit above." An 8-tab strip on
+ * a 900px card measured 184px short of the card's own right edge; a 3-tab
+ * strip (the sprint shape) measured 621px short. That uncovered band is
+ * still inside the strip's own STICKY, z-10 vertical range, so a row
+ * scrolling up through it is only hidden where a tab happens to sit — a row's
+ * trailing content (a status pill, in the reported case) stays fully visible,
+ * uncovered, scrolling straight through the same band the active tab's own
+ * mango count badge occupies. Proven directly: with `self-start`, a "Done"
+ * pill scrolled into the strip's own vertical range was NOT horizontally
+ * covered by the strip's box (`horizontallyCovered: false` at every scroll
+ * position where the pill sat under the strip) — exactly the "mango shape
+ * cutting into scrolled content" the client saw. There was no separate
+ * z-index bug: `[role=tablist]` already carries `z-10` over `sticky`, and
+ * that was never the defect — the strip's own painted box simply didn't
+ * reach far enough to need it.
+ *
+ * THE FIX IS AN EXPLICIT WIDTH, NOT A SWAP TO `w-full`. `[role=tablist]` is
+ * escaped sideways by `-mx-6`/`-mx-[space-7]` (this rule, above) to align its
+ * left edge with the header rather than the card's padded content — so a
+ * bare `w-full` (100% of the SAME un-escaped containing block `self-start`
+ * measured against) would land the box's right edge exactly `space-6`/
+ * `space-7` short of the card's true edge, the same shortfall by a smaller
+ * name. The width has to GROW by the escape amount on both sides, the
+ * ordinary "full bleed" calc. `max-w-none` is required alongside it: the
+ * kit's own `TabsList` (tabs.tsx) already carries `max-w-full` unconditionally,
+ * which would otherwise clamp any wider explicit width straight back down to
+ * 100% of the un-escaped container, silently undoing this. Individual
+ * `TabsTrigger`s are UNTOUCHED — no `flex-1`, no stretch, each tab keeps its
+ * own content width and the row still scrolls horizontally exactly as before
+ * when there are more tabs than room (measured: a narrow host with 8 tabs
+ * still requires the same horizontal scroll after this fix, `Tickets` simply
+ * starts further right because there is more true width to show it in first).
+ * This is the record strip's OWN track reaching full width, never a
+ * per-tab stretch — the mechanism `BreadcrumbFolders` was reverted away from
+ * the same day; that reversal is untouched and does not apply here, this is
+ * a different component with a different problem. */
+/* THE SAME DARK-MODE CORRECTION `STICKY_FOLDER_TABS` TOOK (tabs-view.tsx,
+ * 2026-09-03): both the strip's own fill and the border standing in for the
+ * gap below it read `--background`, the PAGE ground, where they need the
+ * CARD's own `--surface-raised`. Identical in light (both `--kw-off-beige`),
+ * a visible step apart in dark since today's spine work (`--kw-unlit-page`
+ * #141310 vs `--kw-unlit-raised` #26241F). The client reported it on a
+ * collection screen; this is the detail screen's own copy of the same strip,
+ * fixed in the same pass rather than left to be reported a second time. */
 export const STICKY_TABS =
-  "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-[var(--record-tabs-top,0px)] [&>[role=tablist]]:z-10 " +
-  "[&>[role=tablist]]:self-start [&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
+  "[&>[role=tablist]]:bg-[var(--surface-raised)] [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
+  "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
+  "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
+  "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +
   "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "gap-[calc(var(--space-6)_+_var(--record-tab-gap))] " +
+  "gap-[var(--space-6)] " +
   "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +
+  "lg:[&>[role=tablist]]:w-[calc(100%_+_var(--space-7)_+_var(--space-7))] " +
   "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "lg:gap-[calc(var(--space-7)_+_var(--record-tab-gap))]"
+  "lg:gap-[var(--space-7)]"

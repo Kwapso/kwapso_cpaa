@@ -20,7 +20,7 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, Plus } from "@shared/ui/foundations/icons"
+import { ArrowsDownUp, Plus } from "@shared/ui/foundations/icons"
 
 import { facetOptions, selectRows } from "./collection"
 import { useRemembered } from "@shared/web/remembered"
@@ -28,7 +28,7 @@ import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 import { Button } from "@shared/ui/components/button/button"
-import { FilterBar } from "./filter-bar"
+import { useFilterBar } from "./filter-bar"
 import {
   Pagination,
   PaginationContent,
@@ -439,6 +439,19 @@ function CollectionFrame<T>({
       return { ...q, facetValues: next }
     })
 
+  // CALLED UNCONDITIONALLY, ABOVE THE BRANCH — same discipline as every other
+  // hook here (see the comment on `useKitPanel` below): `pill`/`panel` are
+  // plain values either render path can use or ignore, never a hook called
+  // inside one branch only.
+  const { pill: filterBarPill, panel: filterBarPanel } = useFilterBar({
+    facets: config.filterFacets,
+    values: facetValues,
+    data,
+    onChange: setFacet,
+    onClearFacets: () => remember((q) => ({ ...q, facetValues: {} })),
+    resultCount: filtered.length,
+  })
+
   // Page change: optionally scroll the collection's top back into view.
   const goTo = (p: number) => {
     setPage(p)
@@ -530,33 +543,21 @@ function CollectionFrame<T>({
     // so there is no floating surface left here for a Dialog's scroll lock to
     // fight with. `modal` still gates the mobile Sort popover below, which is
     // unrelated and unchanged.
-    // WRAPPED IN A `relative` BOX, and that box is the whole point of the
-    // wrapper — `FilterBar`'s open panel is `position: absolute` with
-    // `top-full`/`inset-x-0` (filter-bar.tsx, 2 Sep 2026: a flex-sibling
-    // panel fed its own height into the toolbar's `rounded-pill` and drew a
-    // giant oval), so it anchors to the nearest POSITIONED ancestor. The kit's
-    // own frame wraps whatever it is handed here in `<div className="flex
-    // min-w-0 flex-wrap items-center gap-2">` with no `position` of its own
-    // (`shared/ui/components/collection-frame/collection-frame.tsx`, R39 — a
-    // hand-edit there turns the build red), and nothing above it is positioned
-    // either, so without this the panel would measure against the initial
-    // containing block and land at the wrong width in the wrong place. This
-    // anchor is narrower than the toolbar — it is only the filters slot — so
-    // the panel carries its own `min-w-*` to keep a usable measure; marking
-    // the kit's own wrapper `relative` is the upstream fix, logged for the
-    // design-kit pipeline.
-    const filterBar = showFilterBar && !isEmptyState ? (
-      <div className="relative flex min-w-0 items-center">
-        <FilterBar
-          facets={config.filterFacets}
-          values={facetValues}
-          data={data}
-          onChange={setFacet}
-          onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
-          resultCount={filtered.length}
-        />
-      </div>
-    ) : null
+    // NOTHING WRAPS IT ANY MORE. This slot used to carry a `relative` box for
+    // one reason: `FilterBar`'s open panel was `position: absolute` and needed
+    // a positioned ancestor to measure against. The panel is in NORMAL FLOW
+    // now (client ruling, 2 Sep 2026: "the expanded toolbar shoudl not be an
+    // overlay, but literaly expand the space"), so there is no anchor to
+    // provide and an empty wrapper would be a box with no argument behind it.
+    // WHERE THE PANEL LANDS IN THIS BRANCH is the kit's own `toolbarPanel`
+    // prop below (v1.2.27) — the upstream fix `filter-bar.tsx`'s header used
+    // to log for the design-kit pipeline, now landed: the kit's frame offers
+    // a real slot between its toolbar and its rows, so this branch hands it
+    // the panel directly instead of publishing a portal target for one.
+    // `filterBarPill`/`filterBarPanel` are the `useFilterBar` call made once,
+    // above the branch, alongside every other hook here.
+    const shownFilterBar = showFilterBar && !isEmptyState ? filterBarPill : null
+    const shownFilterPanel = showFilterBar && !isEmptyState ? filterBarPanel : null
     // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
     // between the actual view switcher and "the sub-tab picker are controls"
     // — this frame has no view switcher, so `SortControl` takes the slot
@@ -585,6 +586,14 @@ function CollectionFrame<T>({
     const createButton = createAction && !isEmptyState ? createActionButton(createAction) : null
 
     return (
+      // THE PANEL'S PLACE, HANDED TO THE KIT'S OWN SLOT — v1.2.27.
+      // `FilterBar`'s open panel is normal-flow now (client ruling, 2 Sep
+      // 2026: it expands the space rather than floating over it), and the
+      // kit's own frame now offers a real slot for exactly that,
+      // `toolbarPanel`, directly under the toolbar and above the rows. No
+      // provider, no outlet, no portal: `useFilterBar` already handed this
+      // branch the panel as an ordinary value above, so it is passed straight
+      // through as a prop like every other slot here.
       <KitCollectionFrame
         className={className}
         // `tone="bare"`/`inset={false}`: this frame always renders inside
@@ -600,7 +609,8 @@ function CollectionFrame<T>({
         heading={config.title || undefined}
         rule={Boolean(config.title)}
         search={searchBox}
-        filters={filterBar}
+        filters={shownFilterBar}
+        toolbarPanel={shownFilterPanel}
         viewSwitch={sortControl}
         actions={createButton}
       >
@@ -692,17 +702,11 @@ function CollectionFrame<T>({
             />
           ) : null
           // `modal` no longer passed: `FilterBar` has no Popover left to gate
-          // (see the `useKitPanel` branch's own note above).
-          const filterBar = showFilterBar ? (
-            <FilterBar
-              facets={config.filterFacets}
-              values={facetValues}
-              data={data}
-              onChange={setFacet}
-              onClearFacets={() => remember((q) => ({ ...q, facetValues: {} }))}
-              resultCount={filtered.length}
-            />
-          ) : null
+          // (see the `useKitPanel` branch's own note above). `filterBarPill`/
+          // `filterBarPanel` are `useFilterBar`'s own values, called once
+          // above the branch alongside every other hook here.
+          const filterBar = showFilterBar ? filterBarPill : null
+          const filterPanel = showFilterBar ? filterBarPanel : null
           const sortControl = showSort ? (
             <SortControl
               options={config.sortOptions}
@@ -747,13 +751,17 @@ function CollectionFrame<T>({
                   legitimate second line here — connected to the row above
                   it rather than floating disconnected from "the toolbar",
                   and never present when there is nothing to filter.
-                  `relative` — `filter-bar.tsx`'s OPEN panel is `position:
-                  absolute` with `top-full`/`inset-x-0` (2 Sep 2026: a
-                  flex-sibling panel fed its height into the toolbar pill and
-                  drew a giant oval), so it measures against the nearest
-                  positioned ancestor; this block is it, which puts the panel
-                  under the whole phone header at the header's own width. */}
-              <div className="relative flex flex-col gap-2 sm:hidden">
+                  `filter-bar.tsx`'s OPEN panel is normal-flow now (client
+                  ruling, 2 Sep 2026: "the expanded toolbar shoudl not be an
+                  overlay, but literaly expand the space"), rendered directly
+                  below as `filterPanel` (v1.2.27's `useFilterBar` split, see
+                  that hook's own doc) — a plain sibling in this same flex
+                  column: under the whole phone header, at the header's own
+                  width, pushing the rows down. Nothing here is a
+                  `rounded-pill`, so the oval that shaped the desktop
+                  toolbar's answer was never this block's risk. `gap-2` was
+                  already this block's own and is unchanged. */}
+              <div className="flex flex-col gap-2 sm:hidden">
                 <div className="flex items-center gap-2">
                   {config.searchable ? (
                     <SearchInput
@@ -776,7 +784,7 @@ function CollectionFrame<T>({
                           aria-label={t("Sort")}
                           className="size-8 shrink-0"
                         >
-                          <ArrowUpDown />
+                          <ArrowsDownUp />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent
@@ -792,6 +800,7 @@ function CollectionFrame<T>({
                   )}
                 </div>
                 {filterBar}
+                {filterPanel}
               </div>
 
               {/* ≥ sm: FILTERS NEVER ORPHAN INTO A ROW OF THEIR OWN ANY MORE
@@ -821,15 +830,16 @@ function CollectionFrame<T>({
                   (default) keeps it on its own row below, exactly as before
                   this fix — that split is a title/sort decision this bug is
                   not about, and it stays untouched.
-                  `relative` is the OTHER half of `filter-bar.tsx`'s open
-                  panel, which is `position: absolute` with
-                  `top-full`/`inset-x-0` so its own height can never feed a
-                  toolbar's box model (2 Sep 2026: it did, once, and drew a
-                  giant oval). It is marked on THIS block rather than on
-                  either layout's inner row so the panel measures against the
-                  whole desktop header in both — under "stacked" that means it
-                  opens below the sort row instead of over it. */}
-              <div className="relative hidden sm:block">
+                  `filterPanel` (v1.2.27's `useFilterBar` split) is the OTHER
+                  half of `filter-bar.tsx`'s open panel, which is normal-flow
+                  now (client ruling, 2 Sep 2026: it expands the space rather
+                  than floating over it) — rendered as this column's own last
+                  child rather than either layout's inner row, so it lands
+                  under the whole desktop header in both — under "stacked"
+                  that means below the sort row rather than over it.
+                  `hidden sm:flex`: a flex column so `filterPanel` stacks
+                  below the header row rather than beside it. */}
+              <div className="hidden flex-col gap-2 sm:flex">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {titleBlock}
@@ -855,6 +865,7 @@ function CollectionFrame<T>({
                     )}
                   </div>
                 )}
+                {filterPanel}
               </div>
             </>
           )

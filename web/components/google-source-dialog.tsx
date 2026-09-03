@@ -50,7 +50,7 @@ import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Check, Plus, Search } from "@shared/ui/foundations/icons"
+import { Check, Plus, MagnifyingGlass } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
@@ -295,7 +295,7 @@ export function GoogleSourceDialog({
             autoFocus
           />
           <Button type="button" variant="secondary" onClick={look} disabled={busy || looking} className="gap-1">
-            {looking ? <Spinner /> : <Search className="size-3.5" aria-hidden />}
+            {looking ? <Spinner /> : <MagnifyingGlass className="size-3.5" aria-hidden />}
             {looking ? t("Looking…") : t("Look")}
           </Button>
         </div>

@@ -1,14 +1,14 @@
-Copyright (c) 2026 Swift Struck. All rights reserved.
+Copyright (c) 2026 Kwapso SLU. All rights reserved.
 
 PROPRIETARY AND CONFIDENTIAL
 
 This software and its accompanying documentation ("the Software") are the
-confidential and proprietary property of Swift Struck. The Software is licensed,
+confidential and proprietary property of Kwapso SLU. The Software is licensed,
 not sold.
 
 No permission is granted to any person to use, copy, modify, merge, publish,
 distribute, sublicense, or sell copies of the Software, or to prepare derivative
-works of it, except under a separate written agreement signed by Swift Struck.
+works of it, except under a separate written agreement signed by Kwapso SLU.
 
 Access to this repository does not grant any licence. If you can read this file
 because you were given access to the repository, you may use the Software only
@@ -22,7 +22,7 @@ HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Contact: alaap@swiftstruck.com
+Contact: office@kwapso.com
 
 
 ----------------------------------------------------------------------------
@@ -42,8 +42,9 @@ The principal direct dependencies and their licences at the time of writing:
     wrangler        MIT OR Apache-2.0   Cloudflare, Inc.
     oxlint          MIT      Boshen and oxc contributors
     vitest          MIT      Vitest contributors
-    shared/ui       proprietary — Swift Struck; not an npm dependency but the
-                    vendored kwapso design kit, pinned from github.com/Kwapso/design
+    shared/ui       proprietary — Kwapso SLU; not an npm dependency but the
+                    vendored kwapso design kit, pinned from
+                    github.com/Kwapso/kwapso-ui-ux
                     (it replaced the retired @kwapso/ui package)
 
 Nothing in the dependency tree is licensed under the GPL or another copyleft

@@ -50,7 +50,11 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { Loader2, Search, X } from "../../foundations/icons";
+import {
+  CircleNotch,
+  MagnifyingGlass,
+  X,
+} from "../../foundations/icons";
 
 const searchShellVariants = cva(
   [
@@ -241,13 +245,13 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           // 700ms turn on the linear curve, kept running under reduced motion
           // because a frozen spinner is the absence of the only signal that
           // work is still open.
-          <Loader2
+          <CircleNotch
             size={16}
             aria-hidden="true"
             className="motion-spinner text-ink-tertiary"
           />
         ) : (
-          <Search size={16} aria-hidden="true" className="text-ink-tertiary" />
+          <MagnifyingGlass size={16} aria-hidden="true" className="text-ink-tertiary" />
         )}
 
         <input

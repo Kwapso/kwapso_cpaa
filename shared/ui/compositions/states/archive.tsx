@@ -46,7 +46,7 @@
    Eyebrow "Group · 118 archived" over the heading "Collection" — that order,
    the same one ch27.1 draws ("Group · 24 open" over "Collection"), so the
    number rides in the micro line and NOT in a count chip. One header action,
-   Export, in the paper fill. Four folder tabs — All · Mine · Waiting ·
+   Export, in the paper fill. Four tabs — All · Mine · Waiting ·
    Archived — with Archived last, active, and the ONLY one carrying a count
    (118); the other three are drawn with no number at all. Then the panel,
    whose first child is the band, then the toolbar (a field placeheld "Search

@@ -42,9 +42,8 @@
    · Bars take `--radius-sm`, boxes `--radius`, chips and controls the pill.
      This is a control: `--radius-pill`, on the field and on the direction
      button both.
-   · THE CHEVRON SITS AT THE INLINE END — `SelectTrigger` places it with
-     `justify-between`, never a named side, so it moves to the visual start in
-     Arabic, Urdu and Persian.
+   · THERE IS NO CHEVRON — `hideChevron` on `SelectTrigger`, client ruling
+     below. Nothing in this file names a side, so the chip still mirrors.
    · Focus is the one global rule (tokens.css §8). The field moves its own
      HAIRLINE to ink on focus, which is a fill colour and not a ring.
    · Disabled is a fill and an ink — the field's hairline at 8%, a step down
@@ -60,13 +59,42 @@
    ORDER FLIP (client, 2026-09-02) — verbatim: "on the sort by, cange the
    ordre: so on tge left of the fused we have the arrow and on the right the
    value and dropdow." The chip's DOM order is now [direction, field]: the
-   arrow button first, the field (value + chevron) second. Rounding follows
+   arrow button first, the field (the value — and, until CHEVRON REMOVED
+   below the same day, a chevron after it) second. Rounding follows
    the DOM, not the words "left"/"right" — `directionVariants` now owns
    `rounded-s-pill rounded-e-none` (its outer corner is the chip's START) and
    `fieldVariants`'s `fused` variant now owns `rounded-e-pill rounded-s-none`
    (its outer corner is the chip's END). Reasoned in logical terms so this
    still mirrors correctly under `dir="rtl"` — see the RTL paragraph on
    `SortControl` itself, updated to match.
+
+   CHEVRON REMOVED (client, 2026-09-02, later the same day) — verbatim: "on
+   the sort, rmeove the chevron after the word. i know its a button". The
+   field now passes `hideChevron` to `SelectTrigger`; `ViewSwitch` took the
+   same ruling in the same breath ("same on views - rmeove the chevron"), so
+   the toolbar's three pills — filter chip, sort chip, view pill — are once
+   again ONE family, and the family is now caret-free throughout. The filter
+   chip never had one, which is why removing it from these two closes a gap
+   rather than opening one.
+
+   NOTHING ELSE MOVED. The direction segment is untouched — its own 40 square,
+   its own start-pill rounding, its own arrow — because it is a separate and
+   recently approved design. The field keeps `--space-4h` (18) of padding on
+   both sides and `--control-height-button` (40), so the pill's HEIGHT and its
+   INSET are exactly what they were; only the chevron's own 16 and the
+   trigger's 8 of `gap-2` leave, which is 24 off a `w-auto` pill's WIDTH and
+   nothing else. Measured: verify/toolbar-trio.
+
+   THE BUSY SPINNER MOVED WITH IT, and it had to. It used to be absolutely
+   positioned at `end-3`, ON TOP of the chevron, in the 24 the chevron
+   reserved. With the chevron gone that 24 is gone too, and an opaque
+   `--hair-faint` disc at `end-3` would have landed on the last ~10px of the
+   VALUE instead. So the spinner is now an ordinary trailing CHILD of the
+   trigger, taking the chevron's old place rather than floating over it: no
+   overlap, and a loading pill is the exact width the resting pill used to be.
+   `justify-between` needs no help here — the trigger is `w-auto`, so there is
+   never free space for it to distribute and the two children sit on the
+   trigger's own `gap-2`, as the value and the chevron did.
 
    RENDERING CONTEXT
    `"use client"`. It holds the uncontrolled key and direction, and attaches
@@ -86,7 +114,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../select/select";
-import { ArrowDown, ArrowUp, Loader2 } from "../../foundations/icons";
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleNotch,
+} from "../../foundations/icons";
 
 export type SortDirection = "asc" | "desc";
 
@@ -117,8 +149,10 @@ const sortControlVariants = cva(["inline-flex min-w-0 items-center gap-2"], {
    2026 — the FIELD's outer shape, now that it shares one chip with the
    direction control instead of standing beside it with a gap: this end
    keeps the pill, the other end squares off where the two meet. Everything
-   else the two share — the open ink, the chevron — is `select.tsx`'s and is
-   not restated here.
+   else the two share — the open ink above all — is `select.tsx`'s and is not
+   restated here. The chevron used to be on that shared list; it is now
+   declined at the call site with `hideChevron`, which is a prop and not a
+   class for the reason `select.tsx` gives on the prop itself.
 
    THE RESTING FILL IS NO LONGER `select.tsx`'s CH09 FIELD SKIN — a second,
    later ruling the same day. Client, verbatim: "all the components in
@@ -274,8 +308,9 @@ export interface SortControlProps
  * The list-ordering control: a key and a direction.
  *
  * TEN STATES
- *  1. default        — the field with the current key, the chevron at the
- *                      inline end, the direction control beside it.
+ *  1. default        — the field with the current key and NO chevron (client,
+ *                      2026-09-02: "i know its a button"), the direction
+ *                      control fused to its inline start.
  *  2. hover          — `--btn-secondary-hover` on BOTH halves, client,
  *                      2026-09-02: the field took `ViewSwitch`'s pill, hover
  *                      included, so the fused chip answers in one colour
@@ -290,9 +325,10 @@ export interface SortControlProps
  *  5. disabled       — both parts: `--hair-faint` / `--ink-disabled` on the
  *                      field, `--btn-disabled-fill` / `--btn-disabled-label` on
  *                      the direction control. A fill and an ink.
- *  6. loading        — the read-only skin, `aria-busy`, and the spinner sits
- *                      over the chevron. The direction control is inert for
- *                      the duration.
+ *  6. loading        — the read-only skin, `aria-busy`, and the spinner in
+ *                      the place the chevron used to hold, at the field's
+ *                      inline end. The direction control is inert for the
+ *                      duration.
  *  7. empty          — no options: renders NOTHING. A sort control over a list
  *                      with nothing to sort by is chrome, and the kit's rule is
  *                      to prefer nothing over a disabled stub.
@@ -318,13 +354,13 @@ export interface SortControlProps
  * RTL — safe, and this is the component where it matters most. Since the
  * ORDER FLIP (client, 2026-09-02) the chip is [direction, field] in DOM
  * order: the direction control sits at the chip's inline START
- * (`rounded-s-pill`, first child, no literal side), and the field's own
- * chevron stays at ITS inline end (`SelectTrigger`'s `justify-between`,
- * unaffected by the outer reorder because it lives inside the field, not
- * beside it). Reasoned in logical properties throughout, so in Arabic, Urdu
- * and Persian the whole chip mirrors: logical start is the visual RIGHT, so
- * the arrow renders on the right and the field (value + chevron) on the
- * left — the same mirrored relationship LTR readers see reversed. Radix
+ * (`rounded-s-pill`, first child, no literal side), and the field carries the
+ * value alone — the chevron was removed the same day, so there is no longer a
+ * second glyph inside the field to place. Reasoned in logical properties
+ * throughout, so in Arabic, Urdu and Persian the whole chip mirrors: logical
+ * start is the visual RIGHT, so the arrow renders on the right and the field
+ * on the left — the same mirrored relationship LTR readers see reversed. The
+ * busy spinner is the field's own inline-end child and mirrors with it. Radix
  * mirrors the list's own alignment from `dir`. The up/down arrows are
  * vertical and mean the same thing in every script.
  */
@@ -443,16 +479,35 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
             </button>
           ) : null}
 
-          <span data-slot="sort-control-field" className="relative inline-flex min-w-0 items-center">
+          <span data-slot="sort-control-field" className="inline-flex min-w-0 items-center">
             <Select value={currentValue} onValueChange={handleValue} disabled={inert}>
               <SelectTrigger
                 id={fieldId}
                 data-slot="sort-control-select"
                 aria-busy={loading || undefined}
                 aria-labelledby={labelId}
+                /* NO CHEVRON — client, 2026-09-02: "on the sort, rmeove the
+                   chevron after the word. i know its a button". See the file
+                   header for what does and does not move with it. */
+                hideChevron
                 className={cn(fieldVariants({ size, state, fused: showDirection }))}
               >
                 <SelectValue />
+                {/* Busy: the spinner takes the chevron's old place at the
+                    field's inline end — a real child, not an overlay, now
+                    that there is no reserved 24 to float inside. It is
+                    decoration (`aria-busy` on the trigger is what announces)
+                    and the trigger is disabled for the duration, so it needs
+                    no pointer rules of its own. */}
+                {loading ? (
+                  <span
+                    aria-hidden="true"
+                    data-slot="sort-control-spinner"
+                    className="grid shrink-0 place-content-center text-ink-tertiary"
+                  >
+                    <CircleNotch size={16} className="motion-spinner" />
+                  </span>
+                ) : null}
               </SelectTrigger>
               {/* The kit's own paper, in both modes. This is the whole of fix 4:
                   the list is `--popover` at the 24 radius under the overlay
@@ -465,21 +520,6 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Busy: the spinner sits OVER the field at the inline end, in front
-                of the chevron, and takes no pointer events. Only drawn while
-                loading — the chevron is `SelectTrigger`'s and stays its own. */}
-            {loading ? (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "pointer-events-none absolute end-3 grid place-content-center",
-                  "bg-hair-faint text-ink-tertiary",
-                )}
-              >
-                <Loader2 size={16} className="motion-spinner" />
-              </span>
-            ) : null}
           </span>
         </span>
       </div>

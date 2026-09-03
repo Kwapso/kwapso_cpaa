@@ -24,7 +24,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
@@ -32,18 +32,22 @@ import { content as contentApi } from "@/lib/api"
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { formatDate } from "@shared/web/format"
 import { softNavigate } from "@/lib/nav"
-import { totalKey } from "@/lib/live-resources"
-import { sliceKey } from "@/components/work-panels"
+import { cursorKey, totalKey } from "@/lib/live-resources"
+import { LoadMore } from "@/components/load-more"
+import { sliceKey, type PanelHost } from "@/components/work-panels"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import { richTextPlain } from "@shared/web/rich-text"
 
-/** Every list on this file is a bounded, already-loaded array — either the
- * whole of it (Companies) or the door's own "page one, a summary" read
- * (Tickets, Meetings — see each panel's own doc). Either way the narrowing
- * below runs over rows already in the browser, the same shape
- * `selectable-screen.tsx`'s own toolbar uses. */
+/** Every list on this file narrows an already-loaded array in the browser, the
+ * same shape `selectable-screen.tsx`'s own toolbar uses — Companies is truly
+ * bounded (a person is a contact of a handful of accounts), while Tickets and
+ * Meetings are R14 GROWING collections whose first page is what loads here and
+ * whose own `<LoadMore>` (below each list) is what makes the rest of it
+ * reachable. Search and sort still run over the loaded prefix rather than
+ * asking the door (R14's honest-search clause is for the collection's OWN
+ * screen, which pages via a search box; this is a record's summary of it). */
 type ActiveFilter = "all" | "active" | "inactive"
 function matchesActive(filter: ActiveFilter, active: boolean): boolean {
   return filter === "all" || (filter === "active" ? active : !active)
@@ -131,9 +135,11 @@ export function CompaniesPanel({
   )
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {companies.length > 1 && (
         <ToolbarRow
+          // Reached only past the `companies.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
@@ -177,7 +183,7 @@ export function CompaniesPanel({
                 {t("No longer")}
               </Badge>
             )}
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>
@@ -190,21 +196,40 @@ export function CompaniesPanel({
 
 /** THE TICKETS RAISED FOR THIS PERSON. The door narrows by `accountId` and counts
  * the same narrowed question, so the badge above and the rows here are one
- * answer. Page one only: a contact's ticket list is a summary on somebody's
- * record, and the whole collection has its own screen with its own paging. */
+ * answer. A contact's ticket list is a summary on somebody's record — the
+ * whole collection has its own screen with its own search and filters — but
+ * it is still R14 GROWING, so page one is never the whole answer on its own;
+ * `<LoadMore>` below the list is what makes a contact with more tickets than
+ * one page reach the rest of them, exactly as the sibling app panel
+ * (work-panels.tsx's `AppTicketsPanel`) already does for the same
+ * collection. */
 export function ContactTicketsPanel({
   accountId,
-  basePath,
+  host,
 }: {
   accountId: string
-  basePath: string
+  /** THIS PERSON'S OWN ADDRESS (`${sectionPath}/${accountId}`) — never the flat
+   * `/tickets` base. A ticket raised for them opens NESTED under their own
+   * record, exactly like an app's own Tickets tab (work-panels.tsx's
+   * `AppTicketsPanel`): the trail is built from `route.levels`
+   * (deep-link/route.ts's `trailPath`), which can only reflect what the URL
+   * actually encodes, so a flat address here would mean "who this ticket was
+   * raised for" is silently dropped the moment somebody opens it — the same
+   * bug the owner reported on 24 Aug 2026 for Accounts → Apps → Sprints,
+   * still uncorrected on this sibling panel until now. */
+  host: PanelHost
 }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState("all")
-  const q = useCached<HelpTicket[]>(sliceKey(TICKETS_OF_ACCOUNT, accountId), () =>
+  const listKey = sliceKey(TICKETS_OF_ACCOUNT, accountId)
+  const q = useCached<HelpTicket[]>(listKey, () =>
     contentApi.help({ accountId }).then((r) => {
       primeCache(totalKey("tickets-account", accountId), r.total)
+      // R14: the cursor sidecar `<LoadMore>` reads below — without it, page
+      // one was the whole answer and every ticket past it was unreachable
+      // from this record.
+      primeCache(cursorKey(listKey), r.nextCursor)
       return r.tickets
     })
   )
@@ -229,9 +254,14 @@ export function ContactTicketsPanel({
         description={t("Every ticket about them will show here once one is raised.")}
       />
     )
-  // Tickets live at their own top-level URL; the account list's base is the
-  // sibling form we arrived through, so the section swap keeps the same shape.
-  const ticketsBase = basePath.replace(/\/accounts$/, "/tickets")
+  // NEST, DON'T REPLACE (deep-link/route.ts) — a ticket opened from here stays
+  // inside the person it was raised for, exactly like `AppTicketsPanel`'s own
+  // tickets. This used to rebuild a flat `/tickets` base off the SECTION path
+  // (`basePath.replace(/\/accounts$/, "/tickets")`), which is the section
+  // swap the 24 Aug fix retired everywhere else: it never carried the
+  // contact's own id in the first place, so the base it swapped from was
+  // already the wrong shape to nest under.
+  const ticketsBase = `${host.base}/tickets`
   // THE STATUS OPTIONS ARE DERIVED FROM WHAT'S ON SCREEN, never a hard-coded
   // enum — the same rule `FilterFacet.options` follows when a caller leaves
   // them off (config.ts: "the distinct values are derived from the data").
@@ -247,9 +277,11 @@ export function ContactTicketsPanel({
         (tk.helpType ?? "").toLowerCase().includes(needle))
   )
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {(q.data.length > 1 || statuses.length > 1) && (
         <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
@@ -290,29 +322,47 @@ export function ContactTicketsPanel({
                 {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
               </p>
             </div>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>
+      {/* R14: this is a GROWING collection and page one is only ever a
+          summary — the sibling app panel (work-panels.tsx's
+          AppTicketsPanel) pages the identical collection, and a contact
+          with more tickets than one page could reach none of the rest. */}
+      <LoadMore
+        listKey={listKey}
+        label={t("Load more tickets")}
+        fetchPage={(cursor) =>
+          contentApi.help({ accountId, cursor }).then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
+        }
+      />
     </div>
   )
 }
 
 /** THE MEETINGS THIS PERSON WAS IN — the meetings list, narrowed to their record. Same
- * shape as the tickets above, and the same reason for page one only. */
+ * shape as the tickets above, and the same reason `<LoadMore>` sits under it too. */
 export function ContactMeetingsPanel({
   accountId,
-  basePath,
+  host,
 }: {
   accountId: string
-  basePath: string
+  /** See `ContactTicketsPanel`'s own note — the same nested-address fix, on
+   * the sibling panel that had the identical bug. */
+  host: PanelHost
 }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = React.useState("")
   const [sort, setSort] = React.useState<{ dir: "asc" | "desc" }>({ dir: "desc" })
-  const q = useCached<Meeting[]>(sliceKey(MEETINGS_OF_ACCOUNT, accountId), () =>
+  const listKey = sliceKey(MEETINGS_OF_ACCOUNT, accountId)
+  const q = useCached<Meeting[]>(listKey, () =>
     contentApi.meetings({ accountId }).then((r) => {
       primeCache(totalKey("meetings-account", accountId), r.total)
+      // R14: the cursor sidecar `<LoadMore>` reads below — without it, page
+      // one was the whole answer and every meeting past it was unreachable
+      // from this record.
+      primeCache(cursorKey(listKey), r.nextCursor)
       return r.meetings
     })
   )
@@ -337,7 +387,9 @@ export function ContactMeetingsPanel({
         description={t("Every meeting they're in will show here once one is arranged.")}
       />
     )
-  const meetingsBase = basePath.replace(/\/accounts$/, "/meetings")
+  // NEST, DON'T REPLACE — see `ContactTicketsPanel`'s own note above, the same
+  // fix on the sibling panel.
+  const meetingsBase = `${host.base}/meetings`
   const needle = query.trim().toLowerCase()
   const dirMul = sort.dir === "desc" ? -1 : 1
   const shown = q.data
@@ -349,9 +401,11 @@ export function ContactMeetingsPanel({
     )
     .sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1) * dirMul)
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {q.data.length > 1 && (
         <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
@@ -389,10 +443,20 @@ export function ContactMeetingsPanel({
                 {[formatDate(m.startsAt, lang), m.location].filter(Boolean).join(" · ")}
               </p>
             </div>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>
+      {/* R14: same gap as the tickets panel above, on the same collection
+          shape — a contact with more meetings than one page could reach
+          none of the rest. */}
+      <LoadMore
+        listKey={listKey}
+        label={t("Load more meetings")}
+        fetchPage={(cursor) =>
+          contentApi.meetings({ accountId, cursor }).then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
+        }
+      />
     </div>
   )
 }

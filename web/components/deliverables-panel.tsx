@@ -42,12 +42,12 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Eye, EyeOff, Pencil, Power } from "@shared/ui/foundations/icons"
+import { Eye, EyeSlash, PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 import {
   InternalRecordDialog,
@@ -173,29 +173,18 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
     }
   }
 
-  if (q.error)
-    return (
-      <ShapeStateBody
-        shape="recordChrome"
-        state="error"
-        copy={{ errorTitle: t("Couldn't load the deliverables.") }}
-        action={
-          <Button variant="secondary" onClick={() => q.refresh()}>
-            {t("Try again")}
-          </Button>
-        }
-      />
-    )
-  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
-
+  // COMPUTED AHEAD OF THE TWO EARLY RETURNS BELOW (`q.data ?? []`), so
+  // `useFilterBar` — a HOOK — can be called unconditionally alongside every
+  // other hook here, the same discipline `apps-screen.tsx`'s own call keeps.
+  const loadedDeliverables = q.data ?? []
   const needle = find.trim().toLowerCase()
   // Searched in the BROWSER, and honestly: this collection is bounded and read
   // whole (R14), so the array in hand IS the shelf. On a paged list the same five
   // lines would answer about page one while looking like an answer about all of
   // it, which is why the paged screens ask their door instead.
   let rows = needle
-    ? q.data.filter((d) => `${d.title} ${d.kind ?? ""}`.toLowerCase().includes(needle))
-    : q.data
+    ? loadedDeliverables.filter((d) => `${d.title} ${d.kind ?? ""}`.toLowerCase().includes(needle))
+    : loadedDeliverables
   // …THEN THE FACETS, same reason: narrowing in the browser is honest here only
   // because the WHOLE shelf is already in hand, so a facet is a plain filter
   // over it, never a door parameter.
@@ -209,7 +198,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   // picking one facet never hides the other's choices — the same rule the
   // apps screen's own client/stage facets follow.
   const kindOptions = Array.from(
-    new Set(q.data.filter((d): d is Deliverable & { kind: string } => Boolean(d.kind)).map((d) => d.kind))
+    new Set(loadedDeliverables.filter((d): d is Deliverable & { kind: string } => Boolean(d.kind)).map((d) => d.kind))
   )
     .sort((a, b) => a.localeCompare(b))
     .map((k) => ({ value: k, label: k }))
@@ -226,9 +215,38 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
     },
   ]
   const sortOptions = DELIVERABLE_SORTS.map((o) => ({ ...o, label: t(o.label) }))
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: facetValues,
+    data: [],
+    onChange: (field, value) =>
+      setFacetValues((prev) => {
+        const next = { ...prev }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setFacetValues({}),
+    resultCount: rows.length,
+  })
+
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the deliverables.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       {/* ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
           approved that night). `filters` used to be a `<FilterBar>` rendered
           as this row's own sibling below it — the same shape her Apps
@@ -237,6 +255,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           (screen-bits.tsx), never a second row this call site draws for
           itself. */}
       <ToolbarRow
+        empty={q.data.length === 0}
         search={
           q.data.length > 0 && (
             <SearchInput
@@ -248,25 +267,8 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
             />
           )
         }
-        filters={
-          q.data.length > 0 && (
-            <FilterBar
-              facets={facets}
-              values={facetValues}
-              data={[]}
-              onChange={(field, value) =>
-                setFacetValues((prev) => {
-                  const next = { ...prev }
-                  if (value === "") delete next[field]
-                  else next[field] = value
-                  return next
-                })
-              }
-              onClearFacets={() => setFacetValues({})}
-              resultCount={rows.length}
-            />
-          )
-        }
+        filters={q.data.length > 0 && filterPill}
+        toolbarPanel={q.data.length > 0 && filterPanel}
         sort={
           q.data.length > 0 && (
             <SortControl
@@ -382,12 +384,12 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           aria-label={t("Edit")}
                           className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
-                          <Pencil className="size-3.5" />
+                          <PencilSimple className="size-3.5" />
                         </Button>
                       )}
                       {/* SHOW IT TO THE CLIENT, OR TAKE IT BACK. `deliverables:edit`,
                           the same right that corrects one — sharing is a different
-                          act, not a harder one. Eye / EyeOff join the house action
+                          act, not a harder one. Eye / EyeSlash join the house action
                           mapping (UI-CONVENTIONS) as show-to-client /
                           hide-from-client; they are not a synonym for the Power
                           icon beside them, which archives our own row. Sharing
@@ -411,7 +413,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
                           {d.visibleToClientAt ? (
-                            <EyeOff className="size-3.5" />
+                            <EyeSlash className="size-3.5" />
                           ) : (
                             <Eye className="size-3.5" />
                           )}

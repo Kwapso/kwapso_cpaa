@@ -44,7 +44,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { RefreshCw } from "@shared/ui/foundations/icons"
+import { ArrowsClockwise } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, content } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"
@@ -274,7 +274,7 @@ export function GoogleSyncButton({
     <div className={`flex flex-col gap-1 ${className ?? ""}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
-        {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
+        {syncing ? <Spinner /> : <ArrowsClockwise className="size-3.5" aria-hidden />}
         {syncing ? t("Bringing it in…") : t("Bring it in")}
       </Button>
       {/* A GRANT SOMEBODY REMOVED IN THEIR GOOGLE ACCOUNT IS SILENT BY NATURE —

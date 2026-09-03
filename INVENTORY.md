@@ -25,7 +25,7 @@ the repository knows exactly what to go and ask for.
 | **Glide** | Business plan or above (that is the tier that issues an API token). Legacy only. See §6 | no route back to the pre-kwapso history |
 
 **Owner and first point of contact for all of the above:**
-Alaap, `alaap@swiftstruck.com` (also commits as `alaap@kwapso.com`), Swift Struck.
+Alaap, `alaap@kwapso.com`, Kwapso.
 There is currently **no second person with independent access to any account in
 this table.** That is the single largest recovery risk in this project, and no
 document can fix it; see § *What has no backup*.

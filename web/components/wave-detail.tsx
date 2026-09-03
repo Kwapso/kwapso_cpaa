@@ -33,7 +33,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Power, RotateCcw, UserMinus } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power, ArrowCounterClockwise, UserMinus } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -252,14 +252,14 @@ export function WaveDetailScreen({
         {
           key: "edit",
           label: t("Edit"),
-          icon: <Pencil className="size-3.5" />,
+          icon: <PencilSimple className="size-3.5" />,
           disabled: busy,
           onSelect: () => setEditOpen(true),
         },
         {
           key: "active",
           label: wave.active ? t("Switch off") : t("Bring back"),
-          icon: wave.active ? <Power className="size-3.5" /> : <RotateCcw className="size-3.5" />,
+          icon: wave.active ? <Power className="size-3.5" /> : <ArrowCounterClockwise className="size-3.5" />,
           disabled: busy,
           destructive: wave.active,
           onSelect: () => void setActive(!wave.active),
@@ -270,9 +270,12 @@ export function WaveDetailScreen({
   return (
     <RecordScreen
       leading={<RecordMark name={wave.name} />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `wave`), client ruling 2026-08-31.
-      eyebrow={t("Wave")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. A
       // wave gained one the same day this rule split off the account-code
       // prefix (shared/workers/refs.ts) — `Wave.ref` didn't exist before that.
@@ -360,7 +363,7 @@ export function WaveDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "sprints")
             return (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col">
                 {/* TWO VERBS, AND THEY ARE DIFFERENT ONES. "Plan a sprint" writes
                     a NEW block of work and drops it straight into this package —
                     which is the order the work actually happens in, because a
@@ -373,8 +376,15 @@ export function WaveDetailScreen({
                     (ICON-ONLY, client ruling 2026-08-31) beside "Put a sprint
                     in this wave" (a search-to-attach control, the same kind of
                     second act `ContactsPanel`'s "Add contact" is). */}
-                {sprints.length > 0 || canCreate || (canEdit && addable.length > 0) ? (
                   <ToolbarRow
+                    // R50 — never toolbar (create/attach included) on an empty
+                    // wave: a wave with no sprints in it yet named "Plan a
+                    // sprint" through this row regardless of `sprints.length`,
+                    // which is the exact lone-"+"-pill shape the client's Time
+                    // screenshot named, just with a picker riding along beside
+                    // it too. `CollectionEmptyState` below carries "Add the
+                    // first" alone once this row is gone.
+                    empty={sprints.length === 0}
                     // THE LIST'S OWN SEARCH + SORT — over the sprints ALREADY in
                     // this wave, never the attach picker's pool. Shown once
                     // there is more than one row to narrow; a wave with one
@@ -385,6 +395,7 @@ export function WaveDetailScreen({
                           <SearchInput
                             value={sprintQuery}
                             onChange={(e) => setSprintQuery(e.target.value)}
+                            onClear={() => setSprintQuery("")}
                             placeholder={t("Search sprints in this wave…")}
                             className="flex-1"
                             aria-label={t("Search sprints in this wave")}
@@ -424,7 +435,6 @@ export function WaveDetailScreen({
                       </>
                     }
                   />
-                ) : null}
 
                 {sprints.length === 0 ? (
                   // No `sprints` import target at all — a wave's sprints are

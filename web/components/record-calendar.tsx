@@ -46,7 +46,7 @@ import { List } from "@shared/web/list-compat"
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { CalendarView, type CalendarDay, type CalendarEvent } from "@shared/ui/components/calendar-view/calendar-view"
 import { Agenda, type AgendaDay } from "@shared/ui/components/agenda/agenda"
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/foundations/icons"
+import { CalendarBlank, CalendarDots, CaretLeft, CaretRight, ListNumbers } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
@@ -137,17 +137,28 @@ function monthSquares(month: Date): Date[] {
 /** The month's name and the weekday headings in the READER'S own locale, the way
  * `shared/web/format.ts` already writes every other date in this app. The
  * library's calendar hard-codes twelve English month names; this one does not,
- * so a person reading the app in German reads a German month. */
-function monthLabel(month: Date): string {
-  return month.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+ * so a person reading the app in German reads a German month.
+ *
+ * Not routed through `shared/web/format.ts` — nothing there produces "long
+ * month name + year" (`formatMonth` is deliberately the short-month AXIS shape)
+ * — so this calls `Intl` directly, but with the app's own `lang`, never
+ * `undefined`: passing `undefined` asks for the RUNTIME's ambient locale
+ * (Node during server rendering, the browser during hydration), which is the
+ * exact bug format.ts's own header warns about. */
+function monthLabel(month: Date, lang: Language): string {
+  return month.toLocaleDateString(lang, { month: "long", year: "numeric" })
 }
 
 // Monday first, matching `monthSquares`. The kit's own `quietColumns` default
 // ([5, 6], the last two) is exactly right for this order — Saturday and Sunday.
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
-  // 5 Jan 1970 was a Monday, so this is Mon…Sun with no magic numbers.
-  new Date(1970, 0, 5 + i).toLocaleDateString(undefined, { weekday: "short" })
-)
+// Same reasoning as `monthLabel`: no formatter here produces a bare weekday
+// name, so this is `Intl` directly, with the reader's own `lang`.
+function weekdayLabels(lang: Language): string[] {
+  return Array.from({ length: 7 }, (_, i) =>
+    // 5 Jan 1970 was a Monday, so this is Mon…Sun with no magic numbers.
+    new Date(1970, 0, 5 + i).toLocaleDateString(lang, { weekday: "short" })
+  )
+}
 
 /* ------------------------------ the overflow ------------------------------- */
 
@@ -248,6 +259,7 @@ export function RecordCalendar({
   onMonthChange?: (month: string) => void
 }) {
   const { t, lang } = useLanguage()
+  const weekdays = React.useMemo(() => weekdayLabels(lang), [lang])
   const isPhone = useIsPhone()
   // WHAT A PHONE OPENS ON. `null` means "nobody has chosen", so the answer keeps
   // following the device — rotate a phone into landscape and the grid arrives.
@@ -323,7 +335,7 @@ export function RecordCalendar({
 
   const emptyState = (
     <p className="text-muted-foreground flex items-center gap-2 text-sm">
-      <CalendarRange aria-hidden className="size-4 shrink-0" />
+      <CalendarDots aria-hidden className="size-4 shrink-0" />
       {emptyText}
     </p>
   )
@@ -334,7 +346,7 @@ export function RecordCalendar({
           The switch is the library's own segmented control rather than two
           buttons whose variant flips, which is the shape R3 refuses. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-medium">{monthLabel(month)}</div>
+        <div className="text-sm font-medium">{monthLabel(month, lang)}</div>
         {/* IT WRAPS, AND THE GROUP IS PUSHED WITH `ml-auto` — the house rule for
             every action row in this app (UI-CONVENTIONS C4), which this one was
             not following. Five controls whose widths are TEXT and therefore
@@ -355,11 +367,11 @@ export function RecordCalendar({
             aria-label={t("How to read this month")}
           >
             <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1 px-2.5">
-              <CalendarDays className="size-3.5" />
+              <CalendarBlank className="size-3.5" />
               <span className="text-xs">{t("Month")}</span>
             </ToggleGroupItem>
             <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1 px-2.5">
-              <ListOrdered className="size-3.5" />
+              <ListNumbers className="size-3.5" />
               <span className="text-xs">{t("Agenda")}</span>
             </ToggleGroupItem>
           </ToggleGroup>
@@ -374,7 +386,7 @@ export function RecordCalendar({
               aria-label={t("Previous month")}
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
             >
-              <ChevronLeft />
+              <CaretLeft />
             </Button>
             <Button
               variant="secondary"
@@ -383,7 +395,7 @@ export function RecordCalendar({
               aria-label={t("Next month")}
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
             >
-              <ChevronRight />
+              <CaretRight />
             </Button>
           </div>
         </div>
@@ -392,7 +404,7 @@ export function RecordCalendar({
       {mode === "month" ? (
         <CalendarView
           view="month"
-          weekdayLabels={WEEKDAYS}
+          weekdayLabels={weekdays}
           days={calendarDays}
           maxEvents={maxPerDay + 1}
           onSelectEvent={(event, day) => {

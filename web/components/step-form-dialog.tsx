@@ -47,7 +47,7 @@ import {
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Settings2 } from "@shared/ui/foundations/icons"
+import { Sliders } from "@shared/ui/foundations/icons"
 
 import { InAppLink } from "@/components/in-app-link"
 
@@ -450,7 +450,7 @@ export function StepFormDialog({
                 href={safeHref(manageHref) ?? ""}
                 className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
               >
-                <Settings2 className="size-3" aria-hidden />
+                <Sliders className="size-3" aria-hidden />
                 {t("Add or edit their roles and tools")}
               </InAppLink>
             )}

@@ -21,7 +21,13 @@ function send(ctx: ErrorContext) {
     })
     if (typeof navigator !== "undefined" && navigator.sendBeacon)
       navigator.sendBeacon("/api/log/client", body)
-    else void fetch("/api/log/client", { method: "POST", body, keepalive: true })
+    // `.catch()`, not a bare `void` — a relative URL has no base to resolve
+    // against outside a real browser (a test environment, an environment with
+    // no `sendBeacon`), which throws async and would otherwise reach the
+    // runtime as an unhandled rejection: logging must never throw and never
+    // break the app, and an unobserved rejection is exactly that, one layer
+    // down from the synchronous throw the surrounding `try` already catches.
+    else fetch("/api/log/client", { method: "POST", body, keepalive: true }).catch(() => {})
   } catch {
     /* logging must never throw and never break the app */
   }

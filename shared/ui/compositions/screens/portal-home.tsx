@@ -13,7 +13,7 @@
    logo." In this file that is four concrete things and no fifth:
      1. `density="calm"` — the narrow centred measure and the quieter heading
         step, both from `SHAPE_SHELL` / `SHAPE_HEADING_SIZE`.
-     2. No table, no folder tabs, no sort control, no pager, no facets. A
+     2. No table, no tabs, no sort control, no pager, no facets. A
         client is not working a queue (ch27.41).
      3. Three things only (ch27.34), and the first region is the one they can
         act on.
@@ -330,7 +330,7 @@ function PortalHomeRoute({
         value: inBuild,
         visible: inBuildVisible,
       }}
-      /* REGION 2 — the folder tabs. There is no prop, which is the point. */
+      /* REGION 2 — the tabs. There is no prop, which is the point. */
       /* REGION 3 — one list: what we need from them, then what is done. The
          ORDER is the shape's; this route supplies two arrays and cannot
          swap them. */

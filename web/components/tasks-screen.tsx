@@ -26,6 +26,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type {
   ScreenActionContext,
@@ -33,7 +34,7 @@ import type {
 } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { type CollectionConfig } from "@shared/web/screen-engine/config"
-import { Inbox } from "@shared/ui/foundations/icons"
+import { ClipboardText } from "@shared/ui/foundations/icons"
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
@@ -139,9 +140,9 @@ const COMPLETED_COLUMNS = [
 /** THE SIX TABS, in the tester's order. Written as data so the strip, the fetch
  * key and the badge cannot fall out of step with each other. */
 const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
-  { value: "overdue", label: "Overdue", icon: "alert-triangle" },
-  { value: "open", label: "List", icon: "inbox" },
-  { value: "calendar", label: "Calendar", icon: "calendar" },
+  { value: "overdue", label: "Overdue", icon: "warning" },
+  { value: "open", label: "List", icon: "clipboard-text" },
+  { value: "calendar", label: "Calendar", icon: "calendar-blank" },
   { value: "completed", label: "Completed", icon: "check" },
   { value: "upcoming", label: "Upcoming", icon: "clock" },
   { value: "all", label: "All tasks", icon: "list" },
@@ -201,6 +202,15 @@ export function TasksScreen({
   const seesEveryones = usePermissions(teamId).can("all_tasks", "read")
   const [taskOpen, setTaskOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
+  // THE CALENDAR'S OWN SEARCH — client ruling, 2026-09-03: "the toolbar,
+  // including the search, should be absolutely everywhere we have a data view
+  // or a collection view. Stop hardcoding this." This tab's toolbar used to be
+  // a bare button (`RecordCalendar` never touches `CollectionFrame`, so the
+  // other five tabs' engine-drawn search never reaches it) — a silent,
+  // per-screen opt-out of exactly the kind the ruling is aimed at, not a
+  // reasoned exemption. In-browser over `calendarEntries` below, the same
+  // bounded shape the other five tabs already search in memory.
+  const [calendarQuery, setCalendarQuery] = React.useState("")
 
   async function addTask(values: TaskFormValues) {
     await contentApi.createTask({
@@ -282,9 +292,19 @@ export function TasksScreen({
         }
       />
     )
-  if (tasksQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const data = shapeTasks(tasksQ.data, lang)
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the heading, the six-tab
+  // strip and "New task" along with the rows. Kept from here down: the tab
+  // strip and the Calendar tab's own `ToolbarRow` (both this file's), which
+  // now stay mounted through the load. The other five tabs draw through
+  // `RecordTable` → the kit's `CollectionFrame` (`useKitPanel`), which has no
+  // loading-state passthrough of its own to lean on — outside this file's
+  // territory (`record-table.tsx` is not one of this pass's files) — so
+  // those five get a rows-region skeleton in place of the table, same as
+  // before this fix, rather than a false "genuinely empty" flash from an
+  // empty `[]` default.
+  const tasksLoading = tasksQ.data === undefined
+  const data = shapeTasks(tasksQ.data ?? [], lang)
   const columns = view === "completed" ? COMPLETED_COLUMNS : EVERYDAY_COLUMNS
   // A TABLE, not a two-line list, and that is what makes the four priority levels
   // distinct: each is its own sortable, filterable column rather than the fourth
@@ -326,8 +346,22 @@ export function TasksScreen({
   //
   // AND EVERY ONE OF THEM OPENS. `onOpen` is the engine's own `open` intent, so
   // a task reached from a square lands on exactly the screen the list reaches.
-  const calendarEntries: CalendarEntry[] = tasksQ.data
+  //
+  // GENUINELY EMPTY (R50), READ BEFORE THE QUERY NARROWS IT: whether this
+  // tab's own query (the same one `tasksKey(teamId, view)` fetched) has ANY
+  // due-dated task at all — never "zero for the month currently shown"
+  // (`RecordCalendar` pages months on its own, in the browser, so a month
+  // with nothing due is the ordinary, expected shape of a perfectly healthy
+  // calendar) and never "zero after `calendarQuery` narrowed it" (that stays
+  // the toolbar's own search-box-only concern, below).
+  const hasDueDated = (tasksQ.data ?? []).some((r) => r.dueOn)
+  const calendarEntries: CalendarEntry[] = (tasksQ.data ?? [])
     .filter((r) => r.dueOn)
+    // THE CALENDAR'S OWN SEARCH (see `calendarQuery` above) — the title is the
+    // one word every square already shows, so it is what a query narrows by,
+    // the same bounded in-memory match `CollectionFrame`'s own search runs for
+    // the other five tabs.
+    .filter((r) => r.title.toLowerCase().includes(calendarQuery.trim().toLowerCase()))
     .map((r) => ({
       id: r.id,
       day: (r.dueOn as string).slice(0, 10),
@@ -353,17 +387,16 @@ export function TasksScreen({
         // The progress bar SUMMARISES the collection, so it sits above the card
         // and outside it.
         aboveCard={progressBar}
-        // The six views are the card's own FOLDER tabs: six filters on one kind
-        // of record, which is the kit's own test for the shape ("if the tab
-        // shows the same kind of record with a filter on it, it is a folder
-        // tab"). They draw flush against the card, so the tabs read as attached
-        // to the list they scope rather than floating above it. TABS ALONE
-        // now (client ruling, 2026-08-31, correcting the earlier fix that
-        // shared this row with "New task") — see the button below instead.
+        // The six views are the card's own tab strip: six filters on one kind
+        // of record, drawn flush against the card the way `FolderTabStrip`
+        // always has (the name predates v1.2.28's retirement of the folder
+        // SHAPE — see tabs-view.tsx's header — the slot's own rule, "tabs
+        // alone, nothing beside them," is unchanged). TABS ALONE now (client
+        // ruling, 2026-08-31, correcting the earlier fix that shared this row
+        // with "New task") — see the button below instead.
         folderTabs={{
           config: {
             ...defaultTabsConfig,
-            variant: "folder",
             tabs: TASK_TABS.map((tab) => ({
               value: tab.value,
               label: t(tab.label),
@@ -385,21 +418,54 @@ export function TasksScreen({
         useKitPanel={view !== "calendar"}
       >
         {view === "calendar" ? (
-          <div className="flex flex-col gap-4">
-            {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. The calendar
-                has no search/sort of its own (`RecordCalendar` never touches
-                `CollectionFrame`), but the button still lives below the tabs
-                rather than beside them (client ruling, 2026-08-31) — a bare
-                `<ToolbarRow>` is this view's own toolbar. The other five tabs
-                get theirs from the kit panel's own toolbar (`useKitPanel`
-                above). */}
-            {canCreate && <ToolbarRow actions={<AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />} />}
-            <RecordCalendar
-              entries={calendarEntries}
-              onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
-              emptyText={t("Nothing due this month.")}
+          <div className="flex flex-col">
+            {/* THE TOOLBAR, NOW WITH ITS OWN SEARCH — CLIENT RULING,
+                2026-09-03, SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO
+                CARRY. Verbatim: "the toolbar, including the search, should be
+                absolutely everywhere we have a data view or a collection
+                view. Stop hardcoding this." `RecordCalendar` still never
+                touches `CollectionFrame` (it is a month grid, not a
+                collection body), so it still cannot inherit the other five
+                tabs' engine-drawn search — but that is a reason this row
+                needs its OWN search box, not a reason to have none. See
+                `calendarQuery` above for the filter this narrows. */}
+            <ToolbarRow
+              // `!tasksLoading &&` — `hasDueDated` reads off `tasksQ.data ??
+              // []`, which is `[]` before the read resolves and would
+              // otherwise say "genuinely empty" too early (2026-09-03 audit).
+              empty={!tasksLoading && !hasDueDated}
+              search={
+                tasksLoading || calendarEntries.length > 0 || calendarQuery !== "" ? (
+                  <SearchInput
+                    value={calendarQuery}
+                    onChange={(e) => setCalendarQuery(e.target.value)}
+                    onClear={() => setCalendarQuery("")}
+                    placeholder={t("Search tasks…")}
+                    className="w-full"
+                  />
+                ) : null
+              }
+              actions={canCreate && <AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />}
             />
+            {tasksLoading ? (
+              // ROWS ONLY — the toolbar above is already real.
+              <Skeleton variant="list" lines={4} />
+            ) : (
+              <RecordCalendar
+                entries={calendarEntries}
+                onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+                emptyText={calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")}
+              />
+            )}
           </div>
+        ) : tasksLoading ? (
+          // THE OTHER FIVE TABS, STILL LOADING — see the note above
+          // `tasksLoading`'s own declaration: their search/sort chrome is the
+          // kit panel's (`RecordTable` → `CollectionFrame`), which has no
+          // loading state of its own to ask for here, so this is a
+          // rows-region skeleton in place of the table rather than a false
+          // "nothing here" read of an empty `[]` default.
+          <Skeleton variant="list" lines={4} />
         ) : (
           <RecordTable
             columns={tableColumns}
@@ -416,7 +482,7 @@ export function TasksScreen({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
-          <Inbox className="size-3.5" />
+          <ClipboardText className="size-3.5" />
           {t("Waiting on clients")}
         </h2>
         <TodosPanel

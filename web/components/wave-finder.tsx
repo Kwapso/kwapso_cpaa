@@ -24,10 +24,12 @@
 
 import * as React from "react"
 
+import { cn } from "@shared/ui/lib/utils"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
-import { FilterBar } from "@shared/web/screen-engine/filter-bar"
+import { List, ChartBarHorizontal } from "@shared/ui/foundations/icons"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
@@ -163,14 +165,16 @@ export function WaveFinder({
             field: "accountId",
             label: t("Client"),
             control: "select" as const,
-            // No `searchable` flag: a facet declares its OPTIONS and nothing
-            // about how they are picked over (`FilterFacet`, config.ts).
-            // Whether the panel offers a search field is one decision in one
-            // place — and since 2 Sep 2026 the answer is no: a facet is a
-            // compact `Select` (client ruling, filter-bar.tsx's own header),
-            // which scrolls and takes type-ahead. This is the list that pays
-            // for that — an agency with 131 clients on staging — and the
-            // toolbar's own search box beside it is untouched.
+            // No `searchable` flag here: a facet declares its OPTIONS and
+            // nothing about how they are picked over (`FilterFacet`,
+            // config.ts) — whether the panel offers a search field is one
+            // decision in one place, `filter-bar.tsx`'s own `SEARCHABLE_PAST`
+            // threshold, measured off this facet's own resolved option count.
+            // This is the exact list that threshold exists for — an agency
+            // with 131 clients on staging, more than the kit's own `Select`
+            // (2026-09-02 through v1.2.26) could search, only scroll — the
+            // kit's `CompactFacet` (v1.2.27) answers it now, and the toolbar's
+            // own search box beside it is untouched.
             options: clients.map((a) => ({ value: a.id, label: a.name })),
           },
         ]
@@ -186,90 +190,135 @@ export function WaveFinder({
     },
   ]
 
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: { accountId: query.accountId, status: query.status },
+    // Empty on purpose: both facets carry their own options, so there is
+    // nothing for the bar to derive from the rows on screen — and a client
+    // whose only wave is filtered out must not vanish from the filter.
+    data: [],
+    onChange: (field, value) => onChange({ ...query, [field]: value }),
+    onClearFacets: () =>
+      onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir }),
+    resultCount,
+  })
+
   // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
   // approved that night, which supersedes this file's own earlier reasoning
   // below). The filter bar used to be drawn as this row's own sibling BELOW
   // it — the same shape her Apps screenshot caught: search+sort(+actions) on
   // one line, the filter chips stranded on a second, disconnected one. The
-  // kit's chip row is still exactly what it always was (a full-width strip on
-  // its own, which is why it is wrapped in a non-growing flex box below
-  // rather than dropped in bare — a bare `w-full` child would still claim the
-  // rest of the line and push `actions` onto a line of its own, the same
-  // fault one level down), it is simply a FLEX ITEM of this one row now
-  // instead of a sibling block underneath it, the same technique the kit's
+  // CONTROL is a flex item of this one row now, the same technique the kit's
   // OWN toolbar uses for its `filters` slot (`shared/ui/components/
-  // collection-frame/collection-frame.tsx`).
+  // collection-frame/collection-frame.tsx`). What is NOT in the row is its
+  // open panel, and that is a different question with a different answer —
+  // see the column below.
+  // ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, MIRRORING THE FIX
+  // `ToolbarRow` (screen-bits.tsx) ALREADY CARRIES. Verbatim: "what this is
+  // doing is creating a new card underneath... it kind of creates a second
+  // toolbar... merge this with the main toolbar so that it's one single
+  // background or container, more like expand behaviour rather than
+  // open-a-new-one behaviour." This track used to carry its own
+  // `rounded-pill bg-background` unconditionally, with the panel one `gap-2`
+  // below it as a second sibling — two same-toned boxes with air between
+  // them, exactly the "second toolbar" she is naming. The fix is the same one
+  // `ToolbarRow` carries: the fill and the radius move to the OUTER column,
+  // chosen by `Boolean(filterPanel)` (R31 — two radii, never a third, never
+  // both at once), and the track keeps only its own padding/gap. No gap
+  // between the track and the panel either.
+  const filterPanelOpen = Boolean(filterPanel)
   return (
-    <div className="relative flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
-      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-          like in your atifact": the reference artifact's search element is
-          `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
-          chips/sort/period after it to the track's far edge instead of
-          sitting immediately after a narrow box. `relative` on this track —
-          `filter-bar.tsx`'s own open panel anchors to it via `position:
-          absolute`/`top-full`, so its own tall height never feeds this
-          pill's `rounded-pill` (2 Sep 2026, second pass: it did, once, and
-          drew a giant oval). */}
-      <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
-        <SearchInput
-          value={query.q}
-          onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-          // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
-          // "Clear all", which was one control quietly owning two questions; the
-          // kit's bar says "Clear filters" and now means only that.
-          onClear={() => onChange({ ...query, q: "" })}
-          placeholder={t("Search waves…")}
-          className="w-full"
-        />
-      </div>
-      {/* NO WRAPPING BOX AROUND `<FilterBar>` — its chip cluster renders
-          inline as a normal flex child (wrapping itself in a non-growing box
-          internally), and its own OPEN panel renders out of flow entirely,
-          `position: absolute` against this track's own `relative` above, so
-          the panel is never part of THIS flexbox's layout math and cannot
-          feed the pill's height. See `filter-bar.tsx`'s own header for the
-          full account, including the second pass that got here. */}
-      <FilterBar
-        facets={facets}
-        values={{ accountId: query.accountId, status: query.status }}
-        // Empty on purpose: both facets carry their own options, so there is
-        // nothing for the bar to derive from the rows on screen — and a client
-        // whose only wave is filtered out must not vanish from the filter.
-        data={[]}
-        onChange={(field, value) => onChange({ ...query, [field]: value })}
-        onClearFacets={() =>
-          onChange({ ...EMPTY_WAVE_QUERY, q: query.q, sortBy: query.sortBy, dir: query.dir })
-        }
-        resultCount={resultCount}
-      />
-      <SortControl
-        options={[
-          { value: "newest", label: t("Newest first") },
-          { value: "name", label: t("Name") },
-          { value: "client", label: t("Client") },
-          { value: "runs", label: t("When it runs") },
-          { value: "sprints", label: t("Sprints inside it") },
-        ]}
-        value={query.sortBy}
-        onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-        direction={query.dir}
-        onDirectionChange={(dir) => onChange({ ...query, dir })}
-        label={t("Sort by")}
-        hideLabel
-      />
-      {period}
-      {view && onViewChange ? (
-        <ViewSwitch
-          views={[
-            { value: "list", label: t("List") },
-            { value: "timeline", label: t("Timeline") },
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        // THE FILL MATCHES THE CARD IT SITS IN — the same latent mismatch
+        // `ToolbarRow` (screen-bits.tsx) carried and was fixed out of
+        // (client, dark mode, Apps screen: "should be same as background of
+        // content body"). This component's own single call site
+        // (waves-screen.tsx) always draws it inside `<CollectionCard>`,
+        // which paints `bg-surface-panel` — not `bg-background` (the page
+        // ground, coincidentally the same colour as a CARD only in light
+        // mode) and not `--surface-raised` either (`ToolbarRow`'s own fix,
+        // right for a row sitting directly on `ScreenShell`'s pane, which
+        // this row never does).
+        "flex w-full min-w-0 flex-col bg-surface-panel",
+        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill",
+        // THE GAP TO WHATEVER COMES NEXT — R49's `--toolbar-content-gap`
+        // (web/app/globals.css), the same token `<ToolbarRow>`
+        // (screen-bits.tsx) pays as its own trailing margin. This component
+        // is the one other toolbar row in the app (a bounded, single-view
+        // collection's own search/filter/sort, never the frame's), and it
+        // used to leave the gap to its ONE call site instead: waves-screen.tsx
+        // wrapped it in a bare `<div className="mb-4">` — 16px, not the
+        // token's 20px, and invisible to R49's own census, which only walks
+        // literal `<ToolbarRow>` call sites and cannot see a wrapper around a
+        // component it does not know by name. Paid here instead, the same way
+        // `ToolbarRow` owns its own margin, so the wrapper div is gone from
+        // the one place that grew it.
+        "mb-[var(--toolbar-content-gap)]"
+      )}
+    >
+      <div
+        data-slot="toolbar-row-track"
+        className="flex w-full flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+      >
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": the reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
+            pill/sort/period after it to the track's far edge instead of sitting
+            immediately after a narrow box. */}
+        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+          <SearchInput
+            value={query.q}
+            onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+            // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+            // "Clear all", which was one control quietly owning two questions; the
+            // kit's bar says "Clear filters" and now means only that.
+            onClear={() => onChange({ ...query, q: "" })}
+            placeholder={t("Search waves…")}
+            className="w-full"
+          />
+        </div>
+        {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
+            normal flex child (wrapping itself in a non-growing box internally),
+            and its open PANEL is the separate `filterPanel` value, rendered
+            into the column below rather than into this row — the split
+            `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
+            never the filters themselves — client, 2026-09-02: "when activce
+            filters, do not display them in the toolbar. only a count niside
+            the filter pill". See `filter-bar.tsx`'s own header for the full
+            account. */}
+        {filterPill}
+        <SortControl
+          options={[
+            { value: "newest", label: t("Newest first") },
+            { value: "name", label: t("Name") },
+            { value: "client", label: t("Client") },
+            { value: "runs", label: t("When it runs") },
+            { value: "sprints", label: t("Sprints inside it") },
           ]}
-          value={view}
-          onValueChange={(v) => onViewChange(v as WaveView)}
-          label={t("View")}
+          value={query.sortBy}
+          onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+          direction={query.dir}
+          onDirectionChange={(dir) => onChange({ ...query, dir })}
+          label={t("Sort by")}
+          hideLabel
         />
-      ) : null}
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {period}
+        {view && onViewChange ? (
+          <ViewSwitch
+            views={[
+              { value: "list", label: t("List"), icon: <List size={16} /> },
+              { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+            ]}
+            value={view}
+            onValueChange={(v) => onViewChange(v as WaveView)}
+            label={t("View")}
+          />
+        ) : null}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {filterPanel}
     </div>
   )
 }

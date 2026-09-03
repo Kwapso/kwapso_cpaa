@@ -100,7 +100,11 @@ import {
   VIRTUALIZE_THRESHOLD,
   useVirtualRows,
 } from "../use-virtual-rows/use-virtual-rows";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "../../foundations/icons";
+import {
+  ArrowDown,
+  ArrowUp,
+  CaretUpDown,
+} from "../../foundations/icons";
 import { CollectionRegister } from "../collection-frame/collection-frame";
 
 export type { SortDirection };
@@ -244,7 +248,7 @@ function HeaderSorter({
       {/* The glyph is decoration; the state is announced by the words beside
           it and by `aria-sort` on the cell. Colour never carries it alone. */}
       <span aria-hidden="true" className="inline-flex">
-        {!active ? <ChevronsUpDown /> : direction === "asc" ? <ArrowUp /> : <ArrowDown />}
+        {!active ? <CaretUpDown /> : direction === "asc" ? <ArrowUp /> : <ArrowDown />}
       </span>
       {/* The column's NAME is already the visible text above; only the
           ORDER needs saying in words, because the glyph must not carry it

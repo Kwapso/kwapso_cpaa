@@ -46,7 +46,7 @@ live on both front doors.
 ## The kit becomes a pinned dependency, and the phone round, 25 Aug 2026
 
 The design-kit swap (`82a575f`) replaced the editable vendored library end
-to end: `shared/ui/` is now `github.com/Kwapso/design` at the tag in
+to end: `shared/ui/` is now `github.com/Kwapso/kwapso-ui-ux` at the tag in
 `shared/ui/VERSION.json`, pulled by `scripts/sync-design.mjs`, and
 `web/test/vendored-kit.test.ts` recomputes a content hash so a hand-edit
 turns the build red — three days after the vendoring made editing-in-place

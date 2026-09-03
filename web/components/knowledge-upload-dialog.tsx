@@ -41,18 +41,26 @@ import {
 } from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Paperclip, Upload } from "@shared/ui/foundations/icons"
+import { Paperclip, UploadSimple } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
+import { KNOWLEDGE_FILE_MAX_BYTES } from "@shared/workers/limits"
 
-/** The client-side cap, matching the door's `KNOWLEDGE_FILE_MAX_BYTES`. It is
- * here so that a person who picked a 400 MB video is told before they spend two
- * minutes uploading it — the door still enforces its own, because a browser is
- * not a boundary. */
-const MAX_FILE_BYTES = 25 * 1024 * 1024
+/** The client-side cap. It is here so that a person who picked a 400 MB video
+ * is told before they spend two minutes uploading it — the door still
+ * enforces its own, because a browser is not a boundary. Read from
+ * `shared/workers/limits.ts` rather than retyped: a copy here that drifted
+ * from the door's own `KNOWLEDGE_FILE_MAX_BYTES` is exactly how this file used
+ * to disagree with itself. */
+const MAX_FILE_BYTES = KNOWLEDGE_FILE_MAX_BYTES
+
+/** The cap, said the way a person says it — binary, an exact multiple of
+ * 1024×1024, so this is always a whole number ("25 MB") and the same
+ * convention the file-size chip below uses. */
+const MAX_FILE_LABEL = `${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB`
 
 const fileField = { ...defaultFieldConfig, label: "Which file?", required: true }
 const titleField = { ...defaultFieldConfig, label: "What should we call it?", required: false }
@@ -120,7 +128,7 @@ export function KnowledgeUploadDialog({
   function take(picked: File | null | undefined) {
     if (!picked) return
     if (picked.size > MAX_FILE_BYTES) {
-      toast.error(t("That file is over 25 MB, please pick a smaller one."))
+      toast.error(t("That file is over {limit}, please pick a smaller one.", { limit: MAX_FILE_LABEL }))
       return
     }
     setFile(picked)
@@ -202,8 +210,13 @@ export function KnowledgeUploadDialog({
             <div className="flex w-full min-w-0 items-center gap-2 text-sm">
               <Paperclip className="text-muted-foreground size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">{file.name}</span>
+              {/* BINARY (1024), not decimal — the same base MAX_FILE_LABEL above
+                  is said in, so a file sitting right at the cap can never show
+                  a KB count that reads as "under" beside a refusal that reads
+                  as "over" for the one convention this app didn't used to
+                  share with itself. */}
               <span className="text-muted-foreground shrink-0 text-xs">
-                {Math.max(1, Math.round(file.size / 1000)).toLocaleString()} {t("KB")}
+                {Math.max(1, Math.round(file.size / 1024)).toLocaleString()} {t("KB")}
               </span>
               <Button
                 type="button"
@@ -218,7 +231,7 @@ export function KnowledgeUploadDialog({
             </div>
           ) : (
             <>
-              <Upload className="text-muted-foreground size-5" aria-hidden />
+              <UploadSimple className="text-muted-foreground size-5" aria-hidden />
               <p className="text-muted-foreground text-sm">{t("Drop a file here, or")}</p>
               <Button
                 type="button"

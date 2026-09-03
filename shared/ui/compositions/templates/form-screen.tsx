@@ -75,7 +75,7 @@ import {
   FormSection,
   type FormErrorItem,
 } from "../../components/form/form";
-import { Upload } from "../../foundations/icons";
+import { UploadSimple } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { useHasRoom } from "../../lib/use-has-room";
 import {
@@ -536,7 +536,7 @@ function FormScreen({
       </Text>
       <div className="flex flex-wrap items-center gap-[var(--space-2h)] pt-1">
         <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
-          <Upload aria-hidden="true" />
+          <UploadSimple aria-hidden="true" />
           {retryLabel}
         </Button>
         {onCopyDraft === undefined ? null : (

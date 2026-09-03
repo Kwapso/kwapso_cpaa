@@ -27,7 +27,7 @@ import { Field } from "@shared/web/field"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Sparkles } from "@shared/ui/foundations/icons"
+import { Sparkle } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { DraftReviewDialog } from "@/components/draft-review"
@@ -96,7 +96,7 @@ export function ReadACall({
   return (
     <>
       <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
-        <Sparkles className="size-3.5" />
+        <Sparkle className="size-3.5" />
         {t("Read a call")}
       </Button>
 

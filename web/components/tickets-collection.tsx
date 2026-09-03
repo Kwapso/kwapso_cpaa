@@ -15,7 +15,7 @@
 // description above is the fossil of that: "sub-tabs … beneath the existing …
 // strip"). The owner had ruled, 2026-08-28, to keep both rather than move one
 // into the toolbar ("there's no way out .. lets' keep 2 tabs but both as the
-// folder tabs" — `web/test/rules.test.ts`'s `TWO_FOLDERS_OK` carried that
+// folder tabs" — `web/test/rules.test.ts`'s `TWO_STRIPS_OK` carried that
 // ruling). The CLIENT overruled it the next business day, verbatim: "there can
 // never be 2 rows of tabs, no folder tabs, no line tabs. just never." Not a
 // narrower version of the 28 Aug ruling — the opposite of it — so this is a
@@ -53,11 +53,12 @@
 // identical defect the same day and fixed it the identical way
 // (`collection-content.tsx`, `accountTabs`): `<PagedFind>`'s `wrap` boxes the
 // toolbar AND the rows in one `CollectionCard`, and the tab strip sits directly
-// above it with zero gap so the folder tab's own pulled-down feet
-// (`--folder-tab-overlap`) melt into the card rather than showing themselves
-// on the base background — see `web/test/rules.test.ts`'s "tab-shape: only the
-// inner filter strips and the record strip override it", which names this
-// exact join for Accounts. Tickets now draws the same join.
+// above it with zero gap. Before v1.2.28 that gap had to stay zero so the
+// folder tab's own pulled-down feet (`--folder-tab-overlap`) melted into the
+// card rather than showing on the base background; the folder shape is gone
+// now (tabs-view.tsx's own header has the client's 2026-09-02 ruling) and the
+// flush join is kept on its own merits. Tickets and Accounts draw the same
+// join.
 //
 // THE TOOLBAR GAINS A FILTER AND A CREATE BUTTON, the two pieces the old
 // search-and-sort-only bar was missing next to Accounts' fixed one: the
@@ -90,7 +91,8 @@ import * as React from "react"
 
 import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
@@ -98,7 +100,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Plus, Send } from "@shared/ui/foundations/icons"
+import { Alarm, ArrowUpRight, EnvelopeOpen, PencilSimple, Plus, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
@@ -179,6 +181,10 @@ export function TicketsCollection({
   // Which type of ticket she was looking at, remembered with the rest of the
   // screen — the sub-tab is as much "where she was" as the search box under it.
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
+  // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
+  // above it has to answer "is the queue empty" to know whether to draw
+  // itself at all, and only `TriageQueue` — which fetches the queue — ever
+  // knows that. See its own header comment.
 
   // The team's own glyphs, scanned once for the whole strip rather than once
   // per tab. The vocabulary is a cache this screen's siblings already hold and
@@ -233,6 +239,10 @@ export function TicketsCollection({
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
   const scopedQ = narrowed ? facetQ : allQ
+  // 2026-09-03 audit — named short so PagedFind's own tag below (a fixed
+  // window this file's `facets-ask-the-door` census reads) stays inside it.
+  const scopedLoading = scopedQ.data === undefined
+  const scopedRows = scopedQ.data ?? []
   // The list key is written out at BOTH call sites below rather than held in a
   // variable: the paging and search checks read the JSX and look for the key the
   // door's own page lands in (`helpKey(`), which is the honest thing to look for
@@ -251,12 +261,11 @@ export function TicketsCollection({
   // question — a ticket's stage in the archive, not its kind or lifecycle stage.
   const tabsConfig = {
     ...defaultTabsConfig,
-    // THE FOLDER. Client ruling E: "folder tabs are for main screens, line tabs
-    // for detail screens", and ch27.13: "folder tabs belong to collections and
-    // main screens only". Tickets is a collection on a main screen, and this is
-    // now its ONLY strip — the shape a single folder tab strip on a main
-    // screen has always had (Tasks, Sprints, Apps, Accounts). Inherited rather
-    // than spelled: `defaultTabsConfig` is already the folder.
+    // Tickets is a collection on a main screen, and this is now its ONLY
+    // strip — the one shape a tab strip draws anywhere in the app since
+    // v1.2.28 (Tasks, Sprints, Apps, Accounts included; tabs-view.tsx's own
+    // header has the ruling). Inherited rather than spelled: `defaultTabsConfig`
+    // already is it.
     tabs: [
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
@@ -301,37 +310,55 @@ export function TicketsCollection({
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
-        {/* ONE STRIP, GENUINELY ATTACHED — the client's 2026-08-31 rulings, both
-            on this exact screen: "there can never be 2 rows of tabs … just
-            never", "toolbar must be inside of card background", and — once
-            "Raise ticket" had moved to share the tab row — "never align the
-            button with the tabs … that button belongs in the right of the
-            toolbar, part of the toolbar". So the strip carries nothing but
-            the tabs, and whatever follows attaches to it with ZERO gap, so
-            the folder tab's own pulled-down feet (`--folder-tab-overlap`,
-            tabs-view.tsx) melt into that panel instead of showing on the base
-            background. This column carries no `gap-*` for exactly that
-            reason — the same join `SectionWithCreate`'s `folderTabs` slot
-            draws for apps-screen.tsx/sprints-screen.tsx/tasks-screen.tsx, and
-            `PagedFind`'s `wrap` now draws for Accounts. */}
+        {/* ONE STRIP, DRAWN THROUGH THE ONE SEAM — the client's 2026-08-31
+            rulings, both on this exact screen: "there can never be 2 rows of
+            tabs … just never", "toolbar must be inside of card background",
+            and — once "Raise ticket" had moved to share the tab row — "never
+            align the button with the tabs … that button belongs in the right
+            of the toolbar, part of the toolbar". So the strip carries nothing
+            but the tabs.
+
+            IT GOES THROUGH `renderFolderTabs` NOW, 2026-09-03, and that is the
+            whole of this screen's share of the client's spacing ruling ("go and
+            uniform that … don't hard-code page by page, but rather you change
+            the rule and you apply it everywhere"). This was the fourth
+            collection strip in the app and the only one drawing its own bare
+            `<TabsView>`: `SectionWithCreate`'s `folderTabs` slot (apps,
+            sprints, tasks) and `PagedFind`'s `tabs` (accounts, contacts,
+            meetings, and this screen's own rows below) both go through
+            `renderFolderTabs`, which is where the sticky rule and the
+            tab-to-content gap live. Drawing its own strip meant Tickets was
+            the one main screen whose tabs did NOT pin on scroll, and the one
+            place a fourth copy of the gap would have had to be written by
+            hand. Same three arguments, one seam, and the difference disappears
+            rather than being maintained. */}
         <div className="flex flex-col">
-          <TabsView config={tabsConfig} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+          {renderFolderTabs({ config: tabsConfig, value: facet, onValueChange: (v) => setFacet(v as HelpFacet) })}
 
           {facet === TRIAGE ? (
-            <CollectionCard attached>
-              {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. Triage is a
-                  queue, not a `<PagedFind>` toolbar, so there is no search/sort
-                  row to share — but "Raise ticket" still lives below the tabs
-                  rather than beside them (client ruling, 2026-08-31), so this
-                  bare `<ToolbarRow>` is Triage's own toolbar. */}
-              {canCreateTicket && (
-                <ToolbarRow className="mb-4" actions={<AddButton label={t("Raise ticket")} onClick={onCreate} />} />
-              )}
+            <CollectionCard>
+              {/* THE TOOLBAR, WITH ITS OWN SEARCH — CLIENT RULING, 2026-09-03,
+                  SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO CARRY. Triage
+                  still has no `<PagedFind>` to share a search box with (it is
+                  a small, whole-team-fetched queue, not a paged door read) —
+                  but "no shared box" is a reason to draw its own, not a
+                  reason to draw none, and "Raise ticket" still lives below
+                  the tabs rather than beside them (client ruling, 2026-08-31).
+                  DRAWN BY `TriageQueue` ITSELF NOW, NOT HERE (R50, 2026-09-03
+                  second pass) — this component only ever knows whether the
+                  reader is ON triage, never whether the queue they'd be
+                  searching has anything in it, so the toolbar used to render
+                  regardless, a lone "Raise ticket" pill above an empty queue
+                  and no message at all for whoever was not on duty this week.
+                  `TriageQueue` fetches the queue, so it is the one place that
+                  can answer "is it empty" honestly — see its own header. */}
               <TriageQueue
                 teamId={teamId}
                 canTriage={can("help", "edit")}
                 canEdit={can("help", "edit")}
                 helpTypeOptions={helpTypeOptions}
+                canCreateTicket={canCreateTicket}
+                onCreate={onCreate}
                 // The engine's open intent carries a URL SEGMENT, not a permission
                 // module — its only consumer builds an address out of it
                 // (deep-link-screen.tsx). Everywhere else in the app the two words
@@ -349,14 +376,14 @@ export function TicketsCollection({
                `byAccount` facet, never drawn before tonight; Where the
                tickets are sitting is `TicketStagesCard`, MOVED here from
                below the list (see the note there) rather than duplicated. */
-            <CollectionCard attached>
+            <CollectionCard>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TicketsByAccountCard teamId={teamId} />
                 <TicketStagesCard teamId={teamId} />
               </div>
             </CollectionCard>
           ) : scopedQ.error ? (
-            <CollectionCard attached>
+            <CollectionCard>
               <ShapeStateBody
                 shape="collectionScreen"
                 state="error"
@@ -368,11 +395,17 @@ export function TicketsCollection({
                 }
               />
             </CollectionCard>
-          ) : scopedQ.data === undefined ? (
-            <CollectionCard attached>
-              <Skeleton variant="list" lines={4} />
-            </CollectionCard>
           ) : (
+            // WAS A THIRD BRANCH HERE, "scopedQ.data === undefined ?
+            // CollectionCard+Skeleton" (2026-09-03 audit — "nine screens
+            // blank their entire toolbar while loading"): that unmounted the
+            // whole PagedFind toolbar (search/sort/filters/"Raise ticket")
+            // while the tab strip above it stayed — so the search box and
+            // the create button still popped into existence only once the
+            // read resolved. Fixed the shared way: `restingLoading` below
+            // keeps PagedFind's own chrome mounted, and `children`'s
+            // `rows === null` check (already there for the search's own
+            // loading state) is what draws the skeleton now.
             <PagedFind<HelpTicket>
               listKey={narrowed ? helpFacetKey(teamId, "all", facet) : helpKey(teamId, "all")}
               placeholder={t("Search tickets…")}
@@ -383,6 +416,11 @@ export function TicketsCollection({
               }}
               sorts={translatedSorts("help", t)}
               defaultSort={COLLECTION_SORTS.help.defaultSort}
+              // R50 — whichever tab is open, `scopedQ` is its own resting read
+              // (the "all" list, or the sub-tab's own facet read), so this is
+              // the one honest "is THIS tab's collection empty" answer.
+              restingEmpty={scopedRows.length === 0}
+              restingLoading={scopedLoading}
               // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
               // overnight (2026-09-01) names Client and Module as the ticket
               // screen's own worked example of "real filter facet chips"; the
@@ -435,7 +473,7 @@ export function TicketsCollection({
               // (`collection-content.tsx`'s own `wrap`): zero gap to the tab row
               // above, which is this component's own flex column rather than a
               // second `gap-*` here.
-              wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+              wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
             >
               {(found) => {
                 const rows = found.active ? found.rows : scopedQ.data
@@ -535,12 +573,19 @@ function TriageQueue({
   canTriage,
   canEdit,
   helpTypeOptions,
+  canCreateTicket,
+  onCreate,
   onOpen,
 }: {
   teamId: string
   canTriage: boolean
   canEdit: boolean
   helpTypeOptions: string[]
+  /** present = the reader may raise one, and this opens the form — the
+   * toolbar's own "Raise ticket" button, moved in from the parent along with
+   * the toolbar itself (see the header comment on why). */
+  canCreateTicket: boolean
+  onCreate: () => void
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -548,6 +593,12 @@ function TriageQueue({
   const [busy, setBusy] = React.useState<string | null>(null)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
   const [replying, setReplying] = React.useState<TriageWaiting | null>(null)
+  // THE QUEUE'S OWN SEARCH — moved in from the parent (R50, 2026-09-03 second
+  // pass): the toolbar this narrows and the row count that gates it now live
+  // in the same component, so "never toolbar on empty collection" can be
+  // answered honestly instead of drawn unconditionally one component up from
+  // the fetch that actually knows.
+  const [query, setQuery] = React.useState("")
 
   /** WHAT THE ROW IS STILL MISSING, in the reader's own language. The gaps
    * themselves are decided by the door (shared/triage-readiness.ts) and arrive
@@ -617,24 +668,88 @@ function TriageQueue({
     toast.success(t("Reply sent."))
   }
 
+  // NO ERROR BRANCH USED TO EXIST HERE (2026-09-03 audit) — every sibling tab
+  // in this file (`scopedQ.error`, above) has its own `ShapeStateBody
+  // state="error"` + Retry, and this queue had none: a failed read fell
+  // straight through to the `triageQ.data === undefined` check below and
+  // spun on a skeleton for ever, with no way out for whoever hit it.
+  if (triageQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the triage queue.") }}
+        action={
+          <Button variant="secondary" onClick={() => triageQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (triageQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const view = triageQ.data
+  // GENUINELY EMPTY, TWO WAYS — NEITHER DRAWS THE TOOLBAR (R50: never toolbar
+  // on empty collection). Whoever is not on duty has no rows of THEIRS to
+  // search or raise a ticket over from here; a real empty queue has nothing
+  // to search either. Only once there is at least one waiting row does the
+  // toolbar (search + "Raise ticket") appear at all — which is also why it
+  // has to live in this component rather than the parent: the parent knows
+  // neither of these two facts.
   if (!view.yours)
     return (
       <p className="text-muted-foreground text-sm">
+        {/* A NAMED HOLE (R28/R33), not a raw interpolated fragment glued to a
+            value — the same sentence beside it, `t("Nobody is on triage this
+            week.")`, was correctly wrapped all along, so a name arriving on
+            duty was the one branch of this sentence shipping in English to
+            every non-English reader. */}
         {view.onDuty?.userName
-          ? `${view.onDuty.userName} is on triage this week, so the queue is theirs.`
+          ? t("{name} is on triage this week, so the queue is theirs.", {
+              name: view.onDuty.userName,
+            })
           : t("Nobody is on triage this week.")}
       </p>
     )
   if (view.waiting.length === 0)
     return <EmptyLine concept="triage">{t("Nothing has been sitting unread. ")}</EmptyLine>
 
+  // THE TOOLBAR'S SEARCH, APPLIED — the row's own reference and description
+  // are the two facts already on screen, so a query narrows by either. This
+  // is the separate, ordinary "your search matched nothing" case — the
+  // toolbar (with its search box) stays up so it can be cleared or changed,
+  // exactly as `narrowed` does everywhere else in the app.
+  const narrowed = query.trim() !== ""
+  const q = query.trim().toLowerCase()
+  const waiting = narrowed
+    ? view.waiting.filter(
+        (w) => (w.ref ?? "").toLowerCase().includes(q) || richTextPlain(w.description).toLowerCase().includes(q)
+      )
+    : view.waiting
+
   return (
+    <>
+      <ToolbarRow
+        // Reached this line only past both genuinely-empty returns above, so
+        // the queue always has at least one waiting row here.
+        empty={false}
+        search={
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            placeholder={t("Search the triage queue…")}
+            className="w-full"
+          />
+        }
+        actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
+      />
+      {waiting.length === 0 ? (
+        <EmptyLine concept="triage">{t("No entries in the triage queue match your search.")}</EmptyLine>
+      ) : (
     <ul className="divide-border divide-y">
-      {view.waiting.map((w) => (
+      {waiting.map((w) => (
         <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
-          <AlarmClock className="text-destructive size-4 shrink-0" />
+          <Alarm className="text-destructive size-4 shrink-0" />
           <div className="min-w-0 flex-1">
             <span className="block truncate text-sm">
               {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
@@ -663,7 +778,7 @@ function TriageQueue({
               className="shrink-0"
               aria-label={t("Edit")}
             >
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <Button
@@ -672,7 +787,7 @@ function TriageQueue({
             onClick={() => setReplying(w)}
             className="shrink-0 gap-1"
           >
-            <Send className="size-3.5" />
+            <PaperPlaneTilt className="size-3.5" />
             {t("Reply")}
           </Button>
           <Button
@@ -699,7 +814,7 @@ function TriageQueue({
               onClick={() => void markRead(w.id)}
               className="shrink-0 gap-1"
             >
-              <MailOpen className="size-3.5" />
+              <EnvelopeOpen className="size-3.5" />
               {t("Mark it read")}
             </Button>
           )}
@@ -734,5 +849,7 @@ function TriageQueue({
         onSubmit={sendReply}
       />
     </ul>
+      )}
+    </>
   )
 }

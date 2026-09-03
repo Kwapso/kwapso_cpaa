@@ -83,8 +83,12 @@ export function ContactsScreen({
   onIntent: (intent: ScreenIntent) => void
 }) {
   if (accountsQ.error) return <LoadError what="contacts" />
-  if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  const loaded = accountsQ.data.filter((a) => a.accountType === "individual")
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the heading and the
+  // whole PagedFind toolbar (search/sort/tabs) along with the rows.
+  // Fixed the shared way — see processes-screen.tsx's identical note.
+  const contactsLoading = accountsQ.data === undefined
+  const loaded = (accountsQ.data ?? []).filter((a) => a.accountType === "individual")
   const contactsTab = tab === "all" ? "all" : "grouped"
   // ONE NUMBER, ON BOTH TABS (R16) — see the file header.
   const contactsBadge = formatCount(total)
@@ -112,6 +116,10 @@ export function ContactsScreen({
           }}
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
+          // R50 — the resting, individuals-only read's own row count.
+          restingEmpty={loaded.length === 0}
+          // 2026-09-03 audit — see processes-screen.tsx's identical note.
+          restingLoading={contactsLoading}
           // ALWAYS narrowed to people — this page has no Companies/All strip to
           // switch it off with, because it IS the "people" half of that strip.
           fixed={{ type: "individual" }}
@@ -134,10 +142,10 @@ export function ContactsScreen({
             value: contactsTab,
             onValueChange: (v) => go(sectionPath, v === "grouped" ? {} : { tab: v }),
           }}
-          wrap={(inner) => <CollectionCard attached>{inner}</CollectionCard>}
+          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
-            const rows = found.active ? found.rows : loaded
+            const rows = found.active ? found.rows : contactsLoading ? null : loaded
             if (rows === null) return <Skeleton variant="list" lines={4} />
             return (
               <>
