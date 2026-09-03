@@ -29,7 +29,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { RecordMark } from "@shared/web/record-mark"
@@ -69,7 +69,7 @@ function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
           {mainLabel}
         </Badge>
       )}
-      <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
+      <CaretRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
     </li>
   )
 }

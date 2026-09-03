@@ -63,7 +63,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../button/button";
 import { fieldErrorClasses } from "../field/field";
 import { Progress } from "../progress/progress";
-import { Upload } from "../../foundations/icons";
+import { UploadSimple } from "../../foundations/icons";
 
 /** One row in the list under the zone. */
 export interface FileUploadItem {
@@ -466,7 +466,7 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
                 "rounded-pill bg-[var(--surface-panel)]",
               )}
             >
-              <Upload
+              <UploadSimple
                 size={24}
                 className={disabled ? "text-ink-disabled" : "text-ink-tertiary"}
               />

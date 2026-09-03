@@ -3,18 +3,23 @@
 The drawing language of the kwapso icon set, measured off the kit's own SVG
 source, plus the name map for the 93 icons the commission requires.
 
-> **SUPERSEDED 2026-08-27, and kept as a record rather than a spec.** No glyph
-> of this language was ever drawn. The kit's art is the **Iconoir** pack (MIT,
-> 1,383 glyphs) — a different drawing language from the one specified below:
-> outline rather than filled, a 24 grid rather than 28.35, and a 1.5 stroke
-> rather than a 2.18 stem expanded to outlines. See
-> `foundations/icons/ATTRIBUTION.md`.
+> **SUPERSEDED 2026-08-27, kept as a record rather than a spec — and
+> superseded a second time, 2026-09-03.** No glyph of this language was ever
+> drawn. The kit's art was briefly the **Iconoir** pack (MIT, 1,383 glyphs,
+> stroked outline on a 24 grid), vendored 2026-08-26 through 2026-09-03; it
+> is now **Phosphor** (MIT, 1,512 glyphs, fill weight on a 256 grid, three
+> named exceptions at regular weight), by direct client instruction — see
+> `foundations/icons/ATTRIBUTION.md`. Neither pack draws the language
+> specified below, which was never commissioned.
 >
 > What follows is still TRUE as analysis — every `[measured]` number was read
 > off the mothership's own SVG source and none of that changed. It is the
-> record of the bespoke set kwapso specified and did not commission, and the
-> name map in it is the origin of the 93 spellings the API still exports. Read
-> it for provenance, never as instructions for drawing something new.
+> record of the bespoke set kwapso specified and did not commission. The name
+> map in it, and the "93 spellings" it originated, no longer describe the
+> API: the client's 2026-09-03 ruling replaced the commission's fixed
+> contract with Phosphor's own names, folder-for-contract, no alias table.
+> Read this document for provenance only, never as instructions for drawing
+> or naming something new.
 
 Sources read in full for this document:
 

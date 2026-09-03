@@ -45,7 +45,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -201,7 +201,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                   only the pencil icon") — no more `sm:not-sr-only` reveal. */}
               {canEdit ? (
                 <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
-                  <Pencil className="size-3.5" />
+                  <PencilSimple className="size-3.5" />
                 </Button>
               ) : null}
               {canSwitchOff ? (

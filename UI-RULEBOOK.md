@@ -449,6 +449,18 @@ record types, two apps.
 
 ### D3: the header and tabs stick
 
+> **SUPERSEDED IN PART, 3 Sep 2026 — the header does NOT collapse any more.** The
+> client, on the live app: *"when I scroll down, the whole compressed title is
+> useless, so remove that. When I scroll down, what is at the top should be only
+> the tabs, if there are tabs, on the same line as the whole eyebrow."* The
+> collapsed line this section describes was built (`web/components/
+> condensed-title.tsx`) and is now deleted. What survives is the second half:
+> **the tab strip pins, and it is the only thing that does** — on a record detail
+> screen (`STICKY_TABS`, record-chrome.tsx) and on a main/collection screen
+> (`STICKY_FOLDER_TABS`, shared/web/screen-engine/tabs-view.tsx), both at
+> `top: 0` now that nothing sits above them. A screen with no tabs pins nothing.
+> The IntersectionObserver sentinel below is no longer used by anything.
+
 On scroll, the header band collapses to a single sticky line (glyph at 28px, title at
 `text-sm font-medium`, breadcrumb trail visible) and the tab strip pins directly under
 it. The full title, the eyebrow and the status line scroll away.
@@ -467,6 +479,17 @@ Evidence: compare `A-4.00.19` (header full, tabs at y≈653) with `A-4.00.30` an
 and badges intact). The tabs demonstrably stick in the old app.
 
 ### D4: the eyebrow names the type, in caps, above the title
+
+> **REVERSED, 3 Sep 2026 — there is no eyebrow anywhere in the app.** The client:
+> *"I want you to remove the eyebrow on the title on main screens. Remove that
+> eyebrow, kill it."* A detail screen's full header had already lost its eyebrow
+> on 1 Sep (the breadcrumb above it names the record type instead); the prop that
+> kept it alive existed only for the condensed bar D3 above describes, and both
+> went on 3 Sep. A main screen's own eyebrow — the nav-section word — went with
+> the same ruling: the rail already shows that word above the screen's own row.
+> `RecordScreen` has no `eyebrow` prop any more; do not re-add one from this
+> section. The `.nk-subheading` type style below is still the app's label style,
+> reached by table column heads and other small caps labels.
 
 ```tsx
 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">

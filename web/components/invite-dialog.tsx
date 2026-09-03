@@ -16,7 +16,7 @@ import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@shared/ui/components/input/input"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Mail } from "@shared/ui/foundations/icons"
+import { Envelope } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { TeamRole } from "@shared/types"
@@ -89,7 +89,7 @@ export function InviteDialog({
       submit={{
         busy: busy,
         disabled: !values.email.trim() || !values.roleId,
-        icon: <Mail className="size-4" />,
+        icon: <Envelope className="size-4" />,
       }}
     >
       <Field config={emailField} htmlFor="invite-email" className={fieldSpacing}>

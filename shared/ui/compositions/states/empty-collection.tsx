@@ -200,7 +200,7 @@ const SYSTEM_LABELS: EmptyCollectionLabels = {
   createLabel: "Add a record",
   filterLabel: "Status",
   filterAny: "Any",
-  searchLabel: "Search this collection",
+  searchLabel: "MagnifyingGlass this collection",
   searchPlaceholder: "Search",
   figuresLabel: "Figures",
   tabsLabel: "Collection subsets",

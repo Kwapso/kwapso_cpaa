@@ -22,7 +22,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Check, ClipboardCheck, Pencil } from "@shared/ui/foundations/icons"
+import { Check, CheckSquare, PencilSimple } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
@@ -281,7 +281,7 @@ export function StoryDetailScreen({
         {
           key: "edit",
           label: t("Edit"),
-          icon: <Pencil className="size-3.5" />,
+          icon: <PencilSimple className="size-3.5" />,
           onSelect: () => setEditOpen(true),
         },
       ]
@@ -290,9 +290,12 @@ export function StoryDetailScreen({
   return (
     <RecordScreen
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `story`), client ruling 2026-08-31.
-      eyebrow={t("Story")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4: the type word and the reference, above the title.
       recordNumber={story.ref || undefined}
       collectionLabel={story.storyType || t("Story")}
@@ -349,7 +352,7 @@ export function StoryDetailScreen({
               collects the words; the door refuses if a timer is still running. */}
           {canEdit && (story.status === "open" || story.status === "in_progress") && (
             <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1">
-              <ClipboardCheck className="size-3.5" />
+              <CheckSquare className="size-3.5" />
               {t("Ready for review")}
             </Button>
           )}

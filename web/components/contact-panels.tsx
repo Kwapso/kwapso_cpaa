@@ -24,7 +24,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
@@ -177,7 +177,7 @@ export function CompaniesPanel({
                 {t("No longer")}
               </Badge>
             )}
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>
@@ -290,7 +290,7 @@ export function ContactTicketsPanel({
                 {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
               </p>
             </div>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>
@@ -389,7 +389,7 @@ export function ContactMeetingsPanel({
                 {[formatDate(m.startsAt, lang), m.location].filter(Boolean).join(" · ")}
               </p>
             </div>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
           </Row>
         ))}
       </ul>

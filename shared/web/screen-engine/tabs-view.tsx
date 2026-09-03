@@ -130,7 +130,7 @@ export function kitIcon(name: string): React.ReactNode {
  * is proved drawable by web/test/icon-vocabulary.test.ts. */
 export const TAB_ICONS: Record<string, IconName> = {
   overview: "info",
-  activity: "history",
+  activity: "clock-counter-clockwise",
   // WHAT THIS RECORD IS CONNECTED TO — the relationship map's tab. Beside
   // `overview` and `activity` rather than with the record kinds below, because
   // like those two it is a VIEW of the record you are already standing on and
@@ -138,67 +138,67 @@ export const TAB_ICONS: Record<string, IconName> = {
   map: "network",
   // the record kinds, matching CONCEPT_ICON in web/lib/pages.ts word for word
   apps: "app-window",
-  companies: "building-2",
-  contacts: "contact",
+  companies: "buildings",
+  contacts: "address-book",
   // Contacts' own By company / All pair (contacts-screen.tsx) — grouped is the
   // company arrangement, so it takes the same glyph `companies` above draws.
-  grouped: "building-2",
+  grouped: "buildings",
   deliverables: "package",
   impact: "piggy-bank",
-  knowledge: "library-big",
-  meetings: "calendar-clock",
-  sprints: "calendar-range",
-  stories: "hammer",
-  tickets: "life-buoy",
+  knowledge: "hard-drives",
+  meetings: "chat",
+  sprints: "calendar-dots",
+  stories: "puzzle-piece",
+  tickets: "tray",
   time: "timer",
-  todos: "inbox",
+  todos: "clipboard-text",
   versions: "git-branch",
-  waves: "layers",
-  portal: "key-round",
-  rates: "banknote",
-  maps: "route",
+  waves: "waves",
+  portal: "key",
+  rates: "money",
+  maps: "git-fork",
   // the process record's own strip and its inner view switch
-  steps: "list-checks",
+  steps: "git-commit",
   list: "list",
-  flow: "workflow",
-  compare: "columns-2",
-  conversation: "message-square",
+  flow: "flow-arrow",
+  compare: "columns",
+  conversation: "chat-teardrop",
   // record-specific sections
   organisation: "network",
-  stakeholders: "users-round",
-  modules: "blocks",
+  stakeholders: "users-three",
+  modules: "cube",
   permissions: "shield-check",
   source: "file-text",
   files: "paperclip",
-  notes: "notebook-pen",
+  notes: "note-pencil",
   // the draft review's three lists of proposed records
-  roles: "user-cog",
+  roles: "user-gear",
   tools: "wrench",
   // collection filters that appear as strips
   //
   // `open` and `done` are the two piles a thing-to-be-finished sits in, and they
   // are here rather than at a call site because two screens already draw them:
   // the task strip's own List/Completed pair and the to-do panel's Open/Done.
-  // Same idea, same glyph, decided once — `open` is deliberately the same inbox
-  // the task strip had chosen for itself, so nothing moves by adding it.
-  open: "inbox",
+  // Same idea, same glyph, decided once — `open` is deliberately the same
+  // clipboard the task strip had chosen for itself, so nothing moves by adding it.
+  open: "clipboard-text",
   done: "check",
   all: "asterisk",
-  active: "circle-check",
-  inactive: "circle-off",
+  active: "check-circle",
+  inactive: "prohibit",
   archived: "archive",
-  week: "calendar-days",
-  calendar: "calendar",
+  week: "calendar-dot",
+  calendar: "calendar-blank",
   // the agency's own record (the Kwapso screen)
-  details: "scroll-text",
+  details: "scroll",
   team: "building",
   brand: "palette",
   // the Settings screen's own four tabs (settings-screen.tsx, 1 Sep 2026),
   // matching that file's own tabsConfig icon-for-icon.
   appearance: "palette",
-  members: "users-round",
-  integrations: "key-round",
-  choices: "list-checks",
+  members: "users-three",
+  integrations: "key",
+  choices: "git-commit",
 }
 
 /** What a tab actually draws. Every tab resolves an icon now: the vocabulary
@@ -250,21 +250,68 @@ export type FolderTabStrip = {
 /**
  * A COLLECTION SCREEN'S OWN TAB STRIP STAYS VISIBLE ON SCROLL TOO — client
  * ruling, 2026-09-01, extending the record detail screen's own `STICKY_TABS`
- * (record-chrome.tsx) to the other half of the app: once a main/collection
- * screen's title condenses (`CollectionHeading`, condensed-title.tsx), its
- * tab strip used to keep scrolling away with the rest of the page, the exact
- * gap a detail screen's tabs had already been fixed for.
+ * (record-chrome.tsx) to the other half of the app: a main/collection
+ * screen's tab strip used to keep scrolling away with the rest of the page,
+ * the exact gap a detail screen's tabs had already been fixed for.
+ *
+ * AND THE STRIP IS NOW THE ONLY THING THAT PINS — client ruling, 2026-09-03,
+ * verbatim: "when I scroll down, the whole compressed title is useless, so
+ * remove that. When I scroll down, what is at the top should be only the
+ * tabs, if there are tabs, on the same line as the whole eyebrow." The
+ * condensed stand-in title that used to take this slot (`condensed-title.tsx`,
+ * `CondensedTitleBar`) is deleted outright, and so is the eyebrow row it and
+ * the full main-screen heading both drew. `top-0` rather than the
+ * `--collection-tabs-top` clearance it read until now: that custom property
+ * existed for ONE reason — to measure the condensed bar's real, wrapping
+ * height and hold the strip clear of it — and with nothing above the strip
+ * any more there is no clearance left to compute. A screen with NO tabs
+ * pins nothing at all, which falls out of `renderFolderTabs` returning
+ * `null`, not out of a second rule.
+ *
+ * IF SOMETHING EVER PINS ABOVE THIS STRIP AGAIN, it cannot hand the offset
+ * down as a class: `SectionWithCreate`'s `folderTabs` slot and `PagedFind`'s
+ * `tabs` sit several layers below a screen's heading and are a plain SIBLING
+ * of it in every `*-screen.tsx` file, so the nearest shared ancestor is the
+ * document root — which is why the deleted mechanism published to
+ * `document.documentElement` (the same reason `shared/web/scale-section.tsx`
+ * still does) and measured with a `ResizeObserver` rather than trusting a
+ * token, since a translated word can change a bar's line count. That is the
+ * part of the old bar's reasoning worth keeping; the bar itself is not.
  *
  * Unlike a record's own strip, this one is never nested inside a padded
  * card it has to escape — `SectionWithCreate`'s `folderTabs` slot and
  * `PagedFind`'s `tabs` both render it as a plain sibling, directly in the
  * page's own flow, ABOVE any card — so this needs none of `STICKY_TABS`'s
- * `-mx`/`px` cancel-and-restore arithmetic, only `position: sticky` and a
- * `top` offset that clears the condensed title bar once it appears.
- * `--collection-tabs-top` is that clearance, published by `CollectionHeading`
- * itself (`usePublishCondensedHeight`, condensed-title.tsx) — `0px` while the
- * heading is not condensed, so the strip sits flush under the app shell
- * exactly as it always did.
+ * `-mx`/`px` cancel-and-restore arithmetic, only `position: sticky` and
+ * `top: 0`.
+ *
+ * `pb-[var(--tab-content-gap)]` — THE SPACE BETWEEN THE TABS AND WHAT THEY
+ * LABEL, client ruling, 2026-09-03, verbatim: "there needs to be space
+ * between the tabs and the start of the container … make sure that you
+ * don't hard-code page by page, but rather you change the rule and you
+ * apply it everywhere," then, same session, scrolled: "make sure to
+ * maintain the space between tabs and content on all screens, even when I
+ * scroll down."
+ *
+ * THIS WAS `mb-[var(--tab-content-gap)]` — A MARGIN — AND A MARGIN BETWEEN
+ * TWO SIBLINGS IS NEVER PAINTED. It reserves space in static layout, which is
+ * why it looked right at rest, but the moment this strip pins
+ * (`position: sticky`, right below), the content below keeps scrolling and
+ * carries that reserved space away with it: the margin belongs to flow, the
+ * strip does not, so past the first scroll tick the panel's own text scrolls
+ * up flush against the tab strip's bottom edge with no gap at all — exactly
+ * the failure the second ruling above names. The kit hit the identical bug on
+ * its own sticky strip (`RecordDetail`, CHANGELOG v1.2.29 "the tab-to-content
+ * gap, made one rule instead of three numbers") and fixed it the same way:
+ * the gap is PADDING on the sticky element's OWN box, not a margin on
+ * whatever comes after it. Padding is inside the box that is sticky and
+ * painted (`bg-background` just below), so it is reserved and repainted at
+ * every scroll position the strip is pinned at, never carried away by a
+ * scrolling sibling. Still `--tab-content-gap` (declared once in
+ * `web/app/globals.css`, the same property `--record-tab-gap` in
+ * record-chrome.tsx resolves to, `design-scale.test.ts`'s own "one seam, both
+ * strips read it" rot-check) — only the CSS property changed, margin to
+ * padding, not the value or where it is declared.
  *
  * `[&>[role=tablist]]:self-start` — THE SAME FIX `STICKY_TABS` NEEDED —
  * `[role=tablist]` is a flex child of `<Tabs>` (`flex flex-col`, tabs.tsx, no
@@ -292,7 +339,7 @@ export type FolderTabStrip = {
  * on `<Tabs>`, giving the browser that ancestor's real height to stick
  * within. */
 export const STICKY_FOLDER_TABS =
-  "bg-background sticky top-[var(--collection-tabs-top,0px)] z-10 " +
+  "bg-background sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place

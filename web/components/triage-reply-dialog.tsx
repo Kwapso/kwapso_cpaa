@@ -23,7 +23,7 @@ import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dia
 import { Field } from "@shared/web/field"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Send } from "@shared/ui/foundations/icons"
+import { PaperPlaneTilt } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -77,7 +77,7 @@ export function TriageReplyDialog({
       onSubmit={submit}
       title={<DialogTitle>{t("Reply")}</DialogTitle>}
       subtitle={<DialogDescription>{t("A message on the ticket. It does not resolve it.")}</DialogDescription>}
-      submit={{ busy: busy, disabled: !ready, icon: <Send className="size-4" /> }}
+      submit={{ busy: busy, disabled: !ready, icon: <PaperPlaneTilt className="size-4" /> }}
     >
       <Field config={bodyField} htmlFor="triage-reply" className={fieldSpacing}>
         <Textarea

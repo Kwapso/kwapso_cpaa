@@ -59,17 +59,29 @@
      tab's pair on `Tabs` rather than on the trigger (TAB-C1): a caller that
      rebinds `--surface-panel` around the strip must not be able to make the
      live tab and the card disagree.
-   · THE LEADING TAB IS SQUARE ON ITS TOP-LEFT, and it is drawn ADDITIVELY.
-     `FolderShape`'s rounded top-left corner is fixed at 6.6 brand units at
-     every size and is not a prop; squaring it in the path would be changing
-     the silhouette, which the client forbade in the same sentence that asked
-     for the square corner. So the corner is FILLED IN instead: a
-     `--folder-radius-lip` square of the shape's own `currentColor`, laid over
-     the arc's exact bounding box. One brand unit is 0.1rem and the arc runs
-     x,y ∈ [0, 6.6] units, so 0.66rem — `--folder-radius-lip` — covers it and
-     nothing else. The path is untouched, the patch is one element, and it is
-     drawn only on the tab that leads the strip, because that is the only tab
-     whose corner the card below squares too.
+   · THE LEADING TAB'S TOP-LEFT CORNER IS ROUNDED, LIKE EVERY OTHER TAB'S.
+     REVERSED 2026-09-03, CLIENT-RULED, ON THE LIVE PRODUCT: "When I am on the
+     left tab, the top corner needs to be more rounded. That's not how the
+     tabs are, so go and fix it." Until today this file laid a
+     `--folder-radius-lip` square of the shape's own `currentColor` over the
+     leading tab's own arc — `FolderShape`'s rounded top-left corner is fixed
+     at 6.6 brand units at every size and is not a prop, so the corner was
+     FILLED IN rather than redrawn — to square the leading tab off to match
+     the card's own squared corner underneath it. THE PATCH IS DELETED, not
+     reduced: a tab is meant to look like a tab, and every other tab in the
+     strip already stands on its own rounded shoulder; the leading one is no
+     longer the exception. `CrumbShape` no longer takes a `lead` flag and
+     draws the identical one element at every position.
+
+     THE CARD'S OWN SQUARED CORNER DOES NOT FOLLOW IT BACK. The two squares
+     were introduced together on 2026-09-02, but they were never one
+     mechanism solving one problem twice — `screen-shell.tsx`'s own header
+     has the geometry: the card's radius (24) is bigger than the strip's own
+     overlap (17.02), so an un-squared card corner shows roughly 7 of its own
+     24 as a curve peeking out below the tab's dead-straight left edge,
+     whatever that tab's own top corner is doing. Un-squaring the tab removes
+     no part of that collision, so the card's corner stays square on its own
+     merits; see that file for the argument and the measurement.
    · Hover and weight are the tab's own, unchanged: an INK move to
      `--foreground` plus a preview of the active weight. No fill move, no
      opacity, no underline — the trail's own link hover underlines, and that
@@ -82,8 +94,8 @@
      happen. The LABEL still transitions, on `BreadcrumbLink`'s own
      `--duration-colour`.
    · Every colour and measure is a token. The only radius on this component is
-     the folder silhouette's own, and the square corner is the documented
-     exception on one edge of one tab.
+     the folder silhouette's own; there is no exception left on it as of
+     2026-09-03 — see the leading-tab bullet above.
    · Focus is ONE global rule (tokens.css §8). No ring here, no
      `outline: none`; the strip pays four pixels of block-start padding and
      takes them straight back as a negative margin so its own `overflow`
@@ -210,13 +222,22 @@ const TAB = cn(
   "[&_svg:not([data-slot=folder-shape])]:shrink-0",
 );
 
-/* An ancestor: the rest fill, 13/300 in secondary ink, hovering to primary ink
-   at the active weight. `hover:no-underline` is the ONE thing suppressed on
-   `BreadcrumbLink` — its underline is `.kw-link`'s, drawn for a link that
-   "occupies no box", and this link is a box. Everything else the part brings
-   (`cursor-pointer`, `no-underline`, the colour transition on
-   `--duration-colour`, and `hover:text-foreground`, which is already the tab's
-   own hover ink) is kept.
+/* An ancestor: the rest fill, 13/300 in secondary ink, hovering to the active
+   WEIGHT ONLY — REVERSED 2026-09-03. `hover:no-underline` is still the ONE
+   thing suppressed on `BreadcrumbLink` — its underline is `.kw-link`'s, drawn
+   for a link that "occupies no box", and this link is a box — but the ink
+   hover it also brings, `hover:text-foreground`, is now overridden back to
+   rest here rather than kept: client ruling, verbatim, "when i hover over a
+   tab i want that it gets the same weight as the active tab (without
+   changing the color) replicate the behaviour we already have in navbar."
+   `rail.tsx`'s `ROW_IDLE` is that behaviour — a fixed ink at every state,
+   weight the only thing that steps up on hover — so `hover:text-ink-secondary`
+   is added, LAST, to win the merge against `BreadcrumbLink`'s own
+   `hover:text-foreground` (same utility group, later in the `cn()` call
+   `<BreadcrumbLink className={cn(TAB, TAB_REST)}>` passes it through).
+   Colour was never invented to move here in the first place — `TAB_REST`
+   itself carried no ink hover of its own before today, only the shared
+   part's did — so this is a suppression, not a second rule to keep in step.
 
    `z-[1]` and `z-[3]` are 24.3's own two numbers, kept so a caller that draws
    its card at `z-[2]` gets ch14's "clipped by the card edge" for the rest tabs
@@ -224,7 +245,7 @@ const TAB = cn(
 const TAB_REST = cn(
   "z-[1]",
   "text-ink-secondary font-[var(--font-weight-light)]",
-  "hover:text-foreground hover:font-[var(--font-weight-medium)]",
+  "hover:text-ink-secondary hover:font-[var(--font-weight-medium)]",
   "hover:no-underline",
 );
 
@@ -241,9 +262,17 @@ const FILL_REST = "text-[var(--kw-crumb-rest)]";
 const FILL_LIVE = "text-[var(--kw-crumb-live)]";
 
 /* ----------------------------------------------------------------------------
-   The silhouette behind one tab, and the square corner on the one that leads.
+   The silhouette behind one tab.
+
+   NO LONGER TAKES A `lead` FLAG. Until 2026-09-02 the leading tab drew an
+   extra `--folder-radius-lip` patch here to square its own top-left corner
+   off, matching the card's own squared corner underneath it; the client
+   reversed the tab half of that on 2026-09-03 ("go and fix it" — see the file
+   header), so every tab, leading or not, is now this one element and nothing
+   more. `data-slot="breadcrumb-folder-square"` no longer exists anywhere in
+   this file; a harness that still queries for it should expect zero.
    -------------------------------------------------------------------------- */
-function CrumbShape({ fill, lead }: { fill: string; lead: boolean }) {
+function CrumbShape({ fill }: { fill: string }) {
   return (
     <span
       aria-hidden="true"
@@ -254,18 +283,6 @@ function CrumbShape({ fill, lead }: { fill: string; lead: boolean }) {
       className={cn("pointer-events-none absolute inset-0 -z-10", fill)}
     >
       <FolderShape crop="lip" />
-      {lead ? (
-        /* THE SQUARE TOP-LEFT, ADDITIVE. See the file header: the shape's own
-           6.6-unit corner radius is fixed and is not a prop, so the corner is
-           covered rather than redrawn. `bg-current` takes the same
-           `currentColor` the path is filled with, so the patch and the shape
-           are one solid; `--folder-radius-lip` (0.66rem) is that radius as a
-           CSS length and is exactly the arc's bounding box. */
-        <span
-          data-slot="breadcrumb-folder-square"
-          className="absolute start-0 top-0 size-[var(--folder-radius-lip)] bg-current"
-        />
-      ) : null}
     </span>
   );
 }
@@ -427,48 +444,66 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
              and it is derived rather than stated per spine — nothing here
              knows what a spine is.
 
-             MEASURED IN `verify/breadcrumb-folder/`, on the two spines the
-             client kept and in both palettes, against the ground the strip
-             stands on (`--spine-fill`):
+             MEASURED IN `verify/breadcrumb-folder/` and `verify/tab-joint/`,
+             on the two spines the client kept and in both palettes, against
+             the ground the strip stands on (`--spine-fill`):
 
                MANGO · LIGHT  ground #FED069 · rest #F7F2EB 1.306 · live
                               #FFFEF9 1.440 · rest vs live 1.103
                MANGO · DARK   ground #FED069 · rest #1C1B18 11.843 · live
                               #26241F 10.661 · rest vs live 1.111
-               QUIET · LIGHT  ground #F7F2EB · rest #F7F2EB 1.000 · live
-                              #FFFEF9 1.103 · rest vs live 1.103
+               QUIET · LIGHT  ground #F7F2EB · rest #EDE8E1 1.094 · live
+                              #FFFEF9 1.103 · rest vs live 1.207
                QUIET · DARK   ground #1C1B18 · rest #1C1B18 1.000 · live
                               #26241F 1.111 · rest vs live 1.111
 
-             ONE FIGURE IS LOGGED RATHER THAN FIXED, AND IT IS OWED A RULING.
-             On the quiet spine a resting tab measures 1.000 against the
-             ground, because the quiet spine IS `--surface-panel` — tokens.css
-             §7b says so in as many words, and that identity is the whole
-             reason the client cut to two spines. A resting crumb there has no
-             edge and reads as a label until it is hovered; the live tab still
-             carries the strip at 1.103 / 1.111, the same step the card itself
-             has, so the trail's endpoint never disappears.
+             THE FIGURE THIS FILE USED TO LOG AS OPEN, RULED, 2026-09-03. A
+             resting tab on the quiet spine used to measure 1.000 against the
+             ground IN BOTH PALETTES, because the quiet spine IS
+             `--surface-panel` (tokens.css §7b) and the rest fill was also
+             `--surface-panel` — the same value twice. The client was shown
+             drawn alternatives and picked #EDE8E1 for QUIET-LIGHT ONLY, the
+             quietest option that still reads as a real step off the ground
+             (1.094) rather than the loudest one available: `tokens.css`
+             names it `--spine-quiet-crumb-rest` and the reasoning for why it
+             is a new value and not a repoint of an existing paper is there.
+             QUIET-DARK IS LEFT AT 1.000, DELIBERATELY, NOT AN OVERSIGHT: its
+             own `--surface-panel` rest fill sits on a ground the live tab
+             already carries at 1.111 (the same step the card itself has), so
+             the trail's endpoint never disappears there the way it could on a
+             genuinely flat quiet-light strip; the client's ruling was scoped
+             to the palette she was shown.
 
-             THE ALTERNATIVE, AND WHY IT IS NOT TAKEN HERE. `--muted` (#FAF9F7
-             / #2F2D28, whose own comment in tokens.css reads "inactive tabs,
-             idle wells") is the kit's third paper and was the retired folder
-             tab's idle fill; it clears the ground on quiet, and it costs
-             mango-light, where rest and live would sit 1.021 apart instead of
-             1.103. The client named soft paper, on mango, tonight, so soft
-             paper is what this draws. `--kw-crumb-rest` is the one lever — a
-             caller, or a spine block, can point it at `--muted` without
-             touching this file, which is the second reason both papers are
-             custom properties and not classes. */
+             THE MECHANISM IS PER-SPINE, IN TOKENS.CSS, NOT PER-PALETTE HERE.
+             `--kw-crumb-rest` below reads `--spine-crumb-rest` with a
+             `var(…, var(--surface-panel))` fallback: `[data-spine="quiet"]`
+             binds it to the new paper in light and back to `--surface-panel`
+             in both dark blocks (tokens.css, right after that spine's own
+             block), and the mango spine never sets it at all, so the fallback
+             alone keeps mango's own two papers exactly as measured above.
+             This file names no palette and no spine — the whole branch is a
+             cascade a caller or a future spine can repoint without touching
+             this component, which is the same argument TAB-C1 already made
+             for declaring both papers as custom properties instead of
+             classes.
+
+             THE ALTERNATIVE CONSIDERED BEFORE THE NEW PAPER, AND WHY IT WAS
+             NOT TAKEN. `--muted` (#FAF9F7 / #2F2D28, whose own comment in
+             tokens.css reads "inactive tabs, idle wells") is the kit's third
+             paper and was the retired folder tab's idle fill; it clears the
+             ground on quiet, and it costs mango-light, where rest and live
+             would sit 1.021 apart instead of 1.103. `--surface-quiet`
+             (#E2DDD4, "cancel buttons, disabled wells") was tried next and
+             also withdrawn — a reuse the client did not choose once she saw
+             the alternatives drawn. */
           "[--kw-crumb-live:var(--surface-raised)]",
-          "[--kw-crumb-rest:var(--surface-panel)]",
+          "[--kw-crumb-rest:var(--spine-crumb-rest,var(--surface-panel))]",
           className,
         )}
         {...props}
       >
         <BreadcrumbList className={cn(STRIP, listClassName)}>
-          {rendered.map((entry, position) => {
-            const lead = position === 0;
-
+          {rendered.map((entry) => {
             if (entry.kind === "gap") {
               return (
                 <BreadcrumbItem key="breadcrumb-folders-gap" className="shrink-0">
@@ -477,7 +512,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                       data-slot="breadcrumb-folders-fold"
                       className={cn(TAB, TAB_REST)}
                     >
-                      <CrumbShape fill={FILL_REST} lead={lead} />
+                      <CrumbShape fill={FILL_REST} />
                       {/* The kit's own elision, reused whole: the glyph is
                           `aria-hidden` and the announced label sits OUTSIDE
                           that wrapper, which is the half of this component
@@ -518,7 +553,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
               <BreadcrumbItem key={key} className="shrink-0">
                 {live ? (
                   <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
-                    <CrumbShape fill={FILL_LIVE} lead={lead} />
+                    <CrumbShape fill={FILL_LIVE} />
                     {entry.item.label}
                   </BreadcrumbPage>
                 ) : entry.item.href === undefined ? (
@@ -533,7 +568,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                     aria-current={undefined}
                     className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary")}
                   >
-                    <CrumbShape fill={FILL_REST} lead={lead} />
+                    <CrumbShape fill={FILL_REST} />
                     {entry.item.label}
                   </BreadcrumbPage>
                 ) : (
@@ -541,7 +576,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                     href={entry.item.href}
                     className={cn(TAB, TAB_REST)}
                   >
-                    <CrumbShape fill={FILL_REST} lead={lead} />
+                    <CrumbShape fill={FILL_REST} />
                     {entry.item.label}
                   </BreadcrumbLink>
                 )}

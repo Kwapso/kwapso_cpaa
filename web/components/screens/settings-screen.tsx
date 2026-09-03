@@ -69,7 +69,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { List } from "@shared/web/list-compat"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AccessTokensSection } from "@/components/access-tokens"
@@ -190,9 +190,9 @@ export function SettingsScreen({
     ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "appearance", label: t("Appearance"), icon: "palette", badge: "", badgeVariant: "" as const },
-      { value: "members", label: t("Members & roles"), icon: "users-round", badge: "", badgeVariant: "" as const },
-      { value: "integrations", label: t("Integrations"), icon: "key-round", badge: "", badgeVariant: "" as const },
-      { value: "choices", label: t("Choices"), icon: "list-checks", badge: "", badgeVariant: "" as const },
+      { value: "members", label: t("Members & roles"), icon: "users-three", badge: "", badgeVariant: "" as const },
+      { value: "integrations", label: t("Integrations"), icon: "key", badge: "", badgeVariant: "" as const },
+      { value: "choices", label: t("Choices"), icon: "git-commit", badge: "", badgeVariant: "" as const },
     ],
   }
 
@@ -366,7 +366,7 @@ export function SettingsScreen({
                       items={adminSections.map((s) => ({
                         id: s.segment,
                         title: t(s.title),
-                        trailing: <ChevronRight className="text-muted-foreground size-4" />,
+                        trailing: <CaretRight className="text-muted-foreground size-4" />,
                       }))}
                     />
                   </section>
@@ -400,7 +400,7 @@ export function SettingsScreen({
                             )}
                           </span>
                         ),
-                        trailing: <ChevronRight className="text-muted-foreground size-4" />,
+                        trailing: <CaretRight className="text-muted-foreground size-4" />,
                       }))}
                     />
                   </section>

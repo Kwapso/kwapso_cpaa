@@ -188,9 +188,9 @@ import {
 } from "../dropdown-menu/dropdown-menu";
 import { Separator } from "../separator/separator";
 import { Spinner } from "../spinner/spinner";
-import { Tabs, TabsCount, TabsList, TabsTrigger } from "../tabs/tabs";
+import { Tabs, TabsCount, TabsList, TabsTrigger, TABS_STRIP_GAP } from "../tabs/tabs";
 import { Title } from "../title/title";
-import { MoreHorizontal } from "../../foundations/icons";
+import { DotsThree } from "../../foundations/icons";
 
 /* ============================================================================
    CollectionRegister — the empty / error / busy notice a collection shows
@@ -880,7 +880,7 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" aria-label={moreActionsLabel}>
-                <MoreHorizontal />
+                <DotsThree />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">{overflowActions}</DropdownMenuContent>
@@ -952,22 +952,30 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
             overlap and the rule about not putting anything in the gap now
             live.
 
-            A `line` strip is attached to nothing by design — it is a rule
-            under a heading — so this stack keeps the frame's ordinary band gap
-            at every density, with no branch left to take. */}
-        <div
-          data-slot="collection-frame-stack"
-          className={cn(
-            "flex min-w-0 flex-col",
-            density === "compact" ? "gap-4" : "gap-5",
-          )}
-        >
+            THE STACK NO LONGER SPENDS A `gap` OF ITS OWN — CHANGED 2026-09-03,
+            SAME DAY AS THE NUMBER ITSELF. It used to keep "the frame's
+            ordinary band gap at every density" here, a flex `gap` between
+            this `<Tabs>` wrapper and the panel below. The client then asked
+            for that space to survive scrolling — a strip that pins at the top
+            of a scrolling pane keeps its own box, including any padding, but
+            a flex `gap` is a static distance between two siblings and stops
+            meaning anything the moment one of them goes sticky. So the space
+            moved onto the STRIP's own box: `TABS_STRIP_GAP` is
+            `tabs.tsx`'s exported padding-block-end, on the `<Tabs>` wrapper
+            immediately below (whose only child is `TabsList`, so this is
+            "padding right after the strip" with nothing else inside that
+            box to disturb). This stack is a plain column now; the density
+            variants above still govern the frame's OWN inset and its OTHER
+            gaps (header to figures, figures to this stack), which this join
+            was never about. */}
+        <div data-slot="collection-frame-stack" className="flex min-w-0 flex-col">
           {tabs && tabs.length > 0 ? (
             <Tabs
               value={value}
               defaultValue={value === undefined ? (defaultValue ?? tabs[0].value) : undefined}
               onValueChange={onValueChange}
               data-slot="collection-frame-tabs"
+              className={TABS_STRIP_GAP}
               /* THE THREE PAPERS THAT USED TO BE RESOLVED HERE ARE GONE WITH
                  THE FOLDER VARIANT (client ruling, 2026-09-02), AND SO IS THE
                  WHOLE OVERRIDE 30 / 38 / 39 ARGUMENT THIS BLOCK CARRIED.

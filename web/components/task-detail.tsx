@@ -25,7 +25,8 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Check, Paperclip, Pencil, Undo2 } from "@shared/ui/foundations/icons"
+import { Check, PencilSimple, ArrowUUpLeft } from "@shared/ui/foundations/icons"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
@@ -109,6 +110,7 @@ export function TaskDetailScreen({
     )
 
   const done = task.status === "done"
+  const FileGlyph = fileTypeIcon(task.fileName)
   const overviewItems = [
     { label: t("Status"), value: done ? t("Done") : t("Open") },
     { label: t("Who has it"), value: task.assigneeName || t("Nobody yet") },
@@ -148,7 +150,7 @@ export function TaskDetailScreen({
                 rel="noreferrer noopener"
                 className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
               >
-                <Paperclip className="size-4 shrink-0" />
+                <FileGlyph className="size-4 shrink-0" />
                 <span className="min-w-0 truncate">{task.fileName || t("Open the file")}</span>
               </a>
             ),
@@ -196,11 +198,14 @@ export function TaskDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={task.title} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `task`), client ruling 2026-08-31. No third, parent-container pill: a
-      // task is "our own internal admin, not for an account's delivery"
-      // (glossary), so it has none to point at.
-      eyebrow={t("Task")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
+      // NO third, parent-container pill: a task is "our own internal admin,
+      // not for an account's delivery" (glossary), so it has none to point at.
       // NO `recordNumber` — the 2026-08-31 ruling puts a task in the same
       // category as a process, a role or a dropdown value: agency-internal
       // admin nobody quotes, so it mints no reference at all (`task.ref` is
@@ -248,12 +253,12 @@ export function TaskDetailScreen({
               own trigger, work-logs-panel.tsx, time-panel.tsx). */}
           {canEdit && !done && (
             <Button variant="secondary" size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           {canEdit && (
             <Button variant="secondary" onClick={onToggleDone} className="gap-1">
-              {done ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
+              {done ? <ArrowUUpLeft className="size-3.5" /> : <Check className="size-3.5" />}
               {done ? t("Put it back") : t("Tick it off")}
             </Button>
           )}

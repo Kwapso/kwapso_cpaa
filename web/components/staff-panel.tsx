@@ -22,7 +22,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { RecordActionsMenu } from "@/components/record-chrome"
@@ -199,7 +199,7 @@ export function StaffPanel({
               onClick={() => setProfileOpen(true)}
               aria-label={profile?.active ? t("Edit profile") : t("Write a profile")}
             >
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           {/* WHEN SOMEBODY LEAVES. Red because it takes the profile out of the
@@ -337,7 +337,7 @@ export function StaffPanel({
                             {
                               key: "edit",
                               label: t("Edit"),
-                              icon: <Pencil className="size-3.5" />,
+                              icon: <PencilSimple className="size-3.5" />,
                               onSelect: () => {
                                 setEditingCert(c)
                                 setCertOpen(true)

@@ -31,7 +31,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Banknote } from "@shared/ui/foundations/icons"
+import { Money } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { tenancy } from "@/lib/api"
@@ -177,7 +177,7 @@ export function MarginPanel({
             href={`/t/${teamId}/internal-rates`}
             className="text-muted-foreground hover:text-foreground mt-2 inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
           >
-            <Banknote className="size-3" aria-hidden />
+            <Money className="size-3" aria-hidden />
             {t("Change what our hour costs")}
           </InAppLink>
         )}

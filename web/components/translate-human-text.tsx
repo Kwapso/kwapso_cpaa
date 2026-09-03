@@ -28,7 +28,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Languages } from "@shared/ui/foundations/icons"
+import { Translate } from "@shared/ui/foundations/icons"
 
 import { ApiFailure, dataOps } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"
@@ -185,7 +185,7 @@ export function TranslateAction({
       disabled={translation.busy}
       onClick={translation.toggle}
     >
-      <Languages className="size-3.5" />
+      <Translate className="size-3.5" />
       {translation.busy
         ? t("Translating…")
         : translation.showing

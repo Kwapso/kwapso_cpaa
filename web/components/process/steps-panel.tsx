@@ -1,5 +1,5 @@
 "use client"
-import { Trash2 } from "@shared/ui/foundations/icons"
+import { Trash } from "@shared/ui/foundations/icons"
 import { SAVINGS_CAPTION, hoursText, minutesText } from "@shared/workers/savings"
 import { frequencyText } from "@shared/web/frequency"
 import { moneyText } from "@shared/web/money"
@@ -37,7 +37,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
@@ -394,7 +394,7 @@ export function StepsPanel({
                         {
                           key: "edit",
                           label: t("Edit"),
-                          icon: <Pencil className="size-3.5" />,
+                          icon: <PencilSimple className="size-3.5" />,
                           onSelect: () => {
                             onEditStep(step)
                             onAddStep()
@@ -446,7 +446,7 @@ export function StepsPanel({
                         {
                           key: "delete",
                           label: t("Delete"),
-                          icon: <Trash2 className="size-3.5" />,
+                          icon: <Trash className="size-3.5" />,
                           disabled: busy,
                           destructive: true,
                           onSelect: () =>

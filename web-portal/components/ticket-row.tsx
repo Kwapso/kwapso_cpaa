@@ -12,7 +12,7 @@ import Link from "next/link"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Clamp } from "@shared/ui/components/clamp/clamp"
-import { ChevronRight } from "@shared/ui/foundations/icons"
+import { CaretRight } from "@shared/ui/foundations/icons"
 
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
@@ -94,7 +94,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
           <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt, t, lang)}</span>
         </div>
       </div>
-      <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+      <CaretRight className="text-muted-foreground size-4 shrink-0" />
     </Link>
   )
 }

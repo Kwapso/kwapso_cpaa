@@ -81,10 +81,40 @@
 // pieces already and can hand each to wherever it belongs — `filters` and
 // `toolbarPanel`, on `ToolbarRow` or on the kit's `CollectionFrame` directly —
 // in one render pass, with no context and no portal. `web/test/filter-row-
-// is-the-kits.test.tsx`'s byte-identical assertion above is unchanged: the
-// pill track still never contains the panel, because the panel is a
-// different VALUE the caller places in a different DOM position, not a
-// different kind of proof.
+// is-the-kits.test.tsx`'s byte-identical assertion above WAS true of the
+// track's own subtree at the time and is SUPERSEDED below (pass five) — the
+// track stopped carrying its own fill/shape at all, which is a stronger
+// property than "unchanged", not a weaker one.
+//
+// PASS FIVE, SUPERSEDING PASS THREE AND FOUR'S "TWO BOXES" SHAPE — CLIENT
+// RULING, 2026-09-03. Verbatim: "what this is doing is creating a new card
+// underneath... it kind of creates a second toolbar. This is not the
+// behaviour I want. I want it to look together, so merge this with the main
+// toolbar so that it's one single background or container, more like expand
+// behaviour rather than open-a-new-one behaviour."
+//
+// Passes three and four solved OVERLAY (the panel is in normal flow and
+// pushes the collection down) and left a second fault standing: the track
+// and this panel were two `bg-background` boxes — the track `rounded-pill`,
+// this panel `rounded-[var(--radius)]` — with a `gap-2` between them. Same
+// fill, same tone, visibly separate: precisely "a second toolbar" no matter
+// how correctly the overlay question was answered. The fix is NOT pass one
+// again (the panel is still never a flex child of the pill, still never feeds
+// anything's height into a `rounded-pill` calc) — it is giving the fill and
+// the shape to exactly ONE element, the caller's own merged container, and
+// having THAT element's shape read off `Boolean(panel)` rather than off any
+// box's measured height. `ToolbarRow` (screen-bits.tsx) does this now: one
+// `bg-background` div, `rounded-pill` with no panel and
+// `rounded-[var(--radius)]` the moment one exists, the track and this panel
+// both painting nothing of their own. This panel's own div lost its
+// `bg-background`/`rounded-[var(--radius)]` for the same reason — see its
+// own comment, below. `web/test/filter-row-is-the-kits.test.tsx`'s "the panel
+// expands the space" test is rewritten for this pass rather than dropped:
+// the pill-inside-the-track regression (pass one) and the floating-overlay
+// regression (pass two) are both still asserted against; what changed is
+// that the track's OWN box now legitimately carries no fill or radius in
+// either state, and the single merged container's radius is asserted to
+// switch instead of staying byte-identical.
 //
 // ── THE TOOLBAR SAYS A COUNT, NEVER THE FILTERS — CLIENT RULING, 2026-09-02 ──
 //
@@ -353,14 +383,25 @@ function useFilterBar<T>({
    * stale field left behind in a caller's own query object cannot inflate it. */
   const activeCount = facets.reduce((n, f) => n + ((values[f.field] ?? "") === "" ? 0 : 1), 0)
 
-  // THE "FILTER" PILL'S OWN LABEL. The bare word while the panel is open (it
-  // is its own explanation once the fields are in front of you), and the bare
-  // word while nothing is on — a count only earns its place once BOTH "there
-  // is something to report" and "the panel that would show it is shut" are
-  // true. Since the chips went (client ruling, 2026-09-02) this count is the
-  // ONLY thing the toolbar says about what is narrowing the list.
-  const addFilterLabel =
-    !open && activeCount > 0 ? t("Filter ({count})", { count: activeCount }) : t("Filter")
+  // THE "FILTER" PILL'S OWN LABEL — CLIENT RULING, 2026-09-03, SUPERSEDING
+  // THE `!open &&` GATE THIS USED TO CARRY. Verbatim: "Even if the filter is
+  // open, I want to see the count pill at all times, like when I'm selecting
+  // and unselecting filters. When the filter toolbar modal is open, I also
+  // want the count visible." The old reasoning — "the fields are their own
+  // explanation once the panel is open, so the count would say nothing new"
+  // — was a plausible-sounding UX call that turned out to be exactly the
+  // wrong one: mid-edit is precisely when a reader wants the running total
+  // in view, not looking at it. So the count is read off `activeCount`
+  // UNCONDITIONALLY now, `open` never enters the expression, and the bare
+  // word is reserved for the one case that still deserves it — nothing is
+  // on at all. Since the chips went (client ruling, 2026-09-02) this count
+  // is still the ONLY thing the toolbar says about what is narrowing the
+  // list; what changed is WHEN it says it, not what it says. `activeCount`
+  // is computed fresh every render off `facets`/`values` (its own comment
+  // above), so this label — and therefore the pill in BOTH open and closed
+  // states — updates the instant a facet is ticked or cleared, never off a
+  // snapshot taken when the panel last closed.
+  const addFilterLabel = activeCount > 0 ? t("Filter ({count})", { count: activeCount }) : t("Filter")
 
   const panel = open ? (
     // NO `role="group"`/`aria-label` OF ITS OWN — the pill's own cluster
@@ -374,17 +415,32 @@ function useFilterBar<T>({
     // `absolute inset-x-0 top-full`, the `z-20` it needed to clear the rows it
     // painted over, and `shadow-[var(--shadow-overlay)]`, the kit's
     // floating-surface elevation — nothing here floats any more, so an
-    // elevation would be saying something untrue about the surface. What is
-    // left is the panel's own paper: `bg-background`, the same step the
-    // toolbar track above it stands on, so the two read as one piece of
-    // furniture rather than a card dropped under a row. `min-w-*` is for the
-    // one host that can only offer a narrow outlet (the engine's
+    // elevation would be saying something untrue about the surface. `min-w-*`
+    // is for the one host that can only offer a narrow outlet (the engine's
     // `useKitPanel` branch), so the panel keeps a usable measure instead of
     // being squeezed to the width of the "Filter" pill.
+    //
+    // NO FILL AND NO RADIUS OF ITS OWN — CLIENT RULING, 2026-09-03, FOURTH
+    // PASS, SUPERSEDING THE `bg-background`/`rounded-[var(--radius)]` THIS DIV
+    // USED TO CARRY. Verbatim: "it kind of creates a second toolbar... merge
+    // this with the main toolbar so that it's one single background or
+    // container." A `bg-background` panel directly under a `bg-background`
+    // track, with a gap between the two, is not "one piece of furniture" —
+    // it is two boxes of the identical colour with air between them, which
+    // reads as exactly the second card she is naming. The surface (fill +
+    // shape) is now painted ONCE, by whichever container places this panel:
+    // `ToolbarRow` (screen-bits.tsx) merges it with its own track into one
+    // `bg-background` box that switches from `rounded-pill` to
+    // `rounded-[var(--radius)]` the moment this panel exists; the kit's own
+    // `CollectionFrame` places it inside its already-painted
+    // `bg-surface-panel` panel via `toolbarPanel`, where a second fill
+    // nested one level in would be the identical double-box CLAUDE.md's
+    // `useKitPanel` note calls "the broken combination". Either way this div
+    // paints nothing of its own — only layout and inset.
     <div
       ref={panelRef}
       data-slot="filter-bar-row"
-      className="flex min-w-[min(26rem,calc(100vw-3rem))] flex-wrap items-start gap-4 rounded-[var(--radius)] bg-background p-4"
+      className="flex min-w-[min(26rem,calc(100vw-3rem))] flex-wrap items-start gap-4 p-4"
     >
       {facets.map((f) => {
         const val = values[f.field] ?? ""
@@ -457,6 +513,49 @@ function useFilterBar<T>({
     </div>
   ) : null
 
+  // WHY THIS IS STILL A STRING, NOT THE TAB STRIP'S `TabsCount` BADGE —
+  // CLIENT RULING, 2026-09-03: "The count design should replicate the count
+  // design that we have on the top lines, like this Mango round background
+  // with no border behind the number." That number is `TabsCount`
+  // (`shared/ui/components/tabs/tabs.tsx`), and it is the kit's real export —
+  // reusing it here (rather than restyling this pill to look like it) was
+  // tried first, and it does not fit for two INDEPENDENT structural reasons,
+  // neither of them a taste call:
+  //
+  //   1. `KitFilterBar`'s own `addFilterLabel` prop is typed `string`
+  //      (`shared/ui/components/filter-bar/filter-bar.tsx`) and rendered as
+  //      `{addFilterLabel}` — bare text content inside a `<button>`. There is
+  //      no slot in the kit's own pill for a component, a badge or any other
+  //      node; only a sentence.
+  //   2. Even with a node slot, `TabsCount`'s mango-vs-quiet SWITCH is not a
+  //      prop on the component — it is `group-data-[state=active]/tab:` CSS,
+  //      read off an ANCESTOR that carries the class `group/tab` and the
+  //      attribute `data-state="active"`. Only `TabsTrigger` sets both
+  //      (`tabs.tsx`'s own `TRIGGER_BASE`), which is Radix `Tabs`-internal
+  //      machinery this filter row has no reason to construct. Rendering the
+  //      real `<TabsCount>` here, unwrapped, would draw the OFF state forever
+  //      (quiet tertiary text, never mango) — visually nothing like what was
+  //      asked for.
+  //
+  //   Both are genuine kit-side gaps, not this file declining to look. The
+  //   upstream fix — logged for the design-kit pipeline, not built here
+  //   (`shared/ui/` is vendored and pinned; CLAUDE.md's `kit-supplies-the-ui`
+  //   forbids a hand-edit) — is to pull the "on" shape `TABS_COUNT_SKIN`
+  //   already states (`inline-flex size-[1.125rem] items-center
+  //   justify-center rounded-pill bg-primary text-primary-foreground
+  //   text-badge tabular-nums leading-none`) OUT from behind the
+  //   group-selector into its own standalone export (a `count: number`
+  //   prop, no ancestor required), have `TabsCount` itself draw that export
+  //   for the active case instead of stating the classes twice, and widen
+  //   `FilterBarProps.addFilterLabel` (or add a sibling node prop) so a
+  //   caller can hand the pill a node instead of only a sentence. Until
+  //   both land, copying `TABS_COUNT_SKIN`'s classes into this file would be
+  //   the exact "restyled clone" the ruling asks this file NOT to build, so
+  //   the pill keeps the kit's own plain-text "+ filter" shape with the
+  //   count folded into its words instead — see `addFilterLabel` above,
+  //   which is unconditional now so the words are visible and live in every
+  //   state (open or closed), even though they cannot yet wear the tab
+  //   strip's own badge.
   const pill = (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
       {/* NO `filters`, NO `onRemove`, NO `onClear` — client ruling,

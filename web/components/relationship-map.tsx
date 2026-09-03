@@ -46,7 +46,7 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Maximize, Minus, Plus } from "@shared/ui/foundations/icons"
+import { ArrowsOut, Minus, Plus } from "@shared/ui/foundations/icons"
 
 import { InAppLink } from "@/components/in-app-link"
 import { useT } from "@shared/web/language"
@@ -227,7 +227,7 @@ export function RelationshipMap({
             <Plus className="size-4" />
           </Button>
           <Button variant="secondary" size="icon" aria-label={t("Fit the whole map")} onClick={reset}>
-            <Maximize className="size-4" />
+            <ArrowsOut className="size-4" />
           </Button>
         </div>
       </div>

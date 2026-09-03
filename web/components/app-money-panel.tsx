@@ -30,7 +30,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Route } from "@shared/ui/foundations/icons"
+import { GitFork } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { tenancy } from "@/lib/api"
@@ -124,7 +124,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
                   className="min-w-0 max-w-full gap-1"
                   onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}
                 >
-                  <Route className="size-3.5 shrink-0" />
+                  <GitFork className="size-3.5 shrink-0" />
                   <span className="truncate">
                     {t("Say who does")} {line.name}
                   </span>

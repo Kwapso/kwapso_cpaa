@@ -125,7 +125,7 @@ import type {
   RecordDetailAuditEntry,
   RecordDetailTab,
 } from "../../components/record-detail/record-detail";
-import { Pencil } from "../../foundations/icons";
+import { PencilSimple } from "../../foundations/icons";
 import { RecordChrome } from "./record-chrome";
 import { ScreenShell } from "./screen-shell";
 import { StepperHero } from "./stepper-hero";
@@ -479,7 +479,7 @@ function RecordRoute({
       <>
         {moreActions}
         <Button variant={stagesShown ? "secondary" : "default"} onClick={onEdit}>
-          <Pencil aria-hidden="true" />
+          <PencilSimple aria-hidden="true" />
           {words.edit}
         </Button>
       </>

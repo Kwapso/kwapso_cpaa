@@ -727,6 +727,27 @@ exactly: `default`, `secondary`, `destructive`, `outline`, `sm`, `lg`, `icon`.
 because none is needed. A rename means either a bridge or a sweep of two
 applications, which is the failure this whole delivery exists to prevent.
 
+**OVERTURNED for `foundations/icons/` specifically, 2026-09-03, by direct
+client ruling — quoted in full because this rule exists precisely to make an
+override like this loud rather than quiet:**
+
+> "I validate the icon mapping, so make sure to make the switch. Any previous
+> icon that's on the repo or wherever, kill it. They are wrong. The only
+> icons that we are using are these icons from Phosphor. If in the future you
+> were to need more icons, we would also take them from Phosphor, so make
+> sure to clean any previous icon anywhere."
+
+Every one of the 93 commission icon spellings, the 3 additive names, and the
+alias table (`foundations/icons/aliases.json`) that bridged them onto
+Iconoir's own names is deleted, not kept as a bridge. The Iconoir pack itself
+— all 1,383 glyphs — is deleted from the repository, not retained as an
+unused fallback. `foundations/icons/generate-icons.mjs` no longer validates
+names against a fixed list at all: the folder is the whole contract, and a
+`.svg` file's name is the export's name, full stop. This is the one place in
+the kit where 9.1 does not hold, and it holds everywhere else unchanged —
+9.1's own reasoning (two applications importing by name) is exactly why the
+override is recorded here rather than assumed.
+
 An added variant takes the kit's own word for it (`inverse`, `cancel`, `info`),
 never a coined one, and carries a comment saying it is an addition and which
 specimen draws it.

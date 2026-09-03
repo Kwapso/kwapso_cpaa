@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@shared/ui/components/select/select"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
-import { Ban, KeyRound, Link2, Power, UserMinus } from "@shared/ui/foundations/icons"
+import { Prohibit, Key, LinkSimple, Power, UserMinus } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
@@ -185,7 +185,7 @@ export function ContactsPanel({
                 <AddButton
                   label={t("Add contact")}
                   onClick={onAdd}
-                  icon={<Link2 className="size-4" />}
+                  icon={<LinkSimple className="size-4" />}
                 />
               )}
               {canCreatePerson && <AddButton label={t("New contact")} onClick={onNew} />}
@@ -357,7 +357,7 @@ export function PortalAccessPanel({
         actions={
           canGrant && (
             <Button size="sm" onClick={onGrant} className="gap-1">
-              <KeyRound className="size-4" />
+              <Key className="size-4" />
               {t("Give access")}
             </Button>
           )
@@ -405,7 +405,7 @@ export function PortalAccessPanel({
                     className="text-destructive hover:text-destructive gap-1"
                     aria-label={t("Take access away")}
                   >
-                    <Ban className="size-3.5" />
+                    <Prohibit className="size-3.5" />
                   </Button>
                 ) : (
                   <Button

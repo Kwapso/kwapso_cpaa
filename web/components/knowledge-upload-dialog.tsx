@@ -41,7 +41,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
-import { Paperclip, Upload } from "@shared/ui/foundations/icons"
+import { Paperclip, UploadSimple } from "@shared/ui/foundations/icons"
 
 import { ApiFailure } from "@/lib/api"
 import { readFileAsDataUrl } from "@shared/web/file"
@@ -218,7 +218,7 @@ export function KnowledgeUploadDialog({
             </div>
           ) : (
             <>
-              <Upload className="text-muted-foreground size-5" aria-hidden />
+              <UploadSimple className="text-muted-foreground size-5" aria-hidden />
               <p className="text-muted-foreground text-sm">{t("Drop a file here, or")}</p>
               <Button
                 type="button"

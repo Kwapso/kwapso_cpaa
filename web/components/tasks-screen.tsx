@@ -26,6 +26,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { KpiProgress } from "@shared/ui/components/kpi-progress/kpi-progress"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type {
   ScreenActionContext,
@@ -33,7 +34,7 @@ import type {
 } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { type CollectionConfig } from "@shared/web/screen-engine/config"
-import { Inbox } from "@shared/ui/foundations/icons"
+import { ClipboardText } from "@shared/ui/foundations/icons"
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
@@ -139,9 +140,9 @@ const COMPLETED_COLUMNS = [
 /** THE SIX TABS, in the tester's order. Written as data so the strip, the fetch
  * key and the badge cannot fall out of step with each other. */
 const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
-  { value: "overdue", label: "Overdue", icon: "alert-triangle" },
-  { value: "open", label: "List", icon: "inbox" },
-  { value: "calendar", label: "Calendar", icon: "calendar" },
+  { value: "overdue", label: "Overdue", icon: "warning" },
+  { value: "open", label: "List", icon: "clipboard-text" },
+  { value: "calendar", label: "Calendar", icon: "calendar-blank" },
   { value: "completed", label: "Completed", icon: "check" },
   { value: "upcoming", label: "Upcoming", icon: "clock" },
   { value: "all", label: "All tasks", icon: "list" },
@@ -201,6 +202,15 @@ export function TasksScreen({
   const seesEveryones = usePermissions(teamId).can("all_tasks", "read")
   const [taskOpen, setTaskOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
+  // THE CALENDAR'S OWN SEARCH — client ruling, 2026-09-03: "the toolbar,
+  // including the search, should be absolutely everywhere we have a data view
+  // or a collection view. Stop hardcoding this." This tab's toolbar used to be
+  // a bare button (`RecordCalendar` never touches `CollectionFrame`, so the
+  // other five tabs' engine-drawn search never reaches it) — a silent,
+  // per-screen opt-out of exactly the kind the ruling is aimed at, not a
+  // reasoned exemption. In-browser over `calendarEntries` below, the same
+  // bounded shape the other five tabs already search in memory.
+  const [calendarQuery, setCalendarQuery] = React.useState("")
 
   async function addTask(values: TaskFormValues) {
     await contentApi.createTask({
@@ -328,6 +338,11 @@ export function TasksScreen({
   // a task reached from a square lands on exactly the screen the list reaches.
   const calendarEntries: CalendarEntry[] = tasksQ.data
     .filter((r) => r.dueOn)
+    // THE CALENDAR'S OWN SEARCH (see `calendarQuery` above) — the title is the
+    // one word every square already shows, so it is what a query narrows by,
+    // the same bounded in-memory match `CollectionFrame`'s own search runs for
+    // the other five tabs.
+    .filter((r) => r.title.toLowerCase().includes(calendarQuery.trim().toLowerCase()))
     .map((r) => ({
       id: r.id,
       day: (r.dueOn as string).slice(0, 10),
@@ -385,18 +400,34 @@ export function TasksScreen({
       >
         {view === "calendar" ? (
           <div className="flex flex-col gap-4">
-            {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. The calendar
-                has no search/sort of its own (`RecordCalendar` never touches
-                `CollectionFrame`), but the button still lives below the tabs
-                rather than beside them (client ruling, 2026-08-31) — a bare
-                `<ToolbarRow>` is this view's own toolbar. The other five tabs
-                get theirs from the kit panel's own toolbar (`useKitPanel`
-                above). */}
-            {canCreate && <ToolbarRow actions={<AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />} />}
+            {/* THE TOOLBAR, NOW WITH ITS OWN SEARCH — CLIENT RULING,
+                2026-09-03, SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO
+                CARRY. Verbatim: "the toolbar, including the search, should be
+                absolutely everywhere we have a data view or a collection
+                view. Stop hardcoding this." `RecordCalendar` still never
+                touches `CollectionFrame` (it is a month grid, not a
+                collection body), so it still cannot inherit the other five
+                tabs' engine-drawn search — but that is a reason this row
+                needs its OWN search box, not a reason to have none. See
+                `calendarQuery` above for the filter this narrows. */}
+            <ToolbarRow
+              search={
+                calendarEntries.length > 0 || calendarQuery !== "" ? (
+                  <SearchInput
+                    value={calendarQuery}
+                    onChange={(e) => setCalendarQuery(e.target.value)}
+                    onClear={() => setCalendarQuery("")}
+                    placeholder={t("Search tasks…")}
+                    className="w-full"
+                  />
+                ) : null
+              }
+              actions={canCreate && <AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />}
+            />
             <RecordCalendar
               entries={calendarEntries}
               onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
-              emptyText={t("Nothing due this month.")}
+              emptyText={calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")}
             />
           </div>
         ) : (
@@ -415,7 +446,7 @@ export function TasksScreen({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
-          <Inbox className="size-3.5" />
+          <ClipboardText className="size-3.5" />
           {t("Waiting on clients")}
         </h2>
         <TodosPanel

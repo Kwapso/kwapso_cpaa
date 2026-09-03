@@ -24,7 +24,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Ban, ChevronRight } from "@shared/ui/foundations/icons"
+import { Prohibit, CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AppMark } from "@/components/app-tiles"
@@ -131,7 +131,7 @@ function OpenLink({ label, onOpen }: { label: string; onOpen: () => void }) {
 
 /** THE ARROW AT THE END OF A ROW, AND IT DOES SOMETHING.
  *
- * It was a bare `<ChevronRight>` — no click target, no label, not inside a
+ * It was a bare `<CaretRight>` — no click target, no label, not inside a
  * button. The owner reported the Processes row as "unable to expand", which is
  * exactly right and exactly the fault: a chevron is the universal "this opens"
  * glyph, so a decorative one is a promise the row does not keep. Only the NAME
@@ -159,7 +159,7 @@ function OpenChevron({ label, onOpen }: { label: string; onOpen: () => void }) {
       // 15x15 on both sides of the swap.
       className="-m-2 size-auto shrink-0 p-2"
     >
-      <ChevronRight className="size-4" />
+      <CaretRight className="size-4" />
     </Button>
   )
 }
@@ -1118,7 +1118,7 @@ export function TodosPanel({
           {
             value: "open",
             label: t("Open"),
-            icon: "inbox",
+            icon: "clipboard-text",
             badge: formatCount(openTotal),
             badgeVariant: "" as const,
           },
@@ -1266,7 +1266,7 @@ export function TodosPanel({
                 aria-label={t("Withdraw this input")}
                 onClick={() => void cancel(todo.id)}
               >
-                <Ban className="size-3.5" />
+                <Prohibit className="size-3.5" />
               </Button>
             )}
           </Row>

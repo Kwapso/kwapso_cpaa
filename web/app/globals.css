@@ -71,6 +71,39 @@
 @import "../../shared/web/library-overrides.css";
 
 /* ============================================================================
+   ONE GAP BETWEEN A TAB STRIP AND THE THING IT LABELS.
+   ============================================================================
+   Client ruling, 2026-09-03, on the live app: "there needs to be space between
+   the tabs and the start of the container. This is already correct on detail
+   screens... The spacing between the tabs and the beginning of the content is
+   incorrect on main screens. Go and uniform that, and make sure that you don't
+   hard-code page by page, but rather you change the rule and you apply it
+   everywhere."
+
+   It differed because it was TWO decisions, not one. A record detail screen
+   held its gap as a real value (`--record-tab-gap`, record-chrome.tsx); a
+   main/collection screen held a DELIBERATE zero, written out at three separate
+   call sites (`paged-find.tsx`, `deep-link/screen-bits.tsx`,
+   `tickets-collection.tsx`), because the retired folder tab pulled itself down
+   into its own panel by `--folder-tab-overlap` and any gap would have left its
+   cut feet showing on the base background. That pull is gone with the folder
+   shape (shared/web/screen-engine/tabs-view.tsx's header carries the
+   2026-09-02 ruling), so those three zeroes had stopped protecting anything
+   and were simply removing space.
+
+   So the gap becomes ONE value in ONE place, here, and both sides read it:
+   `STICKY_FOLDER_TABS` (every main-screen strip, through the single
+   `renderFolderTabs` seam) and `--record-tab-gap` (every detail screen's
+   floated strip). Neither number can be changed without the other following,
+   which is the whole point of the ruling — "change the rule and apply it
+   everywhere". It lives on `:root` rather than in either component because
+   those two have no shared ancestor nearer than the document.
+   ========================================================================= */
+:root {
+  --tab-content-gap: var(--space-5);
+}
+
+/* ============================================================================
    THE PAGE DOES NOT SCROLL SIDEWAYS. EVER.
    ============================================================================
    The owner, more than once and finally in capitals: "there should be no scope

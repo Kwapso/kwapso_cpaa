@@ -153,7 +153,11 @@ import { Hint, Text } from "../../components/typography/typography";
 import { FilterBar, type FilterChip } from "../../components/filter-bar/filter-bar";
 import { type CollectionFrameTab } from "../../components/collection-frame/collection-frame";
 import { FormActions } from "../../components/form/form";
-import { Check, Plus, X } from "../../foundations/icons";
+import {
+  CheckFat,
+  Plus,
+  X,
+} from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { MainScreen } from "../templates";
 
@@ -233,7 +237,7 @@ const DEFAULT_LABELS: FilterBuilderLabels = {
   eyebrow: "Group · 24 open",
   heading: "Collection",
   tabsLabel: "Collection subsets",
-  searchLabel: "Search this collection",
+  searchLabel: "MagnifyingGlass this collection",
   searchPlaceholder: "Search",
   openLabel: "Filter",
   exportLabel: "Export",
@@ -783,7 +787,7 @@ function FilterBuilderScreen({
             )}
             {/* THE ONE MANGO, AND IT CARRIES THE COUNT — and p37's ✓. */}
             <Button onClick={onShow}>
-              <Check aria-hidden="true" />
+              <CheckFat aria-hidden="true" />
               {formatShow(matchCount)}
             </Button>
           </FormActions>

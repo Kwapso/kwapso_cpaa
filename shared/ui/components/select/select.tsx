@@ -64,7 +64,11 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { Check, ChevronDown, ChevronUp } from "../../foundations/icons";
+import {
+  CheckFat,
+  CaretDown,
+  CaretUp,
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    Root, group and value are Radix's, unskinned.
@@ -270,7 +274,7 @@ const SelectTrigger = React.forwardRef<
           {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
               draws it. The colour is set by the cva so the disabled skin can
               reach it. */}
-          <ChevronDown className="size-[var(--icon-button)] shrink-0" />
+          <CaretDown className="size-[var(--icon-button)] shrink-0" />
         </SelectPrimitive.Icon>
       )}
     </SelectPrimitive.Trigger>
@@ -290,7 +294,7 @@ const scrollButtonClasses =
 function SelectScrollUpButton() {
   return (
     <SelectPrimitive.ScrollUpButton className={scrollButtonClasses}>
-      <ChevronUp className="size-[var(--icon-button)]" />
+      <CaretUp className="size-[var(--icon-button)]" />
     </SelectPrimitive.ScrollUpButton>
   );
 }
@@ -298,7 +302,7 @@ function SelectScrollUpButton() {
 function SelectScrollDownButton() {
   return (
     <SelectPrimitive.ScrollDownButton className={scrollButtonClasses}>
-      <ChevronDown className="size-[var(--icon-button)]" />
+      <CaretDown className="size-[var(--icon-button)]" />
     </SelectPrimitive.ScrollDownButton>
   );
 }
@@ -545,7 +549,7 @@ const SelectItem = React.forwardRef<
     ) : null}
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     <SelectPrimitive.ItemIndicator className="ms-auto grid place-content-center">
-      <Check className="size-[var(--icon-button)]" />
+      <CheckFat className="size-[var(--icon-button)]" />
     </SelectPrimitive.ItemIndicator>
   </SelectPrimitive.Item>
 ));

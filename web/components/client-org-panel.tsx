@@ -54,7 +54,7 @@ import {
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -405,7 +405,7 @@ export function ClientOrgPanel({
                     reveal. */}
                 {canEdit ? (
                   <Button variant="ghost" size="icon" onClick={() => setEditingDept(d)} aria-label={t("Edit")}>
-                    <Pencil className="size-3.5" />
+                    <PencilSimple className="size-3.5" />
                   </Button>
                 ) : null}
                 {canSwitchOff && d.active ? (
@@ -484,7 +484,7 @@ export function ClientOrgPanel({
                       reveal. */}
                   {canEdit ? (
                     <Button variant="ghost" size="icon" onClick={() => setEditingRole(r)} aria-label={t("Edit")}>
-                      <Pencil className="size-3.5" />
+                      <PencilSimple className="size-3.5" />
                     </Button>
                   ) : null}
                   {canSwitchOff && r.active ? (
@@ -626,7 +626,7 @@ export function ClientOrgPanel({
                     reveal. */}
                 {canEdit ? (
                   <Button variant="ghost" size="icon" onClick={() => setEditingTool(x)} aria-label={t("Edit")}>
-                    <Pencil className="size-3.5" />
+                    <PencilSimple className="size-3.5" />
                   </Button>
                 ) : null}
                 {canSwitchOff && x.active ? (

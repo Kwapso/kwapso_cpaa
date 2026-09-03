@@ -43,7 +43,7 @@ import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CONCEPT_ICON } from "@/lib/pages"
-import { Pencil } from "@shared/ui/foundations/icons"
+import { PencilSimple } from "@shared/ui/foundations/icons"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -481,7 +481,7 @@ export function WorkLogsPanel({
                   className="shrink-0"
                   aria-label={t("Edit")}
                 >
-                  <Pencil className="size-3.5" />
+                  <PencilSimple className="size-3.5" />
                 </Button>
               )}
             </li>

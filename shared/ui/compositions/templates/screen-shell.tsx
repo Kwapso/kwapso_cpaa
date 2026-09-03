@@ -142,7 +142,7 @@
         that count rather than breaking it. The spine is a ground, not a
         control, and on it the lit row inverts to charcoal — so the rail
         spends ZERO mango actions and this `+` is the screen's one. Under the
-        QUIET spine the same screen carries two. Stepping the `+` down as well
+        ink or paper spine the same screen carries two. Stepping the `+` down as well
         would leave the screen with NO primary action at all.
      3. 27.22's RULE CARD, verbatim: "No mango on this screen at all …
         **The page-level mango + stays in the header where it always is.**"
@@ -209,11 +209,31 @@
    ─────────────────────────────────────────────────────────────────────────
    THE CARD'S TOP-LEFT CORNER IS SQUARE. ONE KNOWING DEPARTURE, ON ONE EDGE.
    ─────────────────────────────────────────────────────────────────────────
-   The client, choosing between the options put to her: *"I choose option 1 to
-   square it."* The breadcrumb is a strip of folder tabs attached to the
-   card's leading edge; the tab that leads the strip is square on ITS top-left
-   too, so the tab and the card read as one silhouette rather than as a
-   rounded box with a rounded box stuck on it.
+   The client, choosing between the options put to her on 2026-09-02: *"I
+   choose option 1 to square it."* At the time the breadcrumb's own leading
+   tab was ALSO squared on its top-left, to read as one silhouette with the
+   card rather than as a rounded box with a rounded box stuck on it.
+
+   THE TAB HALF WAS REVERSED THE NEXT DAY; THE CARD HALF WAS NOT, AND THAT IS
+   A MEASURED CONCLUSION, NOT A LEFTOVER. 2026-09-03, client, on the live
+   product: *"When I am on the left tab, the top corner needs to be more
+   rounded. That's not how the tabs are, so go and fix it."*
+   `breadcrumb-folders.tsx` deleted its own `--folder-radius-lip` patch that
+   same day — every tab, leading or not, now draws its ordinary rounded
+   shoulder. THIS FILE'S OWN CORNER DOES NOT FOLLOW IT BACK, because it was
+   never squared only to match a squared tab: the card's radius (`--radius`,
+   24) is bigger than the strip's own overlap (`--folder-tab-overlap`,
+   17.02), so an un-squared card corner shows the remaining ~6.98 of its own
+   24-unit arc as a curve peeking out below the tab's dead-straight left
+   edge — the tab's own `lipPath` (`components/folder/folder.tsx`) runs
+   arrow-straight from just under its top corner to its foot, so this collision
+   exists no matter what the tab's own top corner is doing. Un-squaring the
+   tab removes none of it. So: THE TAB'S OWN CORNER READS AS A TAB AGAIN, the
+   CARD'S STAYS SQUARE, and the two now read as they do because ONE OF THEM
+   HAS TO GIVE ITS CORNER UP FOR THE JOINT TO HAVE NO VISIBLE SEAM — the tab's
+   because its silhouette is fixed and may not be edited, so it is the card's,
+   which is a plain CSS radius this file owns outright. Measured, in both
+   palettes, in `verify/tab-joint/`.
 
    THIS IS A DEPARTURE FROM THE TWO-RADII LAW AND IT IS WRITTEN DOWN AS ONE.
    Kit ruling 03 flattens the whole radius ladder onto two box values —
@@ -232,12 +252,13 @@
    top-left, so the corner mirrors with the trail in RTL for free, exactly as
    every other inset in this file does.
 
-   TWO SQUARES, TWO OBJECTS, NOT ONE DRAWN TWICE. The breadcrumb strip fills
-   its own leading tab's arc in — its file calls it the `--folder-radius-lip`
-   patch — because the folder SILHOUETTE's corner is a fixed path it may not
-   edit. The shell removes the CARD's corner, which is a CSS radius it owns
-   outright. Different elements, different mechanisms, one joint. Neither file
-   draws the other's.
+   ONE SQUARE, ONE OBJECT, AS OF 2026-09-03. Until yesterday's reversal this
+   section read "two squares, two objects, not one drawn twice" — the
+   breadcrumb filled its own leading tab's arc in because the folder
+   SILHOUETTE's corner is a fixed path it may not edit, and this file removed
+   the CARD's corner, a CSS radius it owns outright. The breadcrumb's half is
+   gone; this file's own mechanism is unchanged, and the paragraph above is
+   the argument for why it did not have to change with it.
 
    ─────────────────────────────────────────────────────────────────────────
    WHAT SURVIVES AS AN ADAPTER, AND WHY
@@ -314,33 +335,45 @@
 
    THE SHADOW IS THE LOAD-BEARING PART AND IT IS NOT DECORATION, AND THE
    NUMBERS ARE MEASURED RATHER THAN ASSUMED — read off the live cascade in
-   `verify/shell-chat/`, on the two spines the client kept.
+   `verify/shell-chat/`, on all three spines the client kept, in both
+   palettes (six combinations; see `verify/spines/` for the harness).
 
-     QUIET · LIGHT   ground #F7F2EB   card #FFFEF9   contrast 1.103
-     QUIET · DARK    ground #1C1B18   card #26241F   contrast 1.111
-     MANGO · LIGHT   ground #FED069   card #FFFEF9   contrast 1.440
+     INK   · LIGHT   ground #1A1918   card #FFFEF9   contrast 17.386
+     INK   · DARK    ground #1C1B18   card #26241F   contrast  1.111
+     PAPER · LIGHT   ground #F7F2EB   card #FFFEF9   contrast  1.103
+     PAPER · DARK    ground #2F2D28   card #26241F   contrast  1.127
+     MANGO · LIGHT   ground #FED069   card #FFFEF9   contrast  1.440
      MANGO · DARK    ground #FED069   card #26241F   contrast 10.661
 
-   ON THE QUIET SPINE THE STEP IS ABOUT 1.1 IN BOTH PALETTES — a real edge,
-   and a thin one; the kind you can lose in a bright room or on a bad panel.
-   That is the case `--shadow-lifted` exists for, and on that spine it is
-   carrying the card rather than agreeing with it. In dark it has more to give
-   than in light: its dark value is rgba(0,0,0,.55) against the .14 charcoal
-   light spends. On mango the card is obviously a card in both palettes and
-   the shadow is only manners.
+   ON FOUR OF THE SIX THE STEP IS ABOUT 1.1–1.4 — a real edge, and a thin
+   one; the kind you can lose in a bright room or on a bad panel. That is the
+   case `--shadow-lifted` exists for, and on those four it is carrying the
+   card rather than agreeing with it. In dark it has more to give than in
+   light: its dark value is rgba(0,0,0,.55) against the .14 charcoal light
+   spends. INK-LIGHT IS THE ONE OUTLIER, AND IT MATTERS MORE THAN THE OTHER
+   FIVE: the client's own reason for keeping three spines is "in light i can
+   choose to have a 'dark' background" — a light-themed workspace with a dark
+   window — so ink-light is not a decorative choice among several, it is the
+   feature. Its ground is charcoal against an off-beige card: 17.386, the
+   strongest edge of the six by more than an order of magnitude, and the
+   shadow there is only manners, same as mango in both palettes.
 
    AND THE THIN CASE WAS ONCE A BROKEN ONE, WHICH IS WORTH RECORDING BECAUSE
-   THE FIX WAS NOT THIS FILE'S. Under the THREE-spine tokens this reshape was
-   first written against, the `paper` spine in dark resolved its ground and
-   `--card` to the SAME `#26241F`: ground and card at **1.000**, with the
-   shadow as the entire distinction between them. That was a genuine
-   collision, it was found here by measuring rather than by reasoning, and it
-   was routed to `tokens.css` rather than patched around — a shell that
-   invented a paper to escape it would have been the exact mistake the
-   2026-08-24 rebuild was correcting. **The routing is fulfilled.** The client
-   cut three spines to two the same day; quiet's dark ground is
-   `--surface-panel` #1C1B18 under a #26241F card, and the collision is gone
-   with the spine that caused it. Nothing below compensates for anything.
+   THE FIX WAS NOT THIS FILE'S, AND BECAUSE THE FIX HAD TO SURVIVE A SECOND
+   RULING. Under the THREE-spine tokens this reshape was first written
+   against, the `paper` spine in dark resolved its ground and `--card` to the
+   SAME `#26241F`: ground and card at **1.000**, with the shadow as the
+   entire distinction between them. That was a genuine collision, it was
+   found here by measuring rather than by reasoning, and it was routed to
+   `tokens.css` rather than patched around — a shell that invented a paper to
+   escape it would have been the exact mistake the 2026-08-24 rebuild was
+   correcting. The client cut three spines to two the same day, which closed
+   it one way (quiet's dark ground was `--surface-panel`, clear of `--card`);
+   reverting to three the next day could have reopened it by simply restoring
+   paper's old dark hex. IT DID NOT: `tokens.css` §7b moved paper's dark
+   ground again, to `--kw-unlit-quiet` #2F2D28 rather than back to
+   `--kw-unlit-raised` #26241F, measured 1.127 against the card above. **The
+   routing is fulfilled twice over.** Nothing below compensates for anything.
 
    WHY THE SHADOW IS WRITTEN AS `shadow-[var(--shadow-lifted)]` AND NOT AS
    `shadow-lg`. The two are the same value — tokens.css aliases `--shadow-lg`
@@ -465,11 +498,18 @@
 
    THE COLOUR IS `--spine-ink` AND IT MAY NEVER BE A FIXED CHARCOAL. Measured,
    because this is the one value on the handle that can make it disappear: a
-   literal charcoal #1A1918 on the quiet spine's DARK ground #1C1B18 measures
-   **1.02** — an invisible control. `--spine-ink` is charcoal on mango and on
-   quiet-light and off-beige on quiet-dark, which measures **12.07 / 15.76 /
-   17.06** on the three. The same token every nav label in the rail already
-   takes, for the same reason.
+   literal charcoal #1A1918 on what was the quiet spine's DARK ground #1C1B18
+   (now ink-dark's) measured **1.02** — an invisible control. `--spine-ink`
+   itself never comes near that: it is off-beige on ink in both palettes,
+   `--foreground` on paper (charcoal light, off-beige dark) and charcoal on
+   mango, measured against each spine's own ground on all six:
+
+       INK · LIGHT    17.386   INK · DARK    17.056
+       PAPER · LIGHT  15.763   PAPER · DARK  13.621
+       MANGO (both palettes)   12.072
+
+   The same token every nav label in the rail already takes, for the same
+   reason.
 
    THE HIT AREA IS 20 x 44 AND IT IS NOT THE BAR. A 3px pointer target is not
    a target. The `<button>` IS the 20 x 44 box — invisible, centred on the bar
@@ -685,7 +725,7 @@ import { Badge } from "../../components/badge/badge";
 import { Button } from "../../components/button/button";
 import { Title } from "../../components/title/title";
 import { Text } from "../../components/typography/typography";
-import { Pencil, Plus } from "../../foundations/icons";
+import { PencilSimple, Plus } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { Rail } from "./rail";
 import { StatStrip, type StatStripFigure } from "./stat-strip";
@@ -718,29 +758,42 @@ export const RAIL_WIDTH = "13rem";
 export const ASIDE_WIDTH = "23.75rem";
 
 /**
- * The spines 26.02 offers in Settings · Appearance.
+ * The spines 26.02 offers in Settings · Appearance — now called Background
+ * (see `settings.tsx`).
  *
- * IT WAS THREE AND THE CLIENT CUT IT TO TWO ON 2026-09-02 — **quiet** and
- * **mango**. `ink` and `paper` cease to exist and are not aliased: `ink` was
- * a charcoal rail on a light page, and once the GROUND is the spine (see the
- * file header) that is not a rail setting any more, it is the palette. So the
- * two survivors are the two that still mean something at window scale — the
- * calm one, and the branded one.
+ * IT WAS THREE, THE CLIENT CUT IT TO TWO ON 2026-09-02, AND SHE PUT IT BACK
+ * ON 2026-09-03, VERBATIM: "you know, i changed my mind. i want to go back
+ * to the 3 options (sorry)." `ink`, `paper` and `mango` are the three names
+ * again, not renamed to anything theme-shaped — Settings · Appearance
+ * already offers Light / Dark / System, and a second setting spelled the
+ * same way would be the confusing thing, not the useful one.
  *
- * `quiet` is `--surface-panel`: #F7F2EB in light, #1C1B18 in dark, so the one
- * name covers what `paper` and `ink` used to say separately and covers it
- * with the palette instead of with a second setting. `mango` is #FED069 in
- * both palettes and does not move, because it is a light ground wearing
- * whichever palette it is in.
+ * THE REASON IS THE WHOLE POINT OF `ink`, NOT A PREFERENCE AMONG THREE EQUAL
+ * OPTIONS. Her words: "my goal is that in light i can choose to have a
+ * 'dark' background option." Appearance decides light or dark; Background
+ * decides the colour behind everything; `ink` is what lets the two disagree
+ * — a light-themed workspace whose window is dark. `paper` is the light one,
+ * `mango` the branded one, and each holds in BOTH palettes: `paper` is
+ * `--surface-panel` (#F7F2EB / #1C1B18) and `ink` is a charcoal-family ground
+ * in both (#1A1918 light / #1C1B18 dark) — the one spine whose whole reason
+ * to exist is that it does NOT track the palette the way the other two do.
+ * `mango` is #FED069 in both, unmoved, same as before.
+ *
+ * INK-LIGHT IS THE CASE THAT HAS TO HOLD. It is the one this rebuild
+ * exercises hardest — under the pre-09-02 design `ink` only ever painted a
+ * rail; today the spine is the ground the whole window stands on (see the
+ * file header's reshape note), so a value drawn for a rail's worth of pixels
+ * now has to carry a window's worth. See that note for the full measured set
+ * this ruling required, card included.
  *
  * A STALE STORED VALUE IS SAFE AND NEEDS NO MIGRATION CODE HERE. tokens.css
- * writes the quiet block as `:root, [data-spine="quiet"]`, so an account
- * whose saved spine is still `"ink"` or `"paper"` matches no block, inherits
- * `:root`, and paints QUIET rather than nothing. TypeScript rejects those two
- * words at a call site now; the cascade forgives them at runtime. Both of
- * those are what you want.
+ * writes the paper block as `:root, [data-spine="paper"]`, so an account
+ * whose saved spine is still `"quiet"` — from the 2026-09-02 build — matches
+ * no block, inherits `:root`, and paints PAPER rather than nothing.
+ * TypeScript rejects that word at a call site now; the cascade forgives it
+ * at runtime. Both of those are what you want.
  */
-export type ScreenSpine = "quiet" | "mango";
+export type ScreenSpine = "ink" | "paper" | "mango";
 
 /* THE BREAKPOINT IS WRITTEN OUT AS A LITERAL EVERY TIME, and that is not
    verbosity. Tailwind scans SOURCE TEXT: a class assembled at runtime from a
@@ -824,21 +877,27 @@ export interface ScreenShellProps
   asideCloseLabel?: string;
 
   /**
-   * THE SPINE — 26.02's per-member Settings · Appearance choice. Client
-   * ruling D3 offered three; the client's ruling of 2026-09-02 cut it to
-   * TWO, **quiet and mango**, and `paper` and `ink` are retired. See
-   * `ScreenSpine`.
+   * THE SPINE — 26.02's per-member Settings · Appearance choice, now
+   * Settings · Background (see `settings.tsx`). Client ruling D3 offered
+   * THREE; the ruling of 2026-09-02 cut it to two, quiet and mango; the
+   * ruling of 2026-09-03 put it back to three, verbatim, "you know, i
+   * changed my mind. i want to go back to the 3 options (sorry)." `ink` and
+   * `paper` are restored, not renamed, and `quiet` is gone. See `ScreenSpine`.
    *
-   * `quiet` the panel tone · `mango` the brand fill. It is
-   * stamped as `data-spine` on the shell's OUTERMOST element — moved there
-   * 2026-09-02, because the ground is the spine now and `--spine-fill` has to
-   * resolve at the level that paints it — and every value it moves is a token
-   * in tokens.css §7b, which is 26.02's own instruction: "the rail's fills
-   * must be tokens, not literals, so a switch re-paints without touching
-   * markup." What used to be true of the rail column is now true of the whole
-   * window; the CARD is what stays put, which is 26.02's own sentence read
-   * the other way round — "the page stays off-beige, cards stay soft paper"
-   * becomes the card stays off-beige while the page takes the spine.
+   * `ink` the dark ground · `paper` the light one · `mango` the brand fill.
+   * `ink` is the reason three matters rather than two: the client's own
+   * words, "in light i can choose to have a 'dark' background option" — a
+   * light-THEMED workspace with a dark WINDOW, which two names (quiet,
+   * mango) could not say and three can. It is stamped as `data-spine` on the
+   * shell's OUTERMOST element — moved there 2026-09-02, because the ground
+   * is the spine now and `--spine-fill` has to resolve at the level that
+   * paints it — and every value it moves is a token in tokens.css §7b, which
+   * is 26.02's own instruction: "the rail's fills must be tokens, not
+   * literals, so a switch re-paints without touching markup." What used to
+   * be true of the rail column is now true of the whole window; the CARD is
+   * what stays put, which is 26.02's own sentence read the other way round —
+   * "the page stays off-beige, cards stay soft paper" becomes the card stays
+   * off-beige while the page takes the spine.
    *
    * DEFAULT `mango`, ON A CLIENT RULING OF 2026-08-24, verbatim: "the define
    * spine by default is the one with the mango sidebar". This overrides both
@@ -1219,9 +1278,9 @@ const SCREEN = cn(
    `overflow-hidden` so the 24 clips the body's scroller. The card is a flex
    COLUMN: the band is `flex-none`, the body takes the rest and scrolls.
 
-   THE SHADOW IS NAMED, NOT ALIASED. See the file header: on the quiet spine
-   in light the ground and this card are a few points apart and this line is
-   what carries the edge.
+   THE SHADOW IS NAMED, NOT ALIASED. See the file header: on paper (both
+   palettes) and ink-dark the ground and this card are a few points apart and
+   this line is what carries the edge.
 
    AND THE PAPER LAW COMES BACK DOWN HERE WITH THE OFF-BEIGE. A filled control
    on this level is SOFT PAPER, the OTHER tone (ruling 01) — the rebinding
@@ -1233,7 +1292,8 @@ const SCREEN = cn(
    reads "the card takes the system's one box radius, and then gives one
    corner back". No fifth radius is invented and the other three corners are
    `--radius` exactly as before; see the file header for the whole argument
-   and for why the breadcrumb's own square lip is not this square.
+   and for why this corner stayed square on 2026-09-03 after the breadcrumb's
+   own square lip (its leading tab's matching corner-fill) was retired.
 
    `relative z-[2]` IS PART OF THE SAME JOINT AND IS NOT DECORATION.
    `breadcrumb-folders.tsx` states the contract in its own words: its rest
@@ -1444,7 +1504,10 @@ const HANDLE_HIT = cn(
 
 /**
  * The bar. `--spine-ink` and never a literal charcoal — measured at 1.02 on
- * the quiet spine in dark, which is an invisible control.
+ * what was the quiet spine's dark ground (now ink-dark's), which is an
+ * invisible control. See "THE EDGE HANDLES" in this file's header for the
+ * six-way measure of `--spine-ink` against every spine's own ground; none
+ * comes near that.
  *
  * Hover thickens AND lengthens, on `--duration-colour` (120ms) and
  * `ease-kwapso`, which is inside the 120–200ms band the rest of the kit
@@ -1539,13 +1602,15 @@ function EdgeHandle({ edge, open, label, onToggle, placement }: EdgeHandleProps)
  *                      `rounded-ss` — start-start, not top-left — so the
  *                      mirror is free.
  * 10. dark           — every fill is a token. The ground is the spine —
- *                      #1C1B18 quiet, #FED069 mango, which do not move with
- *                      the palette in mango's case and must not — and the
- *                      card above it is #26241F, with `--shadow-lifted` at
- *                      rgba(0,0,0,.55) rather than light's .14 charcoal. The
- *                      quiet pair measures 1.111 and the mango pair 10.661.
- *                      The thin case is quiet in either palette, ~1.1, which
- *                      is what the shadow exists for.
+ *                      #1C1B18 ink, #2F2D28 paper, #FED069 mango, which does
+ *                      not move with the palette and must not — and the card
+ *                      above it is #26241F, with `--shadow-lifted` at
+ *                      rgba(0,0,0,.55) rather than light's .14 charcoal. Ink
+ *                      measures 1.111, paper 1.127, mango 10.661. The thin
+ *                      case is ink and paper, ~1.1–1.3 in both palettes
+ *                      except ink-light (17.386 — see the file header's
+ *                      "THE EDGE HANDLES" for the full six), which is what
+ *                      the shadow exists for.
  *
  * THREE BREAKPOINTS
  *  mobile  — no rail, no aside, no handles; no title-row controls and no
@@ -1691,7 +1756,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
         : onEdit !== undefined
           ? (
               <Button onClick={onEdit}>
-                <Pencil aria-hidden="true" />
+                <PencilSimple aria-hidden="true" />
                 {editLabel}
               </Button>
             )

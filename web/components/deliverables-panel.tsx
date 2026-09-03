@@ -42,7 +42,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Eye, EyeOff, Pencil, Power } from "@shared/ui/foundations/icons"
+import { Eye, EyeSlash, PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -383,12 +383,12 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           aria-label={t("Edit")}
                           className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
-                          <Pencil className="size-3.5" />
+                          <PencilSimple className="size-3.5" />
                         </Button>
                       )}
                       {/* SHOW IT TO THE CLIENT, OR TAKE IT BACK. `deliverables:edit`,
                           the same right that corrects one — sharing is a different
-                          act, not a harder one. Eye / EyeOff join the house action
+                          act, not a harder one. Eye / EyeSlash join the house action
                           mapping (UI-CONVENTIONS) as show-to-client /
                           hide-from-client; they are not a synonym for the Power
                           icon beside them, which archives our own row. Sharing
@@ -412,7 +412,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
                           {d.visibleToClientAt ? (
-                            <EyeOff className="size-3.5" />
+                            <EyeSlash className="size-3.5" />
                           ) : (
                             <Eye className="size-3.5" />
                           )}

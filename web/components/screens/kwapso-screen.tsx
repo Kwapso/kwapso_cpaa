@@ -26,7 +26,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { ChevronRight, Palette, Pencil } from "@shared/ui/foundations/icons"
+import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
@@ -102,7 +102,7 @@ export function KwapsoScreen({
         {can("teams", "edit") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           </div>
         )}
@@ -245,7 +245,7 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
                     {a.category || t("No type said")}
                   </span>
                 </span>
-                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                <CaretRight className="text-muted-foreground size-4 shrink-0" />
               </button>
             </li>
           ))}

@@ -56,7 +56,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Search } from "../../foundations/icons";
+import { MagnifyingGlass } from "../../foundations/icons";
 import {
   Dialog,
   DialogContent,
@@ -446,7 +446,7 @@ const CommandInput = React.forwardRef<HTMLInputElement, CommandInputProps>(
 
     return (
       <div data-slot="command-input-row" className={cn(INPUT_ROW)}>
-        <Search size={16} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
+        <MagnifyingGlass size={16} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
         <input
           ref={ref}
           type="text"
@@ -873,7 +873,7 @@ function CommandDialog({
   open,
   onOpenChange,
   title = "Command palette",
-  description = "Search for a record or run a command.",
+  description = "MagnifyingGlass for a record or run a command.",
   children,
   className,
   ...props

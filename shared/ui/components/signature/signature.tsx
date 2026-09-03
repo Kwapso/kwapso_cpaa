@@ -65,7 +65,7 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { RotateCcw } from "../../foundations/icons";
+import { ArrowCounterClockwise } from "../../foundations/icons";
 
 const shellVariants = cva(
   [
@@ -416,7 +416,7 @@ const Signature = React.forwardRef<HTMLDivElement, SignatureProps>(
               "transition-colors duration-[var(--duration-colour)] ease-kwapso",
             )}
           >
-            <RotateCcw size={16} aria-hidden="true" />
+            <ArrowCounterClockwise size={16} aria-hidden="true" />
           </button>
         ) : null}
       </div>

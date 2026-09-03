@@ -20,7 +20,7 @@
 // the same tiles for one client's systems.
 
 import * as React from "react"
-import { ChevronRight, Lock } from "@shared/ui/foundations/icons"
+import { CaretRight, Lock } from "@shared/ui/foundations/icons"
 
 import { softNavigate } from "@/lib/nav"
 import { safeHref } from "@shared/web/rich-text"
@@ -111,7 +111,7 @@ export function AppTiles({
                 caught early. An admin and anybody on the app see the chevron,
                 which is nearly everyone, so the lock is rare by design. */}
             {app.canOpen ? (
-              <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+              <CaretRight className="text-muted-foreground size-4 shrink-0" />
             ) : (
               <Lock
                 className="text-muted-foreground size-4 shrink-0"

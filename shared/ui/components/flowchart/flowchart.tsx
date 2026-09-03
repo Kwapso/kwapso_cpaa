@@ -76,7 +76,11 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 import { Card } from "../card/card";
 import { Skeleton } from "../skeleton/skeleton";
-import { Settings, Sparkles, UserRound } from "../../foundations/icons";
+import {
+  Gear,
+  Sparkle,
+  User,
+} from "../../foundations/icons";
 import { CollectionRegister } from "../collection-frame/collection-frame";
 
 /* ----------------------------------------------------------------------------
@@ -129,9 +133,9 @@ const ROLE_INK = {
 } as const;
 
 const KIND_ICON = {
-  manual: UserRound,
-  auto: Settings,
-  ai: Sparkles,
+  manual: User,
+  auto: Gear,
+  ai: Sparkle,
 } as const;
 
 export interface FlowNode {

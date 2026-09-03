@@ -47,6 +47,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
+import { List, SquaresFour } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
@@ -466,8 +467,8 @@ export function AppsScreen({
                 // generic table-first default (see the state declaration
                 // above and the file's header comment).
                 views={[
-                  { value: "tiles", label: t("Tiles") },
-                  { value: "list", label: t("List") },
+                  { value: "tiles", label: t("Tiles"), icon: <SquaresFour size={16} /> },
+                  { value: "list", label: t("List"), icon: <List size={16} /> },
                 ]}
                 value={view}
                 onValueChange={(next) => setView(next as "tiles" | "list")}

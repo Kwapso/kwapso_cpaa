@@ -39,9 +39,18 @@
    THE LAW THIS FILE OBEYS
    · A tab is a real button and takes the global ring like every other control.
      Nothing here sets `outline: none`.
-   · Hover is a named token, never an opacity — the kit's hover on `.kw-tab`
-     is an INK move (`--ink-tertiary` -> `--ink-primary`) with no fill change
-     at all, so none is invented.
+   · HOVER IS A WEIGHT MOVE ONLY, NOT AN INK MOVE. REVERSED 2026-09-03. The
+     kit's own `.kw-tab` and this file's hover both used to move ink
+     (`--ink-secondary` -> `--foreground`) alongside the weight step added the
+     same day the folder variant retired; the client then asked for the
+     rail's own rule instead — verbatim, "when i hover over a tab i want that
+     it gets the same weight as the active tab (without changing the color)
+     replicate the behaviour we already have in navbar." `rail.tsx`'s
+     `ROW_IDLE` is exactly that: a fixed ink at every state, and only the
+     weight steps up on hover, "because adding a fill [or moving the ink]
+     would make an idle row look half-selected." So the ink hover is deleted
+     here, not softened — resting ink stays `--ink-secondary` through hover,
+     and only the weight below previews the active state.
    · Disabled is an ink (`--btn-disabled-label`) and a cursor, never an
      opacity, and the hover is suppressed so a dead tab never looks live. There
      is no disabled FILL any more: a line tab has no resting box to fill, and
@@ -207,8 +216,14 @@ const TRIGGER_SKIN = cn(
   // The resting ink is SECONDARY, not tertiary: all four drawings of an
   // inactive underline tab write `color: var(--fg2)`. GAPS-FIDELITY-BC
   // TAB-B3.
+  // The resting ink is SECONDARY, not tertiary, AND IT DOES NOT MOVE ON
+  // HOVER — REVERSED 2026-09-03. Until today this line also carried
+  // `enabled:hover:text-foreground`; the client asked for the rail's own
+  // rule instead (see "THE LAW THIS FILE OBEYS" above), so hover is now the
+  // weight step alone and the resting ink is the whole of what a reader sees
+  // at every state short of active. GAPS-FIDELITY-BC TAB-B3 (the resting ink
+  // itself, unchanged).
   "text-sm text-ink-secondary",
-  "enabled:hover:text-foreground",
   // "SAME WEIGHTS AS NAVBAR" — CLIENT RULING 2026-09-02, second half. The
   // hover-preview fix below made hover and active agree; it never made the
   // RESTING tab agree with the rail's own `ROW_IDLE`
@@ -220,12 +235,19 @@ const TRIGGER_SKIN = cn(
   // rail never draws. Naming it explicitly makes idle/hover/active on a tab
   // read the identical three numbers (300/500/500) the rail's nav rows do.
   "font-[var(--font-weight-light)]",
-  // WEIGHT AS A THIRD SIGNAL, CLIENT RULING 2026-09-02 — colour is
-  // untouched (the rule above is unchanged); hover on an inactive trigger
-  // ALSO previews the active weight, `--font-weight-medium`, the same token
-  // `TRIGGER_SELECTED` sets two blocks down. A no-op on an already-
-  // active trigger (it is already at that weight, unconditionally), so this
-  // needs no `data-[state=inactive]` guard.
+  // WEIGHT AS THE ONLY HOVER SIGNAL, CLIENT RULING 2026-09-02 THEN
+  // 2026-09-03. Hover on an inactive trigger previews the active weight,
+  // `--font-weight-medium`, the same token `TRIGGER_SELECTED` sets two
+  // blocks down — a no-op on an already-active trigger (it is already at
+  // that weight, unconditionally), so this needs no `data-[state=inactive]`
+  // guard. IT WAS "colour is untouched, weight is added" on 2026-09-02 and
+  // is "weight is the only thing that moves" as of 2026-09-03: the ink hover
+  // above is gone, so this is now the entire hover state rather than one
+  // signal among three. A hover on a touch device never fires this at all,
+  // which is why the tab still carries its own focus ring and its own
+  // selected state as the signals that DO reach a touch reader — this line
+  // is additive polish for a pointer, never the only way to tell a tab is
+  // reachable.
   "enabled:hover:font-[var(--font-weight-medium)]",
 );
 
@@ -261,6 +283,63 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-transparent text-[var(--btn-disa
 
 /** A 2px rule sitting on the strip's hairline, in primary ink. */
 const INDICATOR_SKIN = "bottom-0 h-[0.125rem] -mb-px bg-foreground";
+
+/**
+ * THE GAP BETWEEN A SCREEN-LEVEL LINE-TAB STRIP AND WHATEVER STANDS DIRECTLY
+ * BELOW IT — a toolbar, a panel, a card. CLIENT RULING, 2026-09-03, on the
+ * live product: "there needs to be space between the tabs and the start of
+ * the container … the spacing between the tabs and the beginning of the
+ * content is incorrect on main screens … go and uniform that, and make sure
+ * that you don't hard-code page by page, but rather you change the rule and
+ * you apply it everywhere."
+ *
+ * THE NUMBER IS NOT A GUESS. It is read off the one join that already drew it
+ * correctly — a record's own tab strip in the live product spends exactly
+ * `--space-5` (20) between the strip and the card, in a token named
+ * `--record-tab-gap` and commented, verbatim, as "the blank page-tone space
+ * the client asked for … a real token rather than a guess". `CollectionFrame`
+ * independently lands on the same number at its own default density (see its
+ * header, "the frame's stack takes its ordinary band gap"). This constant is
+ * that one number, named once, so every kit composition that draws a
+ * screen-level strip reads it rather than re-deriving its own.
+ *
+ * IT IS PADDING ON THE STRIP'S OWN BOX, NOT A FLEX `gap` — REWRITTEN
+ * 2026-09-03, SAME DAY, SECOND RULING. Her words: "make sure to maintain the
+ * space between tabs and content on all screens, even when I scroll down." A
+ * `gap` between two flex siblings is a LAYOUT-TIME measurement: it is real
+ * while both siblings sit in their static position, and it evaporates the
+ * moment one of them goes `position: sticky` and freezes at the top of a
+ * scrolling pane while the other keeps scrolling underneath it — the two
+ * boxes are no longer a fixed distance apart, so the "gap" that used to
+ * separate them stops meaning anything and the content slides up flush
+ * against the pinned strip. Padding on the STRIP'S OWN wrapper does not have
+ * this failure mode: it is part of the box that gets pinned, so it travels
+ * with the strip and the trailing space survives exactly where a `gap` could
+ * not — at rest, scrolled with the strip in flow, and scrolled with the strip
+ * sticky. THE STRIP OWNS THIS PROPERTY, NOT THE SHELL: `ScreenShell` draws no
+ * tab strip of either kind (see its own header, "TABS — SPENT"), so a shell
+ * that does not draw a strip cannot be the thing that reserves room under
+ * one.
+ *
+ * APPLY IT TO A WRAPPER AROUND `TabsList`, NEVER TO `TabsList` ITSELF.
+ * `LIST_SKIN`'s own hairline (`shadow-[inset_0_-0.0625rem_0_var(--border)]`)
+ * is anchored to `TabsList`'s OWN bottom edge, directly under the tab row;
+ * padding added to `TabsList` would push that rule down WITH it, into the
+ * middle of the gap, which reads as a stray line floating in blank space
+ * rather than the strip's own underline. A caller that needs the strip to
+ * pin also owns `position: sticky` / `top-0` / an opaque background on that
+ * SAME wrapper — see `RecordDetail`'s own `strip`, which does both — so the
+ * one box that gets pinned is the one that reserves the trailing space,
+ * always.
+ *
+ * NOT THE BASE DEFAULT BELOW. `Tabs`'s own unlabelled `gap-4` stays the
+ * answer for every OTHER pairing of a strip and its content — a dialog, a
+ * card, a settings page — where nothing has ruled a wider air and nothing
+ * pins on scroll; this constant is reached FOR, by the screen-level
+ * compositions the ruling is actually about, rather than pushed underneath
+ * every caller that never asked for it.
+ */
+export const TABS_STRIP_GAP = "pb-[var(--space-5)]";
 
 /* ============================================================================
    Tabs
@@ -518,10 +597,12 @@ export interface TabsTriggerProps
  *
  * TEN STATES
  *  1. default        — secondary ink over the strip's own rule.
- *  2. hover          — an INK move to `--foreground`, which is the kit's hover
- *                      on `.kw-tab`, plus a preview of the active weight. No
- *                      fill change and no opacity. Guarded with `enabled:` so
- *                      a disabled tab never matches the rule.
+ *  2. hover          — WEIGHT ONLY, as of 2026-09-03: a preview of the active
+ *                      weight, `--font-weight-medium`. No ink move, no fill
+ *                      change, no opacity — the resting `--ink-secondary`
+ *                      holds through hover exactly as it holds through the
+ *                      rest of the strip. Guarded with `enabled:` so a
+ *                      disabled tab never matches the rule.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once.
  *  4. active/pressed — no nudge and no third tone. A tab's press resolves
  *                      instantly into the selected state, which is a far

@@ -113,7 +113,10 @@ import {
   DescriptionList,
   type DescriptionListItem,
 } from "../../components/description-list/description-list";
-import { ChevronLeft, ChevronRight } from "../../foundations/icons";
+import {
+  CaretLeft,
+  CaretRight,
+} from "../../foundations/icons";
 
 /**
  * CH27.37: "the ask cut at 200 characters". The chapter's own figure, kept as
@@ -288,7 +291,7 @@ export interface QuickViewProps {
  *    still visible above it. Everything is drawn; the sheet scrolls.
  *  · tablet / desktop (from 45rem) — the centred modal at the kit's 460 width.
  *
- * RTL — LTR only by client ruling. The arrows are `ChevronLeft`/`Right`, which
+ * RTL — LTR only by client ruling. The arrows are `CaretLeft`/`Right`, which
  * is what the chapter draws.
  */
 function QuickView({
@@ -346,12 +349,12 @@ function QuickView({
         </Hint>
         {onPrevious === undefined ? null : (
           <Button variant="ghost" size="sm" aria-label={words.previous} onClick={onPrevious}>
-            <ChevronLeft size={16} />
+            <CaretLeft size={16} />
           </Button>
         )}
         {onNext === undefined ? null : (
           <Button variant="ghost" size="sm" aria-label={words.next} onClick={onNext}>
-            <ChevronRight size={16} />
+            <CaretRight size={16} />
           </Button>
         )}
       </span>

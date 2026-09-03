@@ -4,35 +4,27 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 /* ============================================================================
-   The one icon wrapper. Every one of the 93 exports is this component with a
-   different `viewBox` and `children` baked in by generate-icons.mjs.
+   The one icon wrapper. Every export is this component with a different
+   `viewBox` and `children` baked in by generate-icons.mjs.
 
-   THE ARTWORK IS PLACEHOLDER; THIS API IS FINAL.
-   Swapping in real art means replacing icons/<Name>.svg and re-running the
-   generator. No call site and no component changes — that is the whole point
-   of the split.
+   THE ART IS PHOSPHOR (MIT), fill weight throughout with three named
+   exceptions drawn at regular weight instead — Plus, Power and Prohibit.
+   Client ruling, verbatim, 2026-09-03: those three "take names from
+   Phosphor... the only icons that we are using are these icons from
+   Phosphor." Fill wraps a bare mark (a plus, a power glyph, a prohibit
+   circle) in a solid disc or square, which reads as a heavy badge rather
+   than a lean glyph for an action icon; regular keeps them a thin outline.
+   See foundations/icons/ATTRIBUTION.md.
 
-   Call-site compatibility
-   -----------------------
-   The 93 names are lucide-react's names, so the applications' existing call
-   sites are almost certainly lucide-shaped:
+   Swapping in different art means replacing icons/<Name>.svg and re-running
+   the generator. No call site and no component changes — that is the whole
+   point of the split.
 
-       <Pencil className="h-4 w-4" />
-       <Loader2 className="animate-spin" size={16} />
-       <Search strokeWidth={1.5} />
-
-   All three keep working:
-     · `className` is merged last, so Tailwind sizing utilities beat the
-       width/height attributes and a caller can still size an icon the way
-       they do today.
-     · `size` is accepted as a number, a string, or one of the six delivery
-       sizes.
-     · `strokeWidth` / `absoluteStrokeWidth` DO SOMETHING NOW. They used to be
-       accepted and ignored, because the placeholder glyphs were filled
-       silhouettes with no stroke to weight. The art is the Iconoir pack, drawn
-       as strokes on a 24 grid at 1.5, so the props are honest: `strokeWidth`
-       sets the weight and `absoluteStrokeWidth` holds it constant in device
-       pixels as the icon scales, which is lucide's meaning for both.
+   Fill weight means SOLID SHAPES, not strokes: the art is closed paths,
+   filled, with holes cut by opposite path winding where a glyph needs one
+   (a gear's centre, a letter's counter). There is nothing to weight, so
+   `strokeWidth` is gone rather than kept as a dead prop — the client asked
+   for no leftover machinery from the pack this replaces.
    ========================================================================= */
 
 /**
@@ -63,8 +55,7 @@ export interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, "ref"> {
    * A bare number is read as px-at-the-16px-authoring-base and converted to
    * rem, so `size={16}` scales with the text-size control instead of pinning
    * itself. That is deliberate and is the behaviour commission rule 5 asks
-   * for; it is the one way this differs from lucide, which would hold 16px
-   * flat at every scale step.
+   * for.
    */
   size?: IconSize | number | string;
   /**
@@ -77,10 +68,6 @@ export interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, "ref"> {
    * translated.
    */
   title?: string;
-  /** Accepted for lucide call-site compatibility. Ignored — glyphs are filled. */
-  strokeWidth?: number | string;
-  /** Accepted for lucide call-site compatibility. Ignored. */
-  absoluteStrokeWidth?: boolean;
 }
 
 function resolveSize(size: IconProps["size"]): string {
@@ -103,28 +90,10 @@ export interface CreateIconOptions {
 
 export function createIcon({ displayName, viewBox, children }: CreateIconOptions) {
   const Icon = React.forwardRef<SVGSVGElement, IconProps>(function Icon(
-    {
-      size,
-      title,
-      className,
-      strokeWidth = 1.5,
-      absoluteStrokeWidth = false,
-      ...props
-    },
+    { size, title, className, ...props },
     ref
   ) {
     const dimension = resolveSize(size);
-
-    /* `absoluteStrokeWidth` means "hold the stroke at this many DEVICE pixels
-       as the icon scales", so it needs the size as a number. resolveSize hands
-       back a CSS length (a rem token), and a caller may pass "1.5em" or a
-       Tailwind class instead of a number at all — there is no px to divide by
-       in those cases, so the weight is left alone rather than guessed. */
-    const px = typeof size === "number" ? size : Number(size);
-    const weight =
-      absoluteStrokeWidth && Number.isFinite(px) && px > 0
-        ? (Number(strokeWidth) * 24) / px
-        : strokeWidth;
     const labelled = title !== undefined || props["aria-label"] !== undefined;
 
     return (
@@ -134,21 +103,13 @@ export function createIcon({ displayName, viewBox, children }: CreateIconOptions
         viewBox={viewBox}
         width={dimension}
         height={dimension}
-        /* THE WHOLE SET IS STROKED, so the root paints the stroke and the art
+        /* THE WHOLE SET IS FILLED, so the root paints the fill and the art
            carries only geometry. The art still names no colour of its own,
            which is how an icon works in both themes for free — it takes the
-           ink of whatever it sits in.
-
-           `fill` is none rather than currentColor, and that one word is what
-           makes stroked art possible: an outline path under a filled root is
-           a solid blob. The handful of glyphs with a genuinely filled part —
-           the dot of an eye, a pip — set `fill="currentColor"` on that element
-           themselves, and a child attribute beats this one. */
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={weight}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+           ink of whatever it sits in. A child path that names its own fill
+           (rare — Phosphor's art is single-tone) would still beat this one,
+           same rule as before. */
+        fill="currentColor"
         focusable="false"
         aria-hidden={labelled ? undefined : true}
         role={labelled ? "img" : undefined}

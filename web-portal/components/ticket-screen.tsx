@@ -84,7 +84,7 @@ import {
   PortalConversation,
   type PortalMessage,
 } from "@shared/ui/components/portal-conversation/portal-conversation"
-import { ArrowLeft, Send } from "@shared/ui/foundations/icons"
+import { ArrowLeft, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"
@@ -341,7 +341,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
             disabled={!draft.trim() || sending}
             onClick={() => void send()}
           >
-            <Send className="size-3.5" />
+            <PaperPlaneTilt className="size-3.5" />
             {sending ? t("Sending…") : t("Reply")}
           </Button>
         </div>

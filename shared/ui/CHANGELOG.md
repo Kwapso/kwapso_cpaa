@@ -1,5 +1,82 @@
 # Changelog
 
+## v1.2.29 — 2026-09-03
+
+### Fixed — the leading breadcrumb tab's corner, reversed
+
+Client, on the live product, the day after ruling for the square: "When I am
+on the left tab, the top corner needs to be more rounded. That's not how the
+tabs are, so go and fix it." Then, narrower: "not more rounded as a random,
+but folders and tabs have a shape … the leftmost one is missing the roundness
+on the corner … it's not subjective."
+
+`components/breadcrumbs/breadcrumb-folders.tsx` — the `--folder-radius-lip`
+patch that squared the leading tab's own top-left arc to match the card is
+DELETED, not reduced. `CrumbShape` no longer takes a `lead` flag; every tab
+draws the identical `FolderShape crop="lip"` element, measured in
+`verify/tab-joint/` as byte-identical path data against a middle tab's.
+
+`compositions/templates/screen-shell.tsx`'s card keeps `rounded-ss-none`. The
+two squares were introduced together on 2026-09-02 but were never one
+mechanism: the card's radius (24) is bigger than the strip's own overlap
+(17.02), so an un-squared card corner shows ~7 of its own 24-unit arc peeking
+out below the tab's dead-straight left edge, regardless of what the tab's own
+top corner does. Un-squaring the tab removes none of that collision, so the
+card's corner stands on its own argument now, spelled out in the file's
+header.
+
+### Fixed — the tab-to-content gap, made one rule instead of three numbers
+
+Client: "there needs to be space between the tabs and the beginning of the
+content … go and uniform that, and make sure that you don't hard-code page by
+page, but rather you change the rule and you apply it everywhere," then,
+same session: "make sure to maintain the space between tabs and content on
+all screens, even when I scroll down."
+
+Three kit files drew three different numbers for the same join —
+`CollectionFrame`'s `gap-4`/`gap-5` (density-driven), `RecordDetail` and
+`ScreenRenderer`'s `gap-[var(--space-3h)]` (14). `tabs.tsx` now exports
+`TABS_STRIP_GAP` — `pb-[var(--space-5)]` (20), the number the live product's
+own detail-screen mechanism already used and named "the blank page-tone
+space the client asked for … a real token rather than a guess." All three
+files read it.
+
+It is PADDING on the strip's own wrapper, not a flex `gap`, so it survives a
+strip that pins on scroll: a `gap` is a static distance between siblings and
+stops meaning anything once one of them goes `position: sticky`, padding on
+the pinned box does not. `RecordDetail`'s sticky strip (opacity + position)
+moved onto that same wrapper, off `TabsList` itself, because `TabsList`'s own
+hairline is anchored to ITS bottom edge and padding there would drag the rule
+into the gap. Measured, at rest and after a real scroll, in
+`verify/tab-joint/`.
+
+### Added — the quiet-spine resting crumb, `--spine-quiet-crumb-rest`
+
+Client, on the live product: the resting breadcrumb tabs on the Quiet spine
+in light were reading as invisible — measured 1.000 against their own
+ground, because the quiet spine IS `--surface-panel` and the rest fill was
+too. Shown alternatives, she picked `#EDE8E1`, quiet-light only (1.094
+against the ground, 1.207 against the live tab, the label at 5.39). Mango
+(1.306) and quiet-dark (1.000, unmoved by this ruling — the live tab still
+carries that strip) are untouched. `foundations/tokens/tokens.css` names the
+value once, bound to `--spine-crumb-rest` on `[data-spine="quiet"]` in light
+and reverted to `--surface-panel` in both dark blocks;
+`breadcrumb-folders.tsx` reads `var(--spine-crumb-rest, var(--surface-panel))`
+so mango needs no second declaration.
+
+### Changed — tab hover is a weight move only, colour does not follow
+
+Client: "when i hover over a tab i want that it gets the same weight as the
+active tab (without changing the color) replicate the behaviour we already
+have in navbar." `rail.tsx`'s `ROW_IDLE` is exactly that — a fixed ink at
+every state, weight the only thing that steps on hover. `components/tabs/
+tabs.tsx`'s `TRIGGER_SKIN` and `breadcrumb-folders.tsx`'s `TAB_REST` both
+drop their `hover:text-foreground` (the breadcrumb's own override,
+`hover:text-ink-secondary`, wins the merge against `BreadcrumbLink`'s shared
+part). Weight alone previewing the active state, unchanged from 2026-09-02.
+Measured in `verify/tab-joint/`, including the row's own content width at
+rest and after a real hover, to catch the weight step reflowing the strip.
+
 ## v1.2.28 — 2026-09-02
 
 ### Added — `BreadcrumbFolders`, the breadcrumb drawn as a strip of folder tabs

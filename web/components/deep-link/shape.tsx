@@ -197,25 +197,28 @@ export function shapeHelpList(
  * Held to KNOWLEDGE_KIND by the same coverage test: a kind with a word and no
  * glyph would draw an initial, which reads as a bug rather than as a default. */
 export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
-  note: "sticky-note",
+  // These three drew nothing for weeks — `note`, `file` and `article` are
+  // Phosphor's own names for exactly this concept, so the glyph is the
+  // concept's name, unaliased.
+  note: "note",
   file: "file",
-  article: "book-open",
+  article: "article",
   // The app's own records borrow the rail's icon for the same concept.
-  ticket: "life-buoy",
-  account: "building-2",
-  contact: "contact",
+  ticket: "tray",
+  account: "buildings",
+  contact: "address-book",
   app: "app-window",
-  process: "route",
-  sprint: "calendar-range",
-  story: "hammer",
-  meeting: "calendar-clock",
-  todo: "inbox",
-  task: "list-todo",
+  process: "git-fork",
+  sprint: "calendar-dots",
+  story: "puzzle-piece",
+  meeting: "chat",
+  todo: "clipboard-text",
+  task: "check-square",
   // The four that arrive through somebody's own Google connection.
   document: "file-text",
-  email: "mail",
+  email: "envelope",
   event: "calendar",
-  message: "message-square",
+  message: "chat-teardrop",
 }
 
 export const KNOWLEDGE_KIND: Record<string, string> = {

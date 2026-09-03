@@ -18,7 +18,7 @@
 
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { LogOut } from "@shared/ui/foundations/icons"
+import { SignOut } from "@shared/ui/foundations/icons"
 
 import { brand } from "@shared/brand"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
@@ -59,7 +59,7 @@ export function NoAccess({ email }: { email: string }) {
         {t("Ask whoever you work with here, and try again after they've done it.")}
       </p>
       <Button variant="secondary" onClick={() => void signOut()}>
-        <LogOut className="size-3.5" />
+        <SignOut className="size-3.5" />
         {t("Sign out")}
       </Button>
     </main>

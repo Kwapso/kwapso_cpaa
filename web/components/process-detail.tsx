@@ -1,5 +1,5 @@
 "use client"
-import { Ban, GitBranch, ListOrdered, Plus } from "@shared/ui/foundations/icons"
+import { Prohibit, GitBranch, ListNumbers, Plus } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 
 // Process detail — one map at /processes/<id>, as a tabbed record (Law R2):
@@ -60,7 +60,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { useConfirm, type Confirm } from "@shared/web/use-confirm"
 import { Comments } from "@shared/ui/components/comments/comments"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import type {
   ClientRole,
@@ -477,9 +477,12 @@ export function ProcessDetailScreen({
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
       leading={<RecordMark name={process.name} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `process`), client ruling 2026-08-31.
-      eyebrow={t("Process")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // NO `collectionLabel` — client correction, 2026-08-31, verbatim:
       // "now it also show 'meeting' as a tag! thats not a tg but the eyebrow
       // remember. not only for meetings, but everywhere." This used to repeat
@@ -508,7 +511,7 @@ export function ProcessDetailScreen({
         <>
           {canEdit && (
             <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
               {t("Edit")}
             </Button>
           )}
@@ -570,7 +573,7 @@ export function ProcessDetailScreen({
                       size="sm"
                       onClick={() => setAuditOpen(true)}
                     >
-                      <Pencil className="size-3.5" />
+                      <PencilSimple className="size-3.5" />
                       {t("Change the date")}
                     </Button>
                   )}
@@ -623,7 +626,7 @@ export function ProcessDetailScreen({
                               size="sm"
                               onClick={() => void unlink(l.id)}
                             >
-                              <Ban className="size-3.5" />
+                              <Prohibit className="size-3.5" />
                               <span className="sr-only sm:not-sr-only">{t("Disconnect")}</span>
                             </Button>
                           )}
@@ -706,7 +709,7 @@ export function ProcessDetailScreen({
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
                         </span>
                       </span>
-                      <ListOrdered className="text-muted-foreground size-4 shrink-0" />
+                      <ListNumbers className="text-muted-foreground size-4 shrink-0" />
                     </button>
                   ))}
                 </div>

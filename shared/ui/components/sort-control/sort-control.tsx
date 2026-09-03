@@ -114,7 +114,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../select/select";
-import { ArrowDown, ArrowUp, Loader2 } from "../../foundations/icons";
+import {
+  ArrowDown,
+  ArrowUp,
+  CircleNotch,
+} from "../../foundations/icons";
 
 export type SortDirection = "asc" | "desc";
 
@@ -501,7 +505,7 @@ const SortControl = React.forwardRef<HTMLDivElement, SortControlProps>(
                     data-slot="sort-control-spinner"
                     className="grid shrink-0 place-content-center text-ink-tertiary"
                   >
-                    <Loader2 size={16} className="motion-spinner" />
+                    <CircleNotch size={16} className="motion-spinner" />
                   </span>
                 ) : null}
               </SelectTrigger>

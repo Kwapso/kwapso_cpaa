@@ -39,7 +39,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Pencil, Power, RotateCcw } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power, ArrowCounterClockwise } from "@shared/ui/foundations/icons"
 import { Gantt, GanttPeriodStepper, type GanttBar, type GanttLane } from "@shared/ui/components/gantt/gantt"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
@@ -472,7 +472,7 @@ export function WaveCollection({
                     reveal. */}
                 {canEdit ? (
                   <Button variant="ghost" size="icon" onClick={() => setEditing(w)} aria-label={t("Edit")}>
-                    <Pencil className="size-3.5" />
+                    <PencilSimple className="size-3.5" />
                   </Button>
                 ) : null}
                 {canEdit && w.active ? (
@@ -498,7 +498,7 @@ export function WaveCollection({
                       )
                     }
                   >
-                    <RotateCcw className="size-3.5" aria-hidden />
+                    <ArrowCounterClockwise className="size-3.5" aria-hidden />
                     <span className="sr-only sm:not-sr-only">{t("Bring back")}</span>
                   </Button>
                 ) : null}

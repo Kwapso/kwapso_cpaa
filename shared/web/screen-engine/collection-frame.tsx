@@ -20,7 +20,7 @@
 // whatever `data` it's handed, so an app can refetch (?q= / FTS5) later.
 
 import * as React from "react"
-import { ArrowUpDown, Plus } from "@shared/ui/foundations/icons"
+import { ArrowsDownUp, Plus } from "@shared/ui/foundations/icons"
 
 import { facetOptions, selectRows } from "./collection"
 import { useRemembered } from "@shared/web/remembered"
@@ -784,7 +784,7 @@ function CollectionFrame<T>({
                           aria-label={t("Sort")}
                           className="size-8 shrink-0"
                         >
-                          <ArrowUpDown />
+                          <ArrowsDownUp />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent

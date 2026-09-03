@@ -24,7 +24,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { useRemembered } from "@shared/web/remembered"
 import { ModulesPanel } from "@/components/modules-panel"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
@@ -523,9 +523,12 @@ export function AppDetailScreen({
       // disagree about which picture an app has.
       mark={appStageMark(app.stage)}
       leading={<AppMark app={app} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `app`), client ruling 2026-08-31.
-      eyebrow={t("App")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. An
       // app gained one the same day this rule split off the account-code
       // prefix (shared/workers/refs.ts) — `AppRow.ref` didn't exist before
@@ -574,7 +577,7 @@ export function AppDetailScreen({
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && (
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />

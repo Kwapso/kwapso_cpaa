@@ -179,7 +179,7 @@ export interface HomeRouteProps
    * THE THREE ACCESSIBLE NAMES THIS SCREEN USED TO OWN.
    *
    * `countLabel`, `searchLabel` and `bodyLabel` were written into the call
-   * below as the literals "tickets", "Search tickets" and "Open tickets",
+   * below as the literals "tickets", "MagnifyingGlass tickets" and "Open tickets",
    * while every neighbour on the same call — `railLabel`, `figuresLabel`,
    * `tabsLabel`, `searchPlaceholder`, `columnLabels` — was a prop. Nothing
    * distinguished them; they were simply missed, and the cost falls on the
@@ -463,12 +463,12 @@ function HomeRoute({
   searchValue,
   onSearchChange,
   onSearchClear,
-  searchPlaceholder = "Search tickets",
+  searchPlaceholder = "MagnifyingGlass tickets",
   /* The three that were literals in the call below. Defaulted HERE so the
      words are declared once, beside their neighbours, instead of buried
      three hundred lines down in the render. */
   countLabel = "tickets",
-  searchLabel = "Search tickets",
+  searchLabel = "MagnifyingGlass tickets",
   bodyLabel = "Open tickets",
   filters,
   onFilterRemove,

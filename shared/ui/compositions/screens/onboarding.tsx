@@ -179,8 +179,9 @@ export interface OnboardingRouteProps
   /** Theme changed. */
   onThemeChange?: (value: string) => void;
   /**
-   * Which spine is picked — `mango` or `quiet` (client ruling 2026-09-02).
-   * p27 draws the Sidebar group between Theme and Text size; override 56
+   * Which spine is picked — `ink`, `paper` or `mango` (client ruling
+   * 2026-09-03, reversing the 2026-09-02 cut to `mango` / `quiet`). p27
+   * draws the Background group between Theme and Text size; override 56
    * makes mango the default.
    */
   spine?: string;
@@ -284,7 +285,7 @@ const FIELD_LABELS: OnboardingFieldLabels = {
   timezoneHelp: "Used for due dates and for the sprint boundary.",
   timezonePlaceholder: "Pick a timezone",
   theme: "Theme",
-  sidebar: "Sidebar",
+  sidebar: "Background",
   textSize: "Text size",
   picked: "Picked",
 };
@@ -332,24 +333,34 @@ const THEMES: readonly AppearanceOption[] = [
   },
 ];
 
-/* p27's Sidebar group — previously missing from this step entirely, and TWO
-   options since the client's ruling of 2026-09-02 cut D3's three to Mango and
-   Quiet. Same captions as `settings.tsx`'s, shortened the way every other
-   caption on this step is: 27.14 is the same words under pressure, a
-   truncation and not a second vocabulary. Fills are not described — the two
-   names carry the colour, so the line says what the choice is like instead. */
+/* p27's Background group — previously missing from this step entirely, cut
+   to two options (Mango and Quiet) on 2026-09-02, and back to THREE on
+   2026-09-03 (client: "you know, i changed my mind. i want to go back to the
+   3 options (sorry)"). Same captions as `settings.tsx`'s, shortened the way
+   every other caption on this step is: 27.14 is the same words under
+   pressure, a truncation and not a second vocabulary. Fills are not
+   described — the three names carry the colour, so each line says what the
+   choice is like instead, Ink included: hers is the one that needs saying
+   even shortened, since "dark" alone would read as a theme rather than a
+   background you can pick on either theme. */
 const SPINES: readonly AppearanceOption[] = [
+  {
+    value: "ink",
+    label: "Ink",
+    description: "Dark, whatever your theme.",
+    picture: <SpinePicture spine="ink" />,
+  },
+  {
+    value: "paper",
+    label: "Paper",
+    description: "Calm, and out of the way.",
+    picture: <SpinePicture spine="paper" />,
+  },
   {
     value: "mango",
     label: "Mango",
     description: "Warm, and easy to find.",
     picture: <SpinePicture spine="mango" />,
-  },
-  {
-    value: "quiet",
-    label: "Quiet",
-    description: "Calm, and out of the way.",
-    picture: <SpinePicture spine="quiet" />,
   },
 ];
 

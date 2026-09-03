@@ -23,7 +23,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import type { AccountRate } from "@shared/types"
@@ -156,7 +156,7 @@ export function AccountRateCard({
                         {
                           key: "edit",
                           label: t("Edit"),
-                          icon: <Pencil className="size-3.5" />,
+                          icon: <PencilSimple className="size-3.5" />,
                           disabled: busy,
                           onSelect: () => setEditing(r),
                         },

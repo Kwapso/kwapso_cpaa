@@ -32,7 +32,7 @@ import {
 } from "@shared/ui/components/permission-matrix/permission-matrix"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
@@ -214,7 +214,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       {
         value: "activity",
         label: t("Activity"),
-        icon: "history",
+        icon: "clock-counter-clockwise",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
@@ -227,9 +227,12 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       // same square every other record's picture or glyph sits in
       // (shared/web/record-mark.tsx).
       leading={<RecordMark name={role.title} size="band" />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `role`), client ruling 2026-08-31.
-      eyebrow={t("Role")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4 + N4: the chip row says one thing about the role's state, never
       // the type word again — client correction, 2026-08-31, verbatim: "now
       // it also show 'meeting' as a tag! thats not a tg but the eyebrow
@@ -264,7 +267,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
         // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon").
         canSave ? (
           <Button variant="secondary" size="icon" onClick={() => setEditingOpen(true)} aria-label={t("Edit details")}>
-            <Pencil className="size-3.5" />
+            <PencilSimple className="size-3.5" />
           </Button>
         ) : undefined
       }

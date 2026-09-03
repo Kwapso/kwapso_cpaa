@@ -437,6 +437,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "assistant-coverage",
     status: "enforced",
   },
+  {
+    id: "R48",
+    dimension: "ui",
+    law: "THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT — NEVER A PER-SCREEN CHOICE. Every collection/data-view screen draws its toolbar's search box UNLESS a named, reasoned entry says otherwise. Two censuses, off the disk, never a hand-list: every `BASE_RECIPES` entry (`web/lib/screens.ts`) whose recipe carries a `CollectionConfig` must have `searchable: true`, or be named in `TOOLBAR_EXEMPT`; and every `<ToolbarRow>` call site across `web/` and `web-portal/` (`web/components/deep-link/screen-bits.tsx`'s own bespoke toolbar, reached by a bounded collection with no recipe search to inherit) must pass a `search` prop, or be named in the same registry. Both directions are rot-checked: an exemption whose file no longer matches the condition it was pinned for fails the build, so the list can only shrink.",
+    why: "The client's own words, correcting a narrower answer already given once: \"I don't care here. You're giving me specifics, and I told you that the toolbar, including the search, should be absolutely everywhere we have a data view or a collection view. Stop hardcoding this. Just write it as a rule.\" A recipe's `searchable` flag and a bespoke `<ToolbarRow search={…}>` prop were both ORDINARY optional fields before this law — nothing stopped a screen from omitting either, and two did, silently: Tasks' Calendar tab and Triage both drew a toolbar with a button and no search box at all, reasoned only in a code comment nothing read at build time (\"the calendar has no search of its own\"). Flipping the default is the only fix that cannot regress the same way twice — an opt-IN can always be forgotten by omission, which is exactly what happened; an opt-OUT has to be written down, named, and given a reason a reviewer can read, in the same shape R31/R32/R29 already use for their own reasoned exceptions. A collection genuinely and permanently empty of rows (`WaveFinder`'s and Sprints' own \"nothing to search yet\" fallback) is the one legitimate reason left, because a search box over zero rows is a control that cannot do anything — and that reason is now written down rather than assumed.",
+    checkId: "toolbar-shows-search",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -616,10 +624,39 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // catalogue already holds rather than a second set of its own. Same blocked
 // translation path every raise above cites — no environment here carries the
 // credential a real translation run needs. Real work owed, not debt hidden.
+// RAISED 2026-09-03, 143 → 144: the assistant became `ScreenShell`'s third
+// COLUMN (client, verbatim: "closed asstant show nothing. it's literally only
+// the bar"), so the shell's edge handle needs the second half of its accessible
+// name — "Close the assistant". ONE new sentence: "Open the assistant" was
+// already the launcher's own label and is already in the catalogue, and the
+// column's own name is the catalogued "Assistant". The rail's handle needed
+// nothing at all, because "Collapse"/"Expand" were its labels before the handle
+// moved into the kit. Same blocked translation path every raise above cites —
+// no environment here carries the credential a real translation run needs.
+// RAISED 2026-09-03, 144 → 149, SAME DAY, DIFFERENT LANE: a concurrent pass on
+// the spine (`shared/spine.ts` + `shared/web/spine-section.tsx`, out of scope
+// for the toolbar work sharing this session) added five new sentences —
+// `npm run lang` is what surfaced the shift, not a string this toolbar change
+// wrote. Every one of `de`/`es`/`ca` moves by the same five, which is why all
+// three raise together rather than drifting apart. Same blocked translation
+// path every raise above cites — no environment here carries the credential a
+// real translation run needs, and this pin only records the count, it does
+// not excuse leaving the five in English.
+// RAISED 2026-09-03, 149 → 153, SAME SESSION, THE TOOLBAR WORK ITSELF (R48):
+// Tasks' Calendar tab and the Triage queue each gained a real search box
+// where they used to have none (see filter-bar.tsx/tasks-screen.tsx/
+// tickets-collection.tsx and R48 in this file) — three new sentences
+// ("Search the triage queue…", "No entries in the triage queue match your
+// search.", "No tasks match your search.") plus "Search tasks…", which turned
+// out never to have been extracted before despite already being said by the
+// existing five non-Calendar tabs (`tasksListRecipe`'s own
+// `searchPlaceholder`) — reused here rather than invented, and its debt is
+// therefore pre-existing, surfaced rather than caused by this change. Same
+// blocked translation path every raise above cites.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 143,
-  es: 143,
-  ca: 143,
+  de: 153,
+  es: 153,
+  ca: 153,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -631,6 +668,8 @@ export const TRANSLATION_CEILING: Record<string, number> = {
  * own directory name (`components/<name>` or `foundations/<name>`), the same
  * id `computeReachability` produces. */
 export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
+  "components/visibility":
+    "unreached as of 2026-09-03, and by a deletion rather than a gap: its `useIsVisible` had exactly one caller in the app, `web/components/condensed-title.tsx`, which watched a screen's real title and swapped in a smaller sticky stand-in once it scrolled away. The client removed that bar outright (\"when I scroll down, the whole compressed title is useless, so remove that\"), so nothing in either front door now asks \"is this element on screen right now\" — every other scroll-dependent surface in the app is plain `position: sticky` (the record and collection tab strips, the shell's breadcrumb bar), which needs no observer at all. The day a screen genuinely needs to know what is in view again, this is the part to reach for rather than a second IntersectionObserver.",
   "components/heatmap":
     "no screen aggregates \"which record did how much work each period\" as a grid — work-log views are single-series (one record's weeks, or one week's people, web/components/work-logs-panel.tsx), never a record×period matrix.",
   "components/pulse-band":
@@ -989,6 +1028,60 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
   // in the one file (the header, the main region and the bottom nav) so all three
   // align to the same edge.
   "web-portal/components/portal-shell.tsx": "max-w-3xl",
+}
+
+/** R48 — reviewed exceptions to "every collection/data-view screen shows its
+ * toolbar's search box by default". Two shapes of key, because the law runs
+ * two censuses:
+ *
+ *   · A `BASE_RECIPES` key (`web/lib/screens.ts`, e.g. `"tickets.list"`) —
+ *     the recipe's own `CollectionConfig.searchable` is `false`.
+ *   · A FILE PATH (`web/components/....tsx`) — a `<ToolbarRow>` call site in
+ *     that file has no `search` prop.
+ *
+ * Rot-checked in both directions, the same shape `SCREEN_WIDTH_EXEMPT` above
+ * uses: an entry whose condition is no longer true (the recipe turned its
+ * search back on, or the call site gained a `search` prop) fails the build,
+ * so a screen that gets fixed cannot leave its pin behind. The list can only
+ * shrink — a NEW screen reaches for the toolbar by doing nothing at all,
+ * because `searchable: true` is `listCollection`'s own default and every
+ * `<ToolbarRow>` a screen writes is expected to carry search unless it is
+ * named here. */
+export const TOOLBAR_EXEMPT: Record<string, string> = {
+  // ── THE SIX PAGED RECIPES — search lives in the host's <PagedFind>, never
+  // in the recipe's own in-memory engine (SEARCH.md's layered model: a
+  // GROWING collection's search has to ask the door, because the frame can
+  // only filter the page it is holding). `listCollection(..., {paged:true})`
+  // is what turns `searchable` off for exactly this reason, and every one of
+  // these six DOES show a real toolbar with a real search box — `PagedFind`
+  // (components/paged-find.tsx) draws an unconditional `<SearchInput>`, no
+  // per-caller way to switch it off — so this is a recorded "search lives
+  // elsewhere", not a screen with none.
+  "tickets.list":
+    "paged (R14) — its search box is the host's own <PagedFind>, drawn by tickets-collection.tsx, which always renders a SearchInput. The recipe's own in-memory search would only ever see page one and call it the whole list.",
+  "accounts.list":
+    "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx, which always renders a SearchInput. Same reason as tickets.list: the recipe's own search sees only the loaded page.",
+  "knowledge.list":
+    "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx (the same file as accounts.list, a second call site), which always renders a SearchInput.",
+  "contacts.list":
+    "paged (R14) — its search box is the host's own <PagedFind> in contacts-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
+  "meetings.list":
+    "paged (R14) — its search box is the host's own <PagedFind> in meetings-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
+  "processes.list":
+    "paged (R14) — its search box is the host's own <PagedFind> in processes-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
+  "stories.list":
+    "paged (R14) — its search box is the host's own <PagedFind> in stories-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
+
+  // ── THE TWO GENUINELY-EMPTY <ToolbarRow> CALL SITES — client ruling,
+  // 2 Sep 2026, "NEVER TOOLBAR ON EMPTY COLLECTION" (the same rule
+  // `CollectionFrame`'s own `isEmptyState` branch already enforces for the
+  // kit-panel path): a search box over a collection that holds no rows at
+  // all is a control that cannot do anything, and both of these draw a real
+  // search box the MOMENT the collection has a single row.
+  "web/components/sprints-screen.tsx":
+    "the bare <ToolbarRow actions={…}> only renders when `sprints.length === 0` — the ternary's other branch is a <ToolbarRow search={<SearchInput .../>} .../> that renders whenever there is at least one sprint to search. Not a silent opt-out: a genuinely empty collection has nothing for a search box to narrow.",
+  "web/components/waves-screen.tsx":
+    "the bare <ToolbarRow actions={…}> only renders when `all.length === 0` (and only once there is a client to sell a wave to) — the sibling branch is <WaveFinder>, which carries the real search/filter/view toolbar and renders whenever the collection holds a row. Same 'never toolbar on empty collection' shape as sprints-screen.tsx.",
 }
 
 /** R29 — reviewed exceptions. A file listed here matches the page-container

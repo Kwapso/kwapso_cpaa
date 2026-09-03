@@ -516,14 +516,21 @@ export function PagedFind<T>({
     </div>
   )
 
-  // ZERO GAP, on purpose — the same reason `screen-bits.tsx`'s own `folderTabs`
-  // slot draws its column with no `gap-4`: the strip sits flush against the
-  // panel below it (before v1.2.28 this was load-bearing for a folder tab's
-  // `--folder-tab-overlap` pull to melt into its actual next sibling; the
-  // folder shape is gone now and the flush look is kept on its own merits —
-  // see `tabs`'s own doc above). A caller with no `tabs` gets one more `<div>`
-  // around exactly the markup this returned before — no gap to apply with a
-  // single child, so nothing moves.
+  // NO `gap-*` ON THIS COLUMN, AND THAT IS NO LONGER A DECISION ABOUT SPACE.
+  // It used to be: "ZERO GAP, on purpose", the same zero `screen-bits.tsx`'s
+  // `folderTabs` slot and `tickets-collection.tsx` each wrote out separately,
+  // back when a folder tab pulled itself down into its own panel by
+  // `--folder-tab-overlap` and any gap here would have left its cut feet
+  // showing. The folder shape is gone (tabs-view.tsx's header carries the
+  // 2026-09-02 ruling), so all that zero did was remove real space — the
+  // client's 2026-09-03 note, "the spacing between the tabs and the beginning
+  // of the content is incorrect on main screens". The gap now belongs to the
+  // STRIP, once, in `renderFolderTabs` (`STICKY_FOLDER_TABS`'s
+  // `--tab-content-gap`, the same value a detail screen's `--record-tab-gap`
+  // reads), so this column has nothing to say about it either way and must
+  // not grow a `gap-*` of its own — that would be a second opinion about one
+  // number, which is exactly what she asked to end. A caller with no `tabs`
+  // gets one more `<div>` around exactly the markup this returned before.
   return (
     <div className="flex w-full flex-col">
       {renderFolderTabs(tabs)}

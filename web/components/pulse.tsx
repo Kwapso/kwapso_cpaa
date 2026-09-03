@@ -45,7 +45,7 @@ import dynamic from "next/dynamic"
 import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
-import { ChartNoAxesColumn } from "@shared/ui/foundations/icons"
+import { ChartBar } from "@shared/ui/foundations/icons"
 
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
@@ -175,7 +175,7 @@ export function NothingYet({ what, how }: { what: string; how: string }) {
       className="text-muted-foreground flex flex-col items-start justify-center gap-1 p-4 text-sm"
       style={{ minHeight: BAND_HEIGHT }}
     >
-      <ChartNoAxesColumn aria-hidden className="mb-1 size-5 opacity-60" />
+      <ChartBar aria-hidden className="mb-1 size-5 opacity-60" />
       <p>{what}</p>
       <p className="text-xs">{how}</p>
     </Card>

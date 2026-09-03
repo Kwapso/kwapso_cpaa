@@ -40,7 +40,7 @@ import {
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Check, ChevronsUpDown } from "@shared/ui/foundations/icons"
+import { Check, CaretUpDown } from "@shared/ui/foundations/icons"
 
 import { clearCache } from "@shared/web/store"
 import { ApiFailure, portal } from "@/lib/api"
@@ -137,7 +137,7 @@ export function AccountSwitcher({
           {busy ? (
             <Spinner size="sm" className="size-3.5 shrink-0" />
           ) : (
-            <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
+            <CaretUpDown className="size-3.5 shrink-0 opacity-60" />
           )}
         </Button>
       </DropdownMenuTrigger>

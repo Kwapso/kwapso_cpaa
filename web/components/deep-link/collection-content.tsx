@@ -22,7 +22,7 @@ import {
 } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
-import { Download, Upload, Plus } from "@shared/ui/foundations/icons"
+import { Download, UploadSimple, Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
 import { WavesScreen } from "@/components/waves-screen"
@@ -488,7 +488,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   onClick={() => go(`/t/${teamId}/import/accounts`)}
                   className="gap-1"
                 >
-                  <Upload className="size-4" />
+                  <UploadSimple className="size-4" />
                   {t("Import CSV")}
                 </Button>
               )}

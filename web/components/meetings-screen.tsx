@@ -405,7 +405,7 @@ export function MeetingsScreen({
               {
                 value: "week",
                 label: t("This week"),
-                icon: "calendar-clock",
+                icon: "chat",
                 badge: formatCount(weekTotal),
                 badgeVariant: "" as const,
               },

@@ -70,7 +70,11 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { imageVariants } from "../image/image";
-import { ExternalLink, Loader2, TriangleAlert } from "../../foundations/icons";
+import {
+  ArrowSquareOut,
+  CircleNotch,
+  Warning,
+} from "../../foundations/icons";
 
 /**
  * Scripts, and nothing else. Stated as a constant so a reader can see what
@@ -287,7 +291,7 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
               "duration-[var(--duration-colour)] ease-kwapso",
             )}
           >
-            <ExternalLink size={16} aria-hidden="true" />
+            <ArrowSquareOut size={16} aria-hidden="true" />
           </a>
         ) : null}
 
@@ -298,7 +302,7 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
             aria-label={loadingLabel}
             className="absolute inset-0 grid place-content-center bg-surface-quiet"
           >
-            <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+            <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
           </span>
         ) : null}
 
@@ -312,7 +316,7 @@ const WebEmbed = React.forwardRef<HTMLIFrameElement, WebEmbedProps>(
               "bg-surface-quiet px-4 text-center",
             )}
           >
-            <TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />
+            <Warning size={20} aria-hidden="true" className="text-ink-tertiary" />
             <span aria-hidden="true" className="text-caption text-ink-secondary">
               {errorLabel}
             </span>

@@ -93,7 +93,12 @@ import { Button } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import { Textarea } from "../textarea/textarea";
 import { CollectionRegister } from "../collection-frame/collection-frame";
-import { CircleStop, Paperclip, Send, Sparkles } from "../../foundations/icons";
+import {
+  StopCircle,
+  Paperclip,
+  PaperPlaneRight,
+  Sparkle,
+} from "../../foundations/icons";
 
 const turnVariants = cva(
   [
@@ -363,7 +368,7 @@ function AssistantMark() {
         "bg-surface-brand text-ink-on-accent",
       )}
     >
-      <Sparkles className="size-3" />
+      <Sparkle className="size-3" />
     </span>
   );
 }
@@ -1092,7 +1097,7 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                 onClick={onStop}
                 aria-label={stopLabel}
               >
-                <CircleStop aria-hidden="true" />
+                <StopCircle aria-hidden="true" />
               </Button>
             ) : (
               <Button
@@ -1104,7 +1109,7 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
                 onClick={send}
                 aria-label={sendLabel}
               >
-                <Send aria-hidden="true" />
+                <PaperPlaneRight aria-hidden="true" />
               </Button>
             )}
           </div>

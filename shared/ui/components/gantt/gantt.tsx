@@ -105,7 +105,10 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "../button/button";
-import { ChevronLeft, ChevronRight } from "../../foundations/icons";
+import {
+  CaretLeft,
+  CaretRight,
+} from "../../foundations/icons";
 import { CollectionRegister } from "../collection-frame/collection-frame";
 
 /* ----------------------------------------------------------------------------
@@ -310,7 +313,7 @@ const GanttPeriodStepper = React.forwardRef<HTMLDivElement, GanttPeriodStepperPr
       >
         {onPrevious ? (
           <Button variant="secondary" size="icon" aria-label={previousLabel} onClick={onPrevious}>
-            <ChevronLeft />
+            <CaretLeft />
           </Button>
         ) : null}
         {windowLabel === undefined || windowLabel === null ? null : (
@@ -320,7 +323,7 @@ const GanttPeriodStepper = React.forwardRef<HTMLDivElement, GanttPeriodStepperPr
         )}
         {onNext ? (
           <Button variant="secondary" size="icon" aria-label={nextLabel} onClick={onNext}>
-            <ChevronRight />
+            <CaretRight />
           </Button>
         ) : null}
       </div>

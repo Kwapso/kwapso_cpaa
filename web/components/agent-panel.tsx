@@ -1,8 +1,13 @@
 "use client"
 
-// AgentPanel — the app-wide AI co-pilot, anchored as a popover off the
-// floating launcher (agent-host.tsx, which owns go() + runAction() + the
-// cache, so the agent can drive real screens). Built on the library AgentChat.
+// AgentPanel — the app-wide AI co-pilot. A permanent THIRD COLUMN on the
+// shell's ground where there is room for one (`ScreenShell`'s `aside`), and the
+// floating panel anchored off its launcher where there is not (below the kit's
+// `md`, where the aside is dropped outright). ONE panel either way: only the
+// box around it changes — see `PanelFrame` below. Mounted once at the root
+// (agent-host.tsx, which owns go() + runAction() + the cache, so the agent can
+// drive real screens) and portalled into the column. Built on the library
+// AgentChat.
 //
 // This file is the RENDER SHELL only. The whole state machine — the transcript,
 // streaming consumption (text deltas / live step rows / the confirm pause /
@@ -15,7 +20,8 @@
 // agent:create; the server re-gates every action AS the signed-in user.
 
 import * as React from "react"
-import { Check, History, Paperclip, Plus, Sparkles, X } from "@shared/ui/foundations/icons"
+import { createPortal } from "react-dom"
+import { Check, ClockCounterClockwise, Paperclip, Plus, Sparkle, X } from "@shared/ui/foundations/icons"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 import { Button } from "@shared/ui/components/button/button"
@@ -36,6 +42,7 @@ import { AgentHistoryDialog } from "@/components/agent-history-dialog"
 import { AssistantLimitNotice } from "@/components/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/agent-sources"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
+import { useAgentDock } from "@/lib/agent-dock"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
 import { personInitials } from "@/lib/identity"
@@ -112,10 +119,159 @@ function SourceChips({
   )
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   THE FRAME — the ONE thing that differs between the two presentations.
+
+   The assistant is a COLUMN on a wide screen (`ScreenShell`'s `aside`, kit
+   v1.2.28) and a floating panel on a narrow one, because the kit drops its
+   third column below `md` and a phone cannot spend 380px on it. Those are two
+   BOXES, not two assistants: everything inside — the transcript, the streamed
+   steps, the confirm pause, the citations, the composer, the attachments — is
+   the same tree in both, rendered once below and handed to whichever box this
+   width calls for. There is no second copy of the panel and no second copy of
+   its state; `useAgentChat` is called once, in `AgentPanel`, above this.
+
+   WHY THE COLUMN IS A PORTAL. The panel is mounted at the ROOT (agent-host.tsx)
+   so it outlives navigation — including the navigation it causes itself, since
+   a multi-step run drives the real screen. The shell's column is several levels
+   BELOW that, inside the routed `AppShell`. `createPortal` is what lets one
+   component be a child of the root in the React tree and a child of the column
+   in the DOM; web/lib/agent-dock.tsx holds the node and the whole argument.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/** WHAT BOTH BOXES PAINT, and it is the whole of what the owner ruled on.
+ *
+ * ITEM 1 (owner, 31 Aug 2026 — the precise repeat of the 28 Aug report,
+ * GAPS-A.md OVL-1): "the background of the assistant should be white, and his
+ * messages in beige." `--card` and `--popover` are #FFFEF9 in light and #26241F
+ * in dark — IDENTICAL to `--background`, which is why the earlier
+ * `bg-surface-panel` patch (still visible in git blame) never really fixed it:
+ * `--surface-panel` (#F7F2EB light / #1C1B18 dark) sits only ONE faint step
+ * from `--card`, not a genuinely different tone. So: the ground is
+ * `bg-background` — the token tokens.css itself calls "the kwapso white" — and
+ * every `bg-card` inside this one subtree (the assistant's bubble, its composer
+ * pill, a pending confirm step's marker) is repointed, by a LOCALLY SCOPED
+ * custom property, at `--surface-quiet` instead: #E2DDD4 light (a real beige,
+ * not an off-white) and #3A3833 dark (distinctly lighter than the near-black
+ * ground — the dark-mode variation the owner asked for). Still one token each
+ * side, per R32 — reassigned for this one surface, not a new colour, and not a
+ * change to `--card` anywhere else in the app. Your OWN messages
+ * (`bg-surface-inverse`, ruling 36's charcoal-on-light / off-beige-on-dark
+ * fill) were never part of this bug — checked: they sit nowhere near the ground
+ * tone in either palette.
+ *
+ * ITEM 3 (owner, 31 Aug 2026): "fix the color of the texts... you invented that
+ * color. refer to guide and rules for colors!" `--card-foreground` is set
+ * EXPLICITLY here, alongside `--card`, rather than left to inherit — R32's own
+ * words, "what a colour MEANS has a token": both halves of this surface's
+ * paper/ink pair are now named together in one place instead of one being
+ * declared and the other assumed. The VALUE is unchanged (`var(--foreground)`
+ * is exactly what `--card-foreground` already resolves to globally —
+ * tokens.css line 203 — so no bubble repaints), which is the honest finding
+ * after tracing every text colour in this surface back to its source: the
+ * assistant's bubble (`text-card-foreground`, agent-chat.tsx's `turnVariants`),
+ * the composer's typed text (`text-foreground`, `textarea.tsx`'s own base
+ * class, FLD-B5) and your own sent bubble (`text-ink-on-inverse`) all already
+ * resolve through real, paired tokens with strong contrast in both palettes.
+ * The one GENUINE gap found while tracing this: `shared/web/markdown-html.ts`
+ * emits bare `<a>`/`<code>`/`<strong>` with no class at all, so a link inside
+ * an assistant reply was rendering in the BROWSER'S default blue rather than
+ * any app token — fixed in `agent-markdown.tsx`. */
+const PANEL_SURFACE =
+  "flex flex-col gap-0 overflow-hidden bg-background " +
+  "[--card:var(--surface-quiet)] [--card-foreground:var(--foreground)]"
+
+/** THE COLUMN. The kit's aside already owns the width (`ASIDE_WIDTH`, 23.75rem),
+ * the inset and the column's own scroller, so this only has to FILL it — no
+ * width of its own, which is also R29 by the letter (no second page measure).
+ *
+ * IT IS PAPER ON THE GROUND, EXACTLY AS THE CARD IS. `ScreenShell`'s own table
+ * puts the aside at the same level as the rail — "NOT a container, lies on it,
+ * paints nothing" — so the column paints nothing and the assistant's own
+ * surface is this app's node: the same `rounded-[var(--radius)]` (R31, no third
+ * radius) and the same `--shadow-lifted` the shell gives the screen card, so
+ * the two things floating on the spine read as siblings rather than as a card
+ * beside a bare stack. `bg-background` rather than `var(--surface-raised)`
+ * because `--surface-raised` resolves through `--card`, which this surface has
+ * just repointed at beige — the same value by a name that is still true here. */
+const PANEL_COLUMN = "h-full w-full rounded-[var(--radius)] shadow-[var(--shadow-lifted)]"
+
+function PanelFrame({ docked, children }: { docked: boolean; children: React.ReactNode }) {
+  const dock = useAgentDock()
+
+  if (docked) {
+    // NO COLUMN, NO PANEL. The aside is not rendered at all when it is shut
+    // (client, verbatim: "closed asstant show nothing. it's literally only the
+    // bar"), and it is dropped outright on screens that draw no shell — login,
+    // onboarding. Both arrive here as a null dock, and both mean the same
+    // thing: there is nowhere to draw, so nothing is drawn. The panel itself
+    // stays mounted above, so the thread and the live run are not lost.
+    if (!dock) return null
+    return createPortal(<div className={cn(PANEL_SURFACE, PANEL_COLUMN)}>{children}</div>, dock)
+  }
+
+  return (
+    <PopoverContent
+      side="top"
+      align="end"
+      sideOffset={12}
+      collisionPadding={16}
+      className={cn(
+        PANEL_SURFACE,
+        "p-0",
+        // ITEM (owner, 1 Sep 2026): "make the assistant as wide as the
+        // add/edit [panel]". That panel is `FormShellDialog`'s Sheet
+        // (shared/web/form-shell.tsx), fixed the same day to
+        // `w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]` — 420px
+        // floor, 34% of the viewport in between, 640px ceiling, with the
+        // matching `max-w` so the floor and ceiling never fight on a view
+        // narrower than 420px either. Copied verbatim rather than re-derived,
+        // so the two surfaces track the SAME number if it ever changes again,
+        // not two numbers that happened to agree today.
+        "w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]",
+        // ITEM 2 (owner, 31 Aug 2026): "make it taller until the top of the
+        // page (while keeping its bubble behaviour)". `h-[100dvh]` is
+        // deliberately larger than any viewport EVER is — the kit's own
+        // `max-h-[var(--radix-popover-content-available-height)]` (from
+        // `popover.tsx`'s SURFACE, still applied, untouched by this className)
+        // is what actually wins: Radix computes that variable as the real gap
+        // between the launcher and the viewport's top edge (minus
+        // `collisionPadding`, 16 above), so the panel always grows to fill
+        // exactly that space — with NO separate breakpoint math to keep in
+        // sync with agent-host.tsx's launcher offsets.
+        "h-[100dvh]",
+        // ITEM (owner, 1 Sep 2026): "add a mango soft glow around it (#FED069)
+        // so that it sticks more out of the page." #FED069 IS this app's
+        // primary token, verbatim — `--kw-mango` (tokens.css line 145,
+        // "PRIMARY. A fill, never a data colour."), `--primary` and
+        // `--surface-brand` both resolve to it, in EITHER palette. So
+        // `var(--primary)` reaches it directly rather than the literal hex the
+        // owner quoted — R32 by the letter (no hex in this file) and by the
+        // point (the colour still MEANS "primary" if that token is ever
+        // retuned). `color-mix(in_srgb, var(--primary) 32%, transparent)` is
+        // the same technique `sheet.tsx`'s own scrim already uses for a
+        // translucent token fill — reached, not invented. Layered AFTER (not
+        // replacing) the kit's own `--shadow-overlay` elevation shadow
+        // (`popover.tsx`'s SURFACE, `shadow-xl`).
+        //
+        // IT IS THE FLOATING FORM'S ONLY, AND THAT IS THE ARGUMENT FOR IT. A
+        // glow exists to lift a bubble off the page it is covering; a column
+        // standing on the ground beside the card is not covering anything, and
+        // a mango halo down the window's edge would be a second mango region
+        // on a mango spine.
+        "shadow-[var(--shadow-overlay),0_0_3rem_0.5rem_color-mix(in_srgb,var(--primary)_32%,transparent)]",
+      )}
+    >
+      {children}
+    </PopoverContent>
+  )
+}
+
 export function AgentPanel({
   teamId,
   user,
   open,
+  docked,
 }: {
   teamId: string | null
   /** The signed-in member — item 6 (owner, 31 Aug 2026): "for my messages I
@@ -131,6 +287,12 @@ export function AgentPanel({
   // outside-click still close a Popover unassisted. `open` stays (still
   // drives `useAgentChat`'s resume-on-open and the composer autofocus
   // effect); the setter that closed it does not.
+  /** WHICH BOX THIS DRAWS IN — the shell's third column, or the floating panel.
+   * Decided ONCE, by width, in agent-host.tsx, and passed rather than read here
+   * so this component has no opinion about a breakpoint and there is one place
+   * the question is asked. See `PanelFrame` above: it is the only thing the two
+   * presentations do not share. */
+  docked: boolean
 }) {
   const { t, lang } = useLanguage()
   const attachInputRef = React.useRef<HTMLInputElement>(null)
@@ -168,7 +330,7 @@ export function AgentPanel({
   const AVATAR_RING = "shadow-[0_0_0_var(--avatar-ring)_var(--background)]"
 
   // ITEM 6, THE ASSISTANT'S OWN SIDE — round (item 6: "avatars are always
-  // round"), the kit's brand fill, its own Sparkles mark: the same glyph the
+  // round"), the kit's brand fill, its own Sparkle mark: the same glyph the
   // launcher and `AssistantMark` already draw, just carried on `Avatar`
   // instead of a square record-mark, because the kit's own ruling 30 ("square
   // for a THING, pill for a person") is a KIT design law, not a Law of the
@@ -178,7 +340,7 @@ export function AgentPanel({
   const assistantAvatar = (
     <Avatar size="sm" variant="brand" className={AVATAR_RING}>
       <AvatarFallback>
-        <Sparkles className="size-3" aria-hidden />
+        <Sparkle className="size-3" aria-hidden />
       </AvatarFallback>
     </Avatar>
   )
@@ -249,6 +411,11 @@ export function AgentPanel({
     ) : null
 
   return (
+    // ONE TREE, TWO BOXES — `PanelFrame` above, and everything from here down
+    // is drawn identically in both. Wide: the shell's third column. Narrow: the
+    // floating panel the rest of this comment argues for, which is still
+    // exactly what a phone gets because the kit drops its aside below `md`.
+    //
     // ITEM 2 (owner, 31 Aug 2026): "more like a bubble coming out of its
     // button, instead of a slide-in". A `Popover`, anchored to the launcher
     // button in agent-host.tsx (which owns the `Popover` root + trigger, and
@@ -283,107 +450,11 @@ export function AgentPanel({
     // The usage + history dialogs render as SIBLINGS of the popover content
     // (below), not nested inside it — exactly as they were siblings of
     // `SheetContent` before. Radix unmounts a closed overlay's content, so
-    // nesting them inside would have closed Usage/History the instant the
+    // nesting them inside would have closed Usage/ClockCounterClockwise the instant the
     // assistant bubble itself closed, which was never the intent (open Usage
     // from the panel, then dismiss the panel with Escape — Usage stays put).
     <>
-    <PopoverContent
-      side="top"
-      align="end"
-      sideOffset={12}
-      collisionPadding={16}
-      className={
-        // ITEM (owner, 1 Sep 2026): "make the assistant as wide as the
-        // add/edit [panel]". That panel is `FormShellDialog`'s Sheet
-        // (shared/web/form-shell.tsx), fixed the same day to
-        // `w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]` — 420px
-        // floor, 34% of the viewport in between, 640px ceiling, with the
-        // matching `max-w` so the floor and ceiling never fight on a view
-        // narrower than 420px either. Copied verbatim rather than
-        // re-derived, so the two surfaces track the SAME number if it ever
-        // changes again, not two numbers that happened to agree today.
-        "flex w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)] flex-col gap-0 overflow-hidden p-0 " +
-        // ITEM 2 (owner, 31 Aug 2026): "make it taller until the top of the
-        // page (while keeping its bubble behaviour)". `h-[100dvh]` is
-        // deliberately larger than any viewport EVER is — the kit's own
-        // `max-h-[var(--radix-popover-content-available-height)]` (from
-        // `popover.tsx`'s SURFACE, still applied, untouched by this
-        // className) is what actually wins: Radix computes that variable as
-        // the real gap between the launcher and the viewport's top edge
-        // (minus `collisionPadding`, 16 below), so the panel always grows to
-        // fill exactly that space — the top of the page, responsively, on a
-        // phone (button at `bottom-20`) and on desktop (`md:bottom-6`) alike
-        // — with NO separate breakpoint math to keep in sync with
-        // agent-host.tsx's launcher offsets. Still the anchored bubble
-        // (`side="top"`), never the old full-width slide-in sheet.
-        "h-[100dvh] bg-background " +
-        // ITEM 1 (owner, 31 Aug 2026 — the precise repeat of the 28 Aug
-        // report, GAPS-A.md OVL-1): "the background of the assistant should
-        // be white, and his messages in beige." `--card` and `--popover`
-        // (this component's own default ground) are #FFFEF9 in light and
-        // #26241F in dark — IDENTICAL to `--background` above, which is why
-        // the earlier `bg-surface-panel` patch (still visible in git blame)
-        // never really fixed it: `--surface-panel` (#F7F2EB light /
-        // #1C1B18 dark) sits only ONE faint step from `--card`, not a
-        // genuinely different tone. So: the ground is `bg-background` — the
-        // token tokens.css itself calls "the kwapso white" — and every
-        // `bg-card` inside this one subtree (the assistant's bubble, its
-        // composer pill, a pending confirm step's marker) is repointed, by a
-        // LOCALLY SCOPED custom property, at `--surface-quiet` instead:
-        // #E2DDD4 light (a real beige, not an off-white) and #3A3833 dark
-        // (distinctly lighter than the near-black ground — the dark-mode
-        // variation the owner asked for). Still one token each side, per
-        // R32 — reassigned for this one surface, not a new colour, and not a
-        // change to `--card` anywhere else in the app. Your OWN messages
-        // (`bg-surface-inverse`, ruling 36's charcoal-on-light /
-        // off-beige-on-dark fill) were never part of this bug — checked: they
-        // sit nowhere near the ground tone in either palette.
-        //
-        // ITEM 3 (owner, 31 Aug 2026): "fix the color of the texts... you
-        // invented that color. refer to guide and rules for colors!"
-        // `--card-foreground` is set EXPLICITLY here, alongside `--card`,
-        // rather than left to inherit — R32's own words, "what a colour
-        // MEANS has a token": both halves of this surface's paper/ink pair
-        // are now named together in one place instead of one being declared
-        // and the other assumed. The VALUE is unchanged (`var(--foreground)`
-        // is exactly what `--card-foreground` already resolves to
-        // globally — tokens.css line 203 — so no bubble repaints), which is
-        // the honest finding after tracing every text colour in this surface
-        // back to its source: the assistant's bubble (`text-card-foreground`,
-        // agent-chat.tsx's `turnVariants`), the composer's typed text
-        // (`text-foreground`, `textarea.tsx`'s own base class, FLD-B5 — "a
-        // field flips against its ground exactly as a card does") and your
-        // own sent bubble (`text-ink-on-inverse`) all already resolve
-        // through real, paired tokens with strong contrast in both palettes
-        // — none of them a literal hex or an Un-registered class. The one
-        // GENUINE gap found while tracing this: `shared/web/markdown-html.ts`
-        // emits bare `<a>`/`<code>`/`<strong>` with no class at all, so a
-        // link inside an assistant reply was rendering in the BROWSER'S
-        // default blue rather than any app token — fixed in
-        // `agent-markdown.tsx`, the one real "invented" (or rather,
-        // UN-invented — browser-default) colour this trace turned up.
-        "[--card:var(--surface-quiet)] [--card-foreground:var(--foreground)] " +
-        // ITEM (owner, 1 Sep 2026): "add a mango soft glow around it (#FED069)
-        // so that it sticks more out of the page." #FED069 IS this app's
-        // primary token, verbatim — `--kw-mango` (tokens.css line 145,
-        // "PRIMARY. A fill, never a data colour."), `--primary` and
-        // `--surface-brand` both resolve to it, in EITHER palette (its own
-        // comment: "is #FED069 in light and in dark"). So `var(--primary)`
-        // reaches it directly rather than the literal hex the owner quoted —
-        // R32 by the letter (no hex in this file) and by the point (the
-        // colour still MEANS "primary" if that token is ever retuned).
-        // `color-mix(in_srgb, var(--primary) 32%, transparent)` is the same
-        // technique `sheet.tsx`'s own scrim already uses for a translucent
-        // token fill (`color-mix(in_srgb,var(--kw-charcoal)_28%,transparent)`)
-        // — reached, not invented. Layered AFTER (not replacing) the kit's
-        // own `--shadow-overlay` elevation shadow (`popover.tsx`'s SURFACE,
-        // `shadow-xl`): `box-shadow` accepts a comma-separated list, so the
-        // panel keeps its normal drop shadow AND gains a soft, wide, low-
-        // opacity mango ring around it — a glow, not a hard border (no
-        // spread tight enough to read as an edge, no full opacity).
-        "shadow-[var(--shadow-overlay),0_0_3rem_0.5rem_color-mix(in_srgb,var(--primary)_32%,transparent)]"
-      }
-    >
+    <PanelFrame docked={docked}>
       <div className="flex shrink-0 flex-col gap-[var(--space-2h)] shadow-[var(--hairline-under)] px-4 pt-[var(--space-5)] pb-[var(--space-4h)]">
         {/* ITEM 1 (owner, 31 Aug 2026): "remove the x button on top right (i
             dont need it anymore)". The launcher button itself already toggles
@@ -419,7 +490,7 @@ export function AgentPanel({
                     disabled={chat.busy}
                     aria-label={t("Past conversations")}
                   >
-                    <History className="size-5" aria-hidden />
+                    <ClockCounterClockwise className="size-5" aria-hidden />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("Past conversations")}</TooltipContent>
@@ -720,7 +791,7 @@ export function AgentPanel({
               // stays at the kit's own default (`true`).
               userAvatar={userAvatar}
               assistantAvatar={assistantAvatar}
-              // NO `header` any more (ITEM 5, 31 Aug 2026) — History and New
+              // NO `header` any more (ITEM 5, 31 Aug 2026) — ClockCounterClockwise and New
               // chat moved UP to share the panel's own `Title` row, aligned
               // with "Assistant" per the just-established title/actions
               // convention (see the comment above the `Title` element). The
@@ -922,7 +993,7 @@ export function AgentPanel({
           )}
         </div>
       )}
-    </PopoverContent>
+    </PanelFrame>
 
       <AgentUsageDialog open={usageOpen} onOpenChange={setUsageOpen} summary={chat.usageSummary} />
       <AgentHistoryDialog

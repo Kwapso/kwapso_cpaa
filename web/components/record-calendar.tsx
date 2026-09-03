@@ -46,7 +46,7 @@ import { List } from "@shared/web/list-compat"
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { CalendarView, type CalendarDay, type CalendarEvent } from "@shared/ui/components/calendar-view/calendar-view"
 import { Agenda, type AgendaDay } from "@shared/ui/components/agenda/agenda"
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ListOrdered } from "@shared/ui/foundations/icons"
+import { CalendarBlank, CalendarDots, CaretLeft, CaretRight, ListNumbers } from "@shared/ui/foundations/icons"
 
 import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
@@ -323,7 +323,7 @@ export function RecordCalendar({
 
   const emptyState = (
     <p className="text-muted-foreground flex items-center gap-2 text-sm">
-      <CalendarRange aria-hidden className="size-4 shrink-0" />
+      <CalendarDots aria-hidden className="size-4 shrink-0" />
       {emptyText}
     </p>
   )
@@ -355,11 +355,11 @@ export function RecordCalendar({
             aria-label={t("How to read this month")}
           >
             <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1 px-2.5">
-              <CalendarDays className="size-3.5" />
+              <CalendarBlank className="size-3.5" />
               <span className="text-xs">{t("Month")}</span>
             </ToggleGroupItem>
             <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1 px-2.5">
-              <ListOrdered className="size-3.5" />
+              <ListNumbers className="size-3.5" />
               <span className="text-xs">{t("Agenda")}</span>
             </ToggleGroupItem>
           </ToggleGroup>
@@ -374,7 +374,7 @@ export function RecordCalendar({
               aria-label={t("Previous month")}
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
             >
-              <ChevronLeft />
+              <CaretLeft />
             </Button>
             <Button
               variant="secondary"
@@ -383,7 +383,7 @@ export function RecordCalendar({
               aria-label={t("Next month")}
               onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
             >
-              <ChevronRight />
+              <CaretRight />
             </Button>
           </div>
         </div>

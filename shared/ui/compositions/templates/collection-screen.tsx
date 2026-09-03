@@ -504,7 +504,7 @@ function CollectionScreen<TRow>({
   searchValue,
   onSearchChange,
   onSearchClear,
-  searchLabel = "Search this collection",
+  searchLabel = "MagnifyingGlass this collection",
   searchPlaceholder = "Search",
   filters,
   onFilterRemove,

@@ -129,7 +129,10 @@ import {
   type FilterChip,
 } from "../../components/filter-bar/filter-bar";
 import type { CollectionFrameTab } from "../../components/collection-frame/collection-frame";
-import { Plus, X } from "../../foundations/icons";
+import {
+  Plus,
+  X,
+} from "../../foundations/icons";
 import { MainScreen } from "../templates";
 
 /** One tab over the collection. Counts are real: the collection is full. */
@@ -177,7 +180,7 @@ const DEFAULT_LABELS: NoResultsLabels = {
   heading: "Collection",
   exportLabel: "Export",
   createLabel: "Add a record",
-  searchLabel: "Search this collection",
+  searchLabel: "MagnifyingGlass this collection",
   searchPlaceholder: "Search",
   addFilterLabel: "Add a filter",
   tabsLabel: "Collection subsets",
@@ -189,7 +192,7 @@ const DEFAULT_LABELS: NoResultsLabels = {
   dropLead: "Dropping",
   dropTail: "would show",
   clear: "Clear filters",
-  archive: "Search the archive instead",
+  archive: "MagnifyingGlass the archive instead",
 };
 
 const DEFAULT_TABS: readonly NoResultsTab[] = [

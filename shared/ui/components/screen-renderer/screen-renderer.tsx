@@ -93,7 +93,14 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { Tabs, TabsList, TabsTrigger, TabsContent, TabsCount } from "../tabs/tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  TabsCount,
+  TABS_STRIP_GAP,
+} from "../tabs/tabs";
 import { Badge } from "../badge/badge";
 import { Title } from "../title/title";
 import { Skeleton } from "../skeleton/skeleton";
@@ -309,8 +316,8 @@ export interface ScreenRegisterProps
   loadingLabel?: string;
 }
 
-/* NO MARK. NONE OF THE THREE. GAPS-COL3 SCR-4 added an `Inbox`, a `SearchX`
-   and a `TriangleAlert` at 32 on the premise that "chapter 21's page draws
+/* NO MARK. NONE OF THE THREE. GAPS-COL3 SCR-4 added a `Tray`, a
+   `MagnifyingGlass` and a `Warning` at 32 on the premise that "chapter 21's page draws
    marks but the specimen set never transcribed them". Re-checked against the
    artifact TEMPLATE, which carries every inline style: that premise is
    false. Chapter 21 draws four registers and not one holds an icon — they
@@ -993,24 +1000,38 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
               value={tab}
               defaultValue={defaultTab ?? tabs[0].value}
               onValueChange={onTabChange}
-              className="gap-[var(--space-3h)]"
+              /* THE STRIP-TO-CONTENT GAP IS `TABS_STRIP_GAP`, ON A WRAPPER
+                 AROUND `TabsList` BELOW — CHANGED 2026-09-03, TWICE. First
+                 from this file's own `gap-[var(--space-3h)]` (14) to the
+                 shared `tabs.tsx` constant (20, `--space-5`), on the client's
+                 "change the rule and apply it everywhere"; then OFF this
+                 root's flex `gap` entirely and onto a wrapper as padding, so
+                 the gap survives a strip that pins on scroll — a `gap`
+                 between siblings stops meaning anything once one of them goes
+                 sticky, padding on the pinned box does not. `gap-0` cancels
+                 `Tabs`'s own base `gap-4` — otherwise the base survives
+                 untouched and the strip carries both the wrapper's 20px
+                 padding and the root's 16px flex gap. */
+              className="gap-0"
             >
-              <TabsList aria-label={tabsLabel}>
-                {tabs.map((item) => (
-                  <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
-                    {item.label}
-                    {/* FIX, matching the bug override 45 already fixed once
-                        in `CollectionFrame`: a `Badge` chip used to sit here,
-                        which is a filled chip inside a tab. `TabsCount` draws
-                        the count's one shape on its own. The rule it broke was
-                        ch14's "counts are quiet, never badges" — the FOLDER
-                        chapter's, and the folder tab is retired; R-4a's line
-                        count is not a badge either, so the fix stands on the
-                        newer ruling. */}
-                    <TabsCount count={item.count} />
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <div className={TABS_STRIP_GAP}>
+                <TabsList aria-label={tabsLabel}>
+                  {tabs.map((item) => (
+                    <TabsTrigger key={item.value} value={item.value} disabled={item.disabled}>
+                      {item.label}
+                      {/* FIX, matching the bug override 45 already fixed once
+                          in `CollectionFrame`: a `Badge` chip used to sit here,
+                          which is a filled chip inside a tab. `TabsCount` draws
+                          the count's one shape on its own. The rule it broke was
+                          ch14's "counts are quiet, never badges" — the FOLDER
+                          chapter's, and the folder tab is retired; R-4a's line
+                          count is not a badge either, so the fix stands on the
+                          newer ruling. */}
+                      <TabsCount count={item.count} />
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
               {toolbar && toolbar.length > 0 ? (
                 <div

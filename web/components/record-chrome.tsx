@@ -8,7 +8,7 @@
 // first and none drew the last, which is how the same record type ended up with
 // six buttons on one screen and a two-line title on another.
 //
-//   RecordActionsMenu — the three-dot overflow (B1/B2). Net-new: `MoreHorizontal`
+//   RecordActionsMenu — the three-dot overflow (B1/B2). Net-new: `DotsThree`
 //                       appeared ZERO times in this repo before 17 Aug 2026, so
 //                       every action a record had was a visible button.
 //   RecordHeader      — the header band (D2). Transparent, so the ambient field
@@ -44,7 +44,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
-import { MoreHorizontal } from "@shared/ui/foundations/icons"
+import { DotsThree } from "@shared/ui/foundations/icons"
 
 import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
 import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/states"
@@ -60,7 +60,6 @@ import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 import { defaultTabsConfig, type TabsConfig } from "@shared/web/screen-engine/tabs-view"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"
-import { useCondensedTitle, CondensedTitleBar, usePublishCondensedHeight } from "@/components/condensed-title"
 
 /* -------------------------- the record tab strip --------------------------
    SUPERSEDED, v1.2.28 — the ruling this constant was built to enforce no
@@ -155,7 +154,7 @@ export function RecordActionsMenu({
           className="shrink-0"
           aria-label={t("More actions")}
         >
-          <MoreHorizontal className="size-4" />
+          <DotsThree className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -417,14 +416,21 @@ export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | 
  * here or in the condensed bar — see the two props' own doc comments below
  * for why the signature keeps them anyway.
  *
- * THE CONDENSED BAR NO LONGER DISAGREES WITH THIS ONE — same ruling,
- * verbatim: "for the detail replicate the main: turn the breadcrumb + title
- * in eyebrow title. do not include image nor pills." A detail screen's
- * condensed bar now hands `CondensedTitleBar` only `eyebrow` and `title`,
- * dropping the `pills` it briefly carried — the exact shape `CollectionHeading`
- * (the main screen's own header) already used, so the two callers finally
- * agree and `CondensedTitleBar` itself no longer has a `pills` (or `mark`)
- * prop to disagree with (condensed-title.tsx).
+ * AND THERE IS NO CONDENSED BAR TO DISAGREE WITH ANY MORE — CLIENT RULING,
+ * 2026-09-03, verbatim: "when I scroll down, the whole compressed title is
+ * useless, so remove that. When I scroll down, what is at the top should be
+ * only the tabs, if there are tabs, on the same line as the whole eyebrow."
+ * `condensed-title.tsx` is deleted: the smaller stand-in header that appeared
+ * once this full one scrolled out of view, the `useIsVisible` trigger that
+ * watched the title, and the measured `--record-tabs-top` clearance it
+ * published for `STICKY_TABS` to sit under. `STICKY_TABS` now pins at `top-0`
+ * — the strip and nothing above it. THIS IS WHAT KILLS THE `eyebrow` PROP
+ * TOO: that bar was its one remaining reader (see the prop's own doc, below,
+ * for the whole of why it had survived this file's own "no eyebrow, anywhere"
+ * ruling), so it went with it, and with it the kit gap this file used to log
+ * — `RecordChrome`'s dropped `eyebrow` slot is no longer a hole this app
+ * needs filled, because this app no longer draws an eyebrow on either kind of
+ * screen.
  *
  * MECHANICALLY: `eyebrow` is dropped from the node this file builds for the
  * kit's `title` slot (never rendered in the full header again), and the
@@ -733,7 +739,6 @@ const IDENTITY_ROW =
    more. */
 
 export function RecordScreen({
-  eyebrow,
   recordNumber,
   collectionLabel,
   chips,
@@ -780,29 +785,25 @@ export function RecordScreen({
    * `leading={<RecordMark …/>}`) left untouched.
    */
   leading?: React.ReactNode
-  /**
-   * The bare record-TYPE word — "App", "Account", "Ticket". The glossary's own
-   * term for the concept (`shared/glossary.ts`), never a screen-invented
-   * synonym (R34).
+  /*
+   * NO `eyebrow` PROP — DELETED 2026-09-03, unlike `mark`/`leading` above.
    *
-   * REMOVED FROM THE FULL HEADER, PERMANENTLY — CLIENT RULING, 2026-09-01,
-   * against a real screenshot of a Ticket detail screen: no eyebrow anywhere
-   * on a detail screen's full header, full stop, because the breadcrumb above
-   * it already says the same thing ("Tickets · Kids training missing from the
-   * website menu"). This reverses "THE EYEBROW COMES BACK, NARROWER" (this
-   * file's header) rather than refining it — that ruling's own reasoning (a
-   * bare eyebrow reads as "what kind of record is this") is now answered by
-   * the breadcrumb instead, so the eyebrow is redundant, not merely
-   * relocated. The PROP survives on this signature, and every call site keeps
-   * passing it, because `CondensedTitleBar` below is a SEPARATE header (the
-   * small sticky bar that appears once scrolled past this one) with its OWN
-   * spec, reached only after scrolling — and that bar keeps an eyebrow even
-   * though this full header does not (it dropped its own `pills`, the other
-   * thing it briefly carried, the same day — condensed-title.tsx). Do not
-   * delete this prop or its call sites while chasing "no eyebrow, anywhere"
-   * — the condensed bar is the one remaining, intentional reader of it.
+   * The 2026-09-01 ruling had already taken the eyebrow out of the FULL
+   * header ("no eyebrow anywhere on a detail screen's full header, full stop,
+   * because the breadcrumb above it already says the same thing"), and the
+   * prop survived that ruling for exactly ONE reason, stated in its own doc at
+   * the time: the condensed sticky bar was a SEPARATE header with its own
+   * spec, and it still drew an eyebrow. The client deleted that bar on
+   * 2026-09-03 (this file's header, "AND THERE IS NO CONDENSED BAR TO
+   * DISAGREE WITH ANY MORE"), which left the prop with no reader at all — not
+   * an inert value like `mark`, which every call site still passes and
+   * `RecordMark` still draws elsewhere, but thirteen translated words
+   * (`eyebrow={t("Ticket")}`, `t("Sprint")`, `t("Account")`…) rendering
+   * nowhere on any screen. So the prop and all thirteen call sites went
+   * together. The record-TYPE word a person needs is still on screen: the
+   * breadcrumb above this header says it, which is the whole reasoning the
+   * 2026-09-01 ruling stood on.
    */
-  eyebrow?: React.ReactNode
   /** The reference a person quotes on the phone. Drawn as the charcoal chip,
    * now ABOVE the title (client ruling, 2026-09-01, reversing "below the
    * title" below): "the black chip is always the ID". */
@@ -811,7 +812,17 @@ export function RecordScreen({
    * beside the ID. "add a chip for Padelbase like in the example". Pass a
    * clickable node (an `InAppLink` or a `Button variant="link"` wrapped around
    * the label) to make it a real cross-reference — `Badge` draws whatever node
-   * it is given, so nothing about the chip itself needs to change for that. */
+   * it is given, so nothing about the chip itself needs to change for that.
+   *
+   * THE RECORD-TYPE WORD IS STILL NOT A CHIP. Seven `*-detail.tsx` files carry
+   * a "NO `collectionLabel`" note quoting the client's 2026-08-31 correction
+   * ("thats not a tg but the eyebrow remember"), each explaining that the type
+   * word was already said by the eyebrow directly above. The eyebrow is gone
+   * (2026-09-03, this file's header), and those notes are kept as the record of
+   * a ruling that did NOT change with it: the breadcrumb above this header says
+   * the type now, so passing `t("Task")`/`t("Meeting")`/… here would still be
+   * the same word twice on one screen. Do not read the missing eyebrow as a
+   * vacancy this chip should fill. */
   collectionLabel?: React.ReactNode
   /**
    * Anything else that belongs on the identity row — a status word, "Archived",
@@ -904,11 +915,12 @@ export function RecordScreen({
   errorAction?: React.ReactNode
 }) {
   const { t, lang } = useLanguage()
-  // THE CONDENSED STICKY TITLE (see condensed-title.tsx). `titleRef` watches
-  // the real title block below — the moment it scrolls out of the viewport,
-  // `condensed` flips and the small stand-in takes the sticky slot above the
-  // tab strip instead.
-  const { titleRef, condensed } = useCondensedTitle<HTMLSpanElement>()
+  // NOTHING WATCHES THIS TITLE ANY MORE. It used to carry a `titleRef` for the
+  // condensed stand-in bar's `useIsVisible` trigger (condensed-title.tsx,
+  // deleted 2026-09-03 — this file's header has the client's ruling), so the
+  // title block below is a plain node again and this screen scrolls its own
+  // header away with nothing taking its place. The tab strip is the only
+  // thing that pins (`STICKY_TABS`, below, now `top-0`).
 
   // THE FULL HEADER'S ORDER, REVERSED — CLIENT RULING, 2026-09-01, against a
   // real screenshot of a Ticket detail screen. New order, top to bottom: the
@@ -1043,9 +1055,9 @@ export function RecordScreen({
   // a same-size echo of the control gap one level down.
   const titleBlock =
     identityChips === undefined && subtitleLine === null ? (
-      <span ref={titleRef} className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+      <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     ) : (
-      <span ref={titleRef} className="flex min-w-0 flex-col">
+      <span className="flex min-w-0 flex-col">
         {identityChips !== undefined ? (
           <span className="mb-[var(--space-4)]">{identityChips}</span>
         ) : null}
@@ -1055,36 +1067,17 @@ export function RecordScreen({
         </span>
       </span>
     )
-  // THE CONDENSED BAR'S OWN HEIGHT, MEASURED — not a fixed token any more.
-  // Even now that the condensed bar carries only `eyebrow` and `title` (see
-  // `CondensedTitleBar`'s own doc, condensed-title.tsx), a longer translated
-  // eyebrow word or a title long enough to wrap can still change its line
-  // count, which is not knowable until the browser has laid it out.
-  // `usePublishCondensedHeight` measures the bar's own node and publishes it
-  // to `--record-tabs-top`, which `STICKY_TABS` reads (falling back to `0px`
-  // while not condensed).
-  const condensedBarRef = React.useRef<HTMLDivElement>(null)
-  usePublishCondensedHeight("--record-tabs-top", condensed, condensedBarRef)
   return (
     // `display: contents` — a real DOM node, so this component's children
     // become direct flex items of whatever this component's own caller
     // renders it into (every `*-detail.tsx`'s `flex flex-col gap-6`), exactly
     // as if `RecordChrome` were still the sole child.
     <div className="contents">
-      {/* NO `mark`, NO `pills` — CLIENT RULING, 2026-09-01: "for the detail
-          replicate the main: turn the breadcrumb + title in eyebrow title.
-          do not include image nor pills." The condensed bar used to be handed
-          `headerMark` and `identityChips` too (a separate, later-reversed
-          ruling the same day gave it both); `CondensedTitleBar` no longer
-          even HAS those two props (condensed-title.tsx), so this call is the
-          same shape `CollectionHeading` already uses for the main screen's
-          own condensed bar — eyebrow and title, nothing else. */}
-      <CondensedTitleBar
-        ref={condensedBarRef}
-        eyebrow={eyebrow}
-        title={title}
-        condensed={condensed}
-      />
+      {/* NO CONDENSED STAND-IN HEADER — client ruling, 2026-09-03: "when I
+          scroll down, the whole compressed title is useless, so remove that."
+          A `<CondensedTitleBar>` used to be the first thing this component
+          rendered; the file that drew it is deleted, and the tab strip below
+          is now the only thing a scrolled record screen pins. */}
       <RecordChrome
         className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS} ${TITLE_ACTIONS_SPLIT}`}
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
@@ -1201,7 +1194,18 @@ const TITLE_ACTIONS_SPLIT =
  * root (an ancestor of both), and each rule below just reads them. */
 const RECORD_TABS_GEOMETRY =
   "[--record-tab-strip-h:calc(var(--space-3)_+_var(--space-3)_+_0.125rem_+_(var(--text-sm)_*_var(--text-sm--line-height))_-_1px)] " +
-  "[--record-tab-gap:var(--space-5)]"
+  // THE GAP IS NOT THIS SCREEN'S TO CHOOSE ANY MORE — client ruling,
+  // 2026-09-03: "there needs to be space between the tabs and the start of the
+  // container. This is already correct on detail screens … Go and uniform
+  // that … change the rule and you apply it everywhere." This was
+  // `var(--space-5)` written out here, and a main screen's own strip was
+  // written with a deliberate ZERO at three call sites — two independent
+  // decisions where the client sees one. `--tab-content-gap` is that one
+  // decision (declared in `web/app/globals.css`), read here and by
+  // `STICKY_FOLDER_TABS` (shared/web/screen-engine/tabs-view.tsx). The value
+  // is unchanged, so a detail screen looks exactly as it did; what changed is
+  // that a main screen can no longer disagree with it.
+  "[--record-tab-gap:var(--tab-content-gap)]"
 
 /** PUSHES THE PANEL CARD DOWN, OUT OF THE FLOATING STRIP'S WAY. Sibling fix to
  * `STICKY_TABS`, applied on `RecordScreen`'s own root (reaches the kit's
@@ -1334,8 +1338,16 @@ const PANEL_BELOW_TABS =
  *     fix — it opts this one flex child out of the column's default stretch,
  *     back to sizing itself off its own tabs, the same as `max-w-full` +
  *     `overflow-x-auto` already assumed it did. */
+/* THE STRIP PINS AT THE PAGE'S OWN TOP EDGE — `top-0`, 2026-09-03. It used to
+ * read `--record-tabs-top`, a MEASURED clearance the condensed stand-in title
+ * published for it (a `ResizeObserver` on that bar, because a translated word
+ * could change its line count), so the strip sat under the bar rather than
+ * over it. The client deleted the bar — "when I scroll down, what is at the
+ * top should be only the tabs, if there are tabs" — so there is nothing left
+ * above the strip to clear, and the variable that carried the clearance went
+ * with the file that published it. */
 export const STICKY_TABS =
-  "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-[var(--record-tabs-top,0px)] [&>[role=tablist]]:z-10 " +
+  "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   "[&>[role=tablist]]:self-start [&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   "gap-[calc(var(--space-6)_+_var(--record-tab-gap))] " +

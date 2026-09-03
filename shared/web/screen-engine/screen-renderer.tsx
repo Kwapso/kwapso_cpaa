@@ -58,7 +58,7 @@ import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
 import { Gallery, type GalleryTile } from "@shared/ui/components/gallery/gallery"
-import { MoreHorizontal } from "@shared/ui/foundations/icons"
+import { DotsThree } from "@shared/ui/foundations/icons"
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import { DataTable, type DataTableColumn } from "@shared/ui/components/data-table/data-table"
 import {
@@ -620,7 +620,7 @@ function renderList(
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={t("Actions")}>
-                <MoreHorizontal className="size-4" />
+                <DotsThree className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

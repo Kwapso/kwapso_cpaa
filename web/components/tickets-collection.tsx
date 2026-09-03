@@ -91,7 +91,8 @@ import * as React from "react"
 
 import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
@@ -99,7 +100,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { AlarmClock, ArrowUpRight, MailOpen, Pencil, Plus, Send } from "@shared/ui/foundations/icons"
+import { Alarm, ArrowUpRight, EnvelopeOpen, PencilSimple, Plus, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
@@ -180,6 +181,13 @@ export function TicketsCollection({
   // Which type of ticket she was looking at, remembered with the rest of the
   // screen — the sub-tab is as much "where she was" as the search box under it.
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
+  // TRIAGE'S OWN SEARCH — client ruling, 2026-09-03: "the toolbar, including
+  // the search, should be absolutely everywhere we have a data view or a
+  // collection view. Stop hardcoding this." Triage still has no `<PagedFind>`
+  // to share a search box with (it is a small, whole-team-fetched queue, not a
+  // paged door read), so it needs one of its own rather than none at all —
+  // see `TriageQueue`'s own `query` prop below, which is what this narrows.
+  const [triageQuery, setTriageQuery] = React.useState("")
 
   // The team's own glyphs, scanned once for the whole strip rather than once
   // per tab. The vocabulary is a cache this screen's siblings already hold and
@@ -301,38 +309,63 @@ export function TicketsCollection({
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
-        {/* ONE STRIP, GENUINELY ATTACHED — the client's 2026-08-31 rulings, both
-            on this exact screen: "there can never be 2 rows of tabs … just
-            never", "toolbar must be inside of card background", and — once
-            "Raise ticket" had moved to share the tab row — "never align the
-            button with the tabs … that button belongs in the right of the
-            toolbar, part of the toolbar". So the strip carries nothing but
-            the tabs, and whatever follows attaches to it with ZERO gap. Before
-            v1.2.28 that gap had to stay zero for the folder tab's own
-            pulled-down feet to melt into the panel below rather than showing
-            on the base background; the folder shape is gone now
-            (tabs-view.tsx's own header) and the flush look is kept on its own
-            merits — the same join `SectionWithCreate`'s `folderTabs` slot
-            draws for apps-screen.tsx/sprints-screen.tsx/tasks-screen.tsx, and
-            `PagedFind`'s `wrap` now draws for Accounts. */}
+        {/* ONE STRIP, DRAWN THROUGH THE ONE SEAM — the client's 2026-08-31
+            rulings, both on this exact screen: "there can never be 2 rows of
+            tabs … just never", "toolbar must be inside of card background",
+            and — once "Raise ticket" had moved to share the tab row — "never
+            align the button with the tabs … that button belongs in the right
+            of the toolbar, part of the toolbar". So the strip carries nothing
+            but the tabs.
+
+            IT GOES THROUGH `renderFolderTabs` NOW, 2026-09-03, and that is the
+            whole of this screen's share of the client's spacing ruling ("go and
+            uniform that … don't hard-code page by page, but rather you change
+            the rule and you apply it everywhere"). This was the fourth
+            collection strip in the app and the only one drawing its own bare
+            `<TabsView>`: `SectionWithCreate`'s `folderTabs` slot (apps,
+            sprints, tasks) and `PagedFind`'s `tabs` (accounts, contacts,
+            meetings, and this screen's own rows below) both go through
+            `renderFolderTabs`, which is where the sticky rule and the
+            tab-to-content gap live. Drawing its own strip meant Tickets was
+            the one main screen whose tabs did NOT pin on scroll, and the one
+            place a fourth copy of the gap would have had to be written by
+            hand. Same three arguments, one seam, and the difference disappears
+            rather than being maintained. */}
         <div className="flex flex-col">
-          <TabsView config={tabsConfig} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+          {renderFolderTabs({ config: tabsConfig, value: facet, onValueChange: (v) => setFacet(v as HelpFacet) })}
 
           {facet === TRIAGE ? (
             <CollectionCard>
-              {/* THE TOOLBAR, EVEN WHERE IT HOLDS ONLY THE BUTTON. Triage is a
-                  queue, not a `<PagedFind>` toolbar, so there is no search/sort
-                  row to share — but "Raise ticket" still lives below the tabs
-                  rather than beside them (client ruling, 2026-08-31), so this
-                  bare `<ToolbarRow>` is Triage's own toolbar. */}
-              {canCreateTicket && (
-                <ToolbarRow className="mb-4" actions={<AddButton label={t("Raise ticket")} onClick={onCreate} />} />
-              )}
+              {/* THE TOOLBAR, NOW WITH ITS OWN SEARCH — CLIENT RULING,
+                  2026-09-03, SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO
+                  CARRY. Triage still has no `<PagedFind>` to share a search
+                  box with (it is a small, whole-team-fetched queue, not a
+                  paged door read) — but "no shared box" is a reason to draw
+                  its OWN, not a reason to draw none, and "Raise ticket" still
+                  lives below the tabs rather than beside them (client ruling,
+                  2026-08-31). Always drawn now (not gated on
+                  `canCreateTicket`), because search is for every reader who
+                  can see this queue, not only the ones who may raise a
+                  ticket. */}
+              <ToolbarRow
+                className="mb-4"
+                search={
+                  <SearchInput
+                    value={triageQuery}
+                    onChange={(e) => setTriageQuery(e.target.value)}
+                    onClear={() => setTriageQuery("")}
+                    placeholder={t("Search the triage queue…")}
+                    className="w-full"
+                  />
+                }
+                actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
+              />
               <TriageQueue
                 teamId={teamId}
                 canTriage={can("help", "edit")}
                 canEdit={can("help", "edit")}
                 helpTypeOptions={helpTypeOptions}
+                query={triageQuery}
                 // The engine's open intent carries a URL SEGMENT, not a permission
                 // module — its only consumer builds an address out of it
                 // (deep-link-screen.tsx). Everywhere else in the app the two words
@@ -536,12 +569,18 @@ function TriageQueue({
   canTriage,
   canEdit,
   helpTypeOptions,
+  query,
   onOpen,
 }: {
   teamId: string
   canTriage: boolean
   canEdit: boolean
   helpTypeOptions: string[]
+  /** The parent's own search box (see `TicketsCollection`'s `triageQuery`) —
+   * a plain in-memory match over the row's own reference + description, the
+   * two facts the row already shows, since this queue is whole-team-fetched
+   * rather than paged and has nothing to ask a door for. */
+  query: string
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -631,11 +670,29 @@ function TriageQueue({
   if (view.waiting.length === 0)
     return <EmptyLine concept="triage">{t("Nothing has been sitting unread. ")}</EmptyLine>
 
+  // THE TOOLBAR'S SEARCH, APPLIED — the row's own reference and description
+  // are the two facts already on screen, so a query narrows by either. NEVER
+  // TOOLBAR ON EMPTY COLLECTION still holds one level up (the ToolbarRow
+  // above this only ever draws once `view.waiting.length > 0`, checked above);
+  // this is the separate, ordinary "your search matched nothing" case.
+  const narrowed = query.trim() !== ""
+  const q = query.trim().toLowerCase()
+  const waiting = narrowed
+    ? view.waiting.filter(
+        (w) => (w.ref ?? "").toLowerCase().includes(q) || richTextPlain(w.description).toLowerCase().includes(q)
+      )
+    : view.waiting
+
+  if (waiting.length === 0)
+    return (
+      <EmptyLine concept="triage">{t("No entries in the triage queue match your search.")}</EmptyLine>
+    )
+
   return (
     <ul className="divide-border divide-y">
-      {view.waiting.map((w) => (
+      {waiting.map((w) => (
         <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
-          <AlarmClock className="text-destructive size-4 shrink-0" />
+          <Alarm className="text-destructive size-4 shrink-0" />
           <div className="min-w-0 flex-1">
             <span className="block truncate text-sm">
               {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
@@ -664,7 +721,7 @@ function TriageQueue({
               className="shrink-0"
               aria-label={t("Edit")}
             >
-              <Pencil className="size-3.5" />
+              <PencilSimple className="size-3.5" />
             </Button>
           )}
           <Button
@@ -673,7 +730,7 @@ function TriageQueue({
             onClick={() => setReplying(w)}
             className="shrink-0 gap-1"
           >
-            <Send className="size-3.5" />
+            <PaperPlaneTilt className="size-3.5" />
             {t("Reply")}
           </Button>
           <Button
@@ -700,7 +757,7 @@ function TriageQueue({
               onClick={() => void markRead(w.id)}
               className="shrink-0 gap-1"
             >
-              <MailOpen className="size-3.5" />
+              <EnvelopeOpen className="size-3.5" />
               {t("Mark it read")}
             </Button>
           )}

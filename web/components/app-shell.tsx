@@ -1,7 +1,7 @@
 "use client"
 
 // AppShell — the persistent frame every in-app screen sits inside. Desktop: a
-// left sidebar (team switcher, Home/Settings nav, profile). Mobile: a top bar
+// left sidebar (team switcher, House/Gear nav, profile). Mobile: a top bar
 // (switcher + profile) and a bottom tab bar. A breadcrumb strip (per page) shows
 // where you are and lets you climb back. One live channel for the active team is
 // opened here, refreshing caches when something changes. Composed from library
@@ -42,10 +42,10 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, BadgeCheck, Building2, CalendarClock, CalendarRange, Hammer, Home, LibraryBig, ListTodo, Palette, ProfileCircle, Route, Settings, LifeBuoy, Timer, MoreHorizontal } from "@shared/ui/foundations/icons"
-// `SeaWaves` is the audit module's mark and the kit's 96 have no glyph of that
+import { AppWindow, SealCheck, Buildings, Chat, CalendarDots, Hammer, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
+// `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
-import { SeaWaves } from "@shared/ui/foundations/icons"
+import { Waves } from "@shared/ui/foundations/icons"
 // THE NAVBAR ITSELF (R45). Was hand-rolled — its own button markup reading the
 // same `--spine-*` tokens the kit's Rail reads, its own group/divider layout,
 // its own collapse control — while `ScreenShell`'s rail COLUMN was already the
@@ -61,7 +61,7 @@ import { SeaWaves } from "@shared/ui/foundations/icons"
 // `null`/`false` below, and this file draws its own equivalents instead. Each
 // is a documented kit gap, not an oversight:
 //   · Rail's `groups` prop has no "no heading" shape for a destination that
-//     wants to sit outside every section (Home) — every RailGroup draws a
+//     wants to sit outside every section (House) — every RailGroup draws a
 //     clickable disclosure control over its items, even at an empty label.
 //     `StandaloneNavItem` below draws that one, token-for-token with Rail's
 //     own row treatment.
@@ -109,47 +109,49 @@ import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 import { toSpine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+import { AgentDockSlot } from "@/lib/agent-dock"
+import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 
 // Kwapso is `inRail: false` now (client, 31 Aug 2026 — see NavGroup in
 // pages.ts), so this mapping is never actually looked up — kept anyway, the
 // same way `settings` already sat here unused, so `NavItem.icon`'s union
 // stays fully covered rather than needing a cast at the one call site below.
-const NAV_ICONS = { home: Home, settings: Settings, kwapso: BadgeCheck } as const
+const NAV_ICONS = { home: House, settings: Gear, kwapso: SealCheck } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
-// a section without one falls back to Home, which is the tell that one is missing.
+// a section without one falls back to House, which is the tell that one is missing.
 //
 // TWO WERE MISSING, and the fallback is exactly why nobody noticed: `time` and
-// `meetings` shipped without a line, so the rail drew Home three times — Home,
+// `meetings` shipped without a line, so the rail drew House three times — House,
 // Time and Meetings wearing one icon, which a tester reported as "Meetings and
 // Time share the same icon". Both concepts already had their own glyph in
 // CONCEPT_ICON (`timer`, `calendar-clock`); only this map had not been told.
 // web/test/nav.test.ts now derives the required keys from TEAM_SECTIONS and
 // insists every icon is distinct, so a silent fallback cannot ship again.
-const SECTION_ICONS: Record<string, typeof Home> = {
-  accounts: Building2,
+const SECTION_ICONS: Record<string, typeof House> = {
+  accounts: Buildings,
   // The same glyph `CONCEPT_ICON.contacts` ("contact") resolves to everywhere
   // else it is drawn (the alias chain in shared/web/screen-engine/icon-names.ts
-  // — "contact" → "profile-circle" → ProfileCircle) — one concept, one icon,
+  // — "contact" → "profile-circle" → AddressBook) — one concept, one icon,
   // whether the rail draws it as a component or a screen draws it by name.
-  contacts: ProfileCircle,
-  tickets: LifeBuoy,
-  knowledge: LibraryBig,
-  processes: Route,
+  contacts: AddressBook,
+  tickets: Tray,
+  knowledge: HardDrives,
+  processes: GitFork,
   stories: Hammer,
-  sprints: CalendarRange,
+  sprints: CalendarDots,
   // The package a client bought — several sprints arriving together.
-  waves: SeaWaves,
+  waves: Waves,
   apps: AppWindow,
-  tasks: ListTodo,
+  tasks: CheckSquare,
   time: Timer,
-  meetings: CalendarClock,
+  meetings: Chat,
   brand: Palette,
 }
 
 /** THE SAME ROW SKIN RAIL'S OWN `RailRow` DRAWS, for the one destination that
- * sits outside any of Rail's `groups` (Home — see `NavGroup` in lib/pages.ts).
+ * sits outside any of Rail's `groups` (House — see `NavGroup` in lib/pages.ts).
  * Copied token-for-token from `templates/rail.tsx`'s private
  * `ROW_SHAPE`/`ROW_EXPANDED`/`ROW_COLLAPSED`/`ACTIVE_TREATMENT`/`ROW_IDLE`
  * (none of them exported — a kit gap, not a choice), so the standalone entry
@@ -160,7 +162,7 @@ function StandaloneNavItem({
   collapsed,
   onSelect,
 }: {
-  item: { slug: string; title: string; Icon: typeof Home }
+  item: { slug: string; title: string; Icon: typeof House }
   active: boolean
   collapsed: boolean
   onSelect: () => void
@@ -180,7 +182,7 @@ function StandaloneNavItem({
       ? "size-[var(--avatar-md)] justify-center rounded-pill p-0"
       // Transcribed from the kit's own `ROW_EXPANDED` (rail.tsx), which stopped
       // bleeding to the rail's true edge in v1.2.22 — the client asked for the
-      // active pill to keep "a bit of blank space on the sides". Home is the
+      // active pill to keep "a bit of blank space on the sides". House is the
       // one destination outside any group, so it is drawn here rather than by
       // the rail composition, and the kit exports no row-shape constant to
       // import; keeping the two in step is manual until it does.
@@ -195,7 +197,7 @@ function StandaloneNavItem({
       ? "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)] font-[var(--font-weight-medium)] hover:bg-[var(--spine-active-hover)]"
       // `--ink-secondary`, not `--spine-ink-quiet` — the same darker-chip
       // tier the kit-drawn rows get via the descendant-selector override on
-      // `railContent`'s own root, below. Home is a "chip" too (Standalone
+      // `railContent`'s own root, below. House is a "chip" too (Standalone
       // Nav Item's whole point is to draw the same row Rail draws), so it
       // reads the token directly here instead of needing a selector of its own.
       : "text-[var(--ink-secondary)] hover:text-[var(--spine-ink)]",
@@ -265,7 +267,7 @@ function NavBrandHeader({
 }) {
   // THE MARK IS THE WAY HOME (client, 31 Aug 2026): "remove home from navbar,
   // make that when we click the icon kwapso on top of sidebar it takes us
-  // there" — Welcome (the old "Home") has no rail row of its own any more
+  // there" — Welcome (the old "House") has no rail row of its own any more
   // (`inRail: false` in pages.ts), so the brand mark is now its only entry
   // point besides landing here straight off sign-in.
   return (
@@ -332,12 +334,12 @@ export function AppShell({
   }, [userScale])
 
   // WHICH SPINE THE SIDEBAR IS PAINTED IN — ink, paper or mango, chosen in
-  // Settings (shared/web/spine-section.tsx) and persisted on the person's own
+  // Gear (shared/web/spine-section.tsx) and persisted on the person's own
   // row exactly as `scale` is, so it follows them between devices. Unlike
   // scale this is an ordinary React prop rather than a document-level side
   // effect: `toSpine` falls back to the default for null/unrecognised, which
   // has been MANGO since the client's ruling of 2026-09-02 — it was paper, to
-  // keep a person who had never opened Settings on the rail they already had,
+  // keep a person who had never opened Gear on the rail they already had,
   // and that argument is recorded in shared/spine.ts where it was overturned.
   const spine = toSpine(active.user?.spine)
 
@@ -413,6 +415,13 @@ export function AppShell({
   // always-drawn band is not free. One key, one request: both callers go
   // through `loadShared`.
   const runningTimers = useRunningTimers(teamId)
+  // IS THE ASSISTANT SHOWING. The same module store the panel itself reads
+  // (web/lib/agent-open.ts) — read here because the shell's third column is
+  // CONTROLLED by it: the kit holds the aside's state uncontrolled unless it is
+  // given one, and a state it held privately could not be persisted per person
+  // or shared with the panel's other presentation. One flag, two readers, never
+  // two answers.
+  const assistantOpen = useAgentOpen()
   // THE TRAIL, AS ONE ARRAY, BECAUSE TWO THINGS READ IT. The strip itself and
   // the DEPTH the shell derives the title's step from have to be the same
   // fact; `breadcrumbs` is optional at the prop, so it is normalised once here
@@ -438,7 +447,7 @@ export function AppShell({
   // page, it just asks each one where it goes. A section gated by a right the
   // caller lacks vanishes from its group, and a group that empties out draws
   // no heading.
-  type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string; group: NavGroup | "none" }
+  type ShellLink = { slug: string; title: string; Icon: typeof House; path: string; group: NavGroup | "none" }
   const universal: ShellLink[] = NAV.filter((i) => !i.need && i.inRail !== false).map((i) => ({
     slug: i.slug,
     title: t(i.title),
@@ -450,9 +459,9 @@ export function AppShell({
     ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && can(s.module, "read")).map((s) => ({
         slug: s.key,
         title: t(s.title),
-        Icon: SECTION_ICONS[s.key] ?? Home,
+        Icon: SECTION_ICONS[s.key] ?? House,
         // Clean top-level URL (/stories, /tickets) — resolves the active team from
-        // context, like Home. (The gateway serves the shell for any sub-path.)
+        // context, like House. (The gateway serves the shell for any sub-path.)
         path: `/${s.segment}`,
         group: s.group ?? "my-work",
       }))
@@ -491,7 +500,7 @@ export function AppShell({
   const railBlocks: ShellLink[][] = [homeStandalone, ...namedGroups].filter((b) => b.length > 0)
 
   // THE RAIL'S GROUPS, IN THE KIT'S OWN SHAPE (R45) — the four NAMED sections
-  // only; Home is drawn outside the kit's own Rail entirely by
+  // only; House is drawn outside the kit's own Rail entirely by
   // `StandaloneNavItem` (see the note above it). One `RailItem` per
   // destination, the same icon vocabulary the tabs use (`item.Icon`), and a
   // plain `onSelect` — deliberately NO `href`. Rail's own `<a>` fires
@@ -707,9 +716,9 @@ export function AppShell({
   // The nav region still scrolls INSIDE its own wrapper (`min-h-0 flex-1
   // overflow-y-auto`), not the whole column, so a long list of sections can
   // never push the standalone anchor or the account menu off screen — Rail's
-  // own `min-h-full` needs a sized box to fill, and this wrapper is it. Home
+  // own `min-h-full` needs a sized box to fill, and this wrapper is it. House
   // sits OUTSIDE that scrolling wrapper (the same "the anchor keeps its end
-  // of the rail" property the old Home-first/Settings-last order had), so it
+  // of the rail" property the old House-first/Gear-last order had), so it
   // never scrolls out of view.
   //
   // THE COLLAPSE CONTROL IS THE SHELL'S NOW, AND IT IS NOT DRAWN HERE. This
@@ -855,14 +864,14 @@ export function AppShell({
 
           THE ACTUAL BUG THAT KEPT RECURRING WAS NEVER HERE — it was that
           this div wraps ONLY `<Rail>` (below), and `StandaloneNavItem`'s
-          entries (Home, `homeStandalone.map` above) render BEFORE this div,
+          entries (House, `homeStandalone.map` above) render BEFORE this div,
           entirely outside it. Every prior pass fixed `<Rail>`'s own rows —
-          first this override, then the kit itself — and Home's separate,
+          first this override, then the kit itself — and House's separate,
           hand-copied skin (this file's own `StandaloneNavItem`, which has
           to duplicate the kit's row shape at all only because rail.tsx never
           exports `ROW_EXPANDED`/`ROW_COLLAPSED` — see that function's own
           header) kept its stale `rounded-none` untouched through both,
-          because nobody traced that Home takes neither code path. Fixed
+          because nobody traced that House takes neither code path. Fixed
           2026-09-02 by matching `StandaloneNavItem`'s own literal to the
           kit's current value. The durable fix — exporting the kit's row
           constants so there is only one shape to drift — is still owed;
@@ -1062,12 +1071,12 @@ export function AppShell({
               to be wider than a phone. It is three segments the kit will not
               collapse to an icon, and on a 375px screen it pushed the avatar
               off the edge and the whole PAGE sideways with it. It lives in
-              Settings, under the text size, and in the profile menu. */}
+              Gear, under the text size, and in the profile menu. */}
           <ProfileMenu active={active} />
         </div>
       </header>
 
-      {/* THE SHELL. `spine={spine}` — the person's own Settings · Sidebar
+      {/* THE SHELL. `spine={spine}` — the person's own Gear · Sidebar
        * choice (shared/spine.ts), which defaults to MANGO since the client's
        * ruling of 2026-09-02 and is offered again at onboarding. It defaulted
        * to paper before that, which is also what this file hardcoded before
@@ -1111,9 +1120,9 @@ export function AppShell({
            `position: sticky` resolves its offsets against the SCROLLPORT'S
            PADDING BOX, and the kit's body pane is `p-[var(--space-6)]
            lg:p-[var(--space-7)]`. So every sticky bar this app draws inside
-           the pane — the condensed title (`condensed-title.tsx`), the record
-           tab strip (`STICKY_TABS`, record-chrome.tsx) and the collection tab
-           strip (`shared/web/screen-engine/tabs-view.tsx`) — pins 32px BELOW
+           the pane — the record tab strip (`STICKY_TABS`, record-chrome.tsx)
+           and the collection tab strip
+           (`shared/web/screen-engine/tabs-view.tsx`) — pins 32px BELOW
            the pane's own top edge, while the pane CLIPS at that edge. The band
            between the two is inside the scroller, so content scrolls THROUGH
            it: measured at 1440x900, a probe row sat at y=50.5-90.5 with the
@@ -1128,9 +1137,11 @@ export function AppShell({
            still floors that div to the pane and the footer still lands on the
            pane's floor), and a sticky child now pins at the pane's true top
            edge with nothing able to show above it. Only the BLOCK-START edge
-           moves — the pane keeps its own inline padding, so
-           `CondensedTitleBar`'s `-mx`/`px` bleed still reaches exactly the
-           edge it was measured against.
+           moves — the pane keeps its own inline padding, so the bleed on
+           `STICKY_TABS` still reaches exactly the edge it was measured
+           against. (That bleed belonged to `CondensedTitleBar` until it was
+           deleted on 2026-09-03; the strip inherited both the bleed and the
+           measurement, which is why this paragraph still holds.)
 
            IT IS AN OVERRIDE HERE AND NOT A KIT EDIT for the reason the five
            rail overrides above give: `shared/ui/` is vendored and pinned and a
@@ -1161,16 +1172,51 @@ export function AppShell({
         onRailCollapsedChange={persistCollapsed}
         railCollapseLabel={t("Collapse")}
         railExpandLabel={t("Expand")}
-        /* NO `aside`, DELIBERATELY, AND THE COLUMN IS LEFT EMPTY RATHER THAN
-           FILLED. The kit's third column is where the assistant would dock,
-           and the assistant is a Radix `Sheet` today (`agent-panel.tsx`,
-           mounted once at the root in `agent-host.tsx`). Turning a slide-over
-           into a permanent column is not a prop change: it lands on the
-           scroll-lock workaround in `shared/web/library-overrides.css`, which
-           both front doors share and which is written against a page that
-           scrolls. That is its own change, on its own day. Passing `aside`
-           here would draw a second edge handle and a 380px column with
-           nothing in it. */
+        /* THE ASSISTANT'S COLUMN — the rail's mirror, and the shell's own
+           third level. Passed as an EMPTY BOX, not as the panel: the panel is
+           mounted once at the ROOT (agent-host.tsx) so it outlives the
+           navigation it causes itself, and it portals its elements into this
+           box (web/lib/agent-dock.tsx has the whole argument, and
+           web/test/agent-host.test.ts still locks the panel out of this file).
+
+           SHUT MEANS ABSENT, AND THAT IS THE CLIENT'S OWN SENTENCE ("closed
+           asstant show nothing. it's literally only the bar"). The kit does
+           it: with `asideOpen` false it renders no column at all — not a
+           zero-width box, not an icon strip — and the card takes the width
+           back. Only the 3px handle stays, in the ground's own gutter. So
+           nothing here needs a second opinion about the closed state; passing
+           the slot unconditionally is what makes the HANDLE exist, and the
+           handle is the only assistant control on a wide screen (the mango
+           launcher is not drawn there — `SHELL.md`'s one-mango rule, argued in
+           agent-host.tsx).
+
+           GATED THE SAME WAY THE LAUNCHER ALWAYS WAS. No `agent:create`, no
+           column and no handle: a bar that opens an empty panel is worse than
+           no bar. The server re-checks every action regardless.
+
+           BELOW `md` THE KIT DROPS THIS COLUMN ITSELF, and the assistant
+           becomes the floating panel again — one decision, taken by width in
+           agent-host.tsx against the kit's own 48rem, never a second copy of
+           the panel.
+
+           THE OPEN STATE IS CONTROLLED AND PERSISTED, exactly as the rail's
+           collapse is one prop above: the value goes down (`asideOpen`) and
+           every change comes back (`onAsideOpenChange`) to the module store
+           that mirrors it to `localStorage`, so the column the person left
+           open is the column they come back to.
+
+           THE LABELS ARE THE KIT'S NOUNS, in this app's catalogue. Unlike the
+           rail's "Collapse"/"Expand" — which were this app's words before the
+           handle moved into the kit — the assistant had no shorter name of its
+           own: "Open the assistant" was already the launcher's own label and
+           "Close the assistant" is new (R28: extracted, catalogued, and the
+           ceiling moved in the same commit). */
+        aside={can("agent", "create") ? <AgentDockSlot /> : undefined}
+        asideLabel={t("Assistant")}
+        asideOpen={assistantOpen}
+        onAsideOpenChange={setAgentOpen}
+        asideOpenLabel={t("Open the assistant")}
+        asideCloseLabel={t("Close the assistant")}
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
              stated at the kit's own `breadcrumb` prop: no buttons, no pills,
@@ -1257,14 +1303,20 @@ export function AppShell({
          * every screen is `ScreenShell`'s body pane
          * (`[data-slot="screen-shell-body"]`), the direct parent of this div;
          * the page itself is `h-dvh overflow-hidden` and does not move. So the
-         * sticky layers this div wraps — the condensed title bar
-         * (`condensed-title.tsx`), the record tab strip (`STICKY_TABS`,
+         * sticky layers this div wraps — the record tab strip (`STICKY_TABS`,
          * record-chrome.tsx) and the collection tab strip
          * (`shared/web/screen-engine/tabs-view.tsx`) — now pin to the pane
          * instead of to the window, which is what they always read as. Turning
          * THIS div into a scroll container would put a second scroller between
-         * them and the pane and break all three the same way; `clip` is still
-         * what stops that.
+         * them and the pane and break both the same way; `clip` is still what
+         * stops that.
+         *
+         * THERE WERE THREE OF THEM UNTIL 2026-09-03. The condensed title bar
+         * was the first, and it is gone — client: "when i scroll down, the
+         * whole compressed title is useless, so remove that. When I scroll
+         * down, what is at the top should be only the tabs." Its measured
+         * offset mechanism went with it: both strips pin at `top-0` now
+         * because there is nothing above them to clear.
          *
          * ONE PAGE CONTAINER, ONE CAP, ON THE SHELL (R29, UI-RULEBOOK L1). This
          * used to live one level down, in `deep-link-screen.tsx`'s own return —
@@ -1395,7 +1447,7 @@ export function AppShell({
                 : "text-muted-foreground"
             }`}
           >
-            <MoreHorizontal className="size-5 shrink-0" />
+            <DotsThree className="size-5 shrink-0" />
             <span className="w-full text-center leading-tight">{t("More")}</span>
           </button>
         )}

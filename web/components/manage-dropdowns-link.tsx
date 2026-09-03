@@ -14,7 +14,7 @@
 // opens the one door Settings itself offers — `?tab=choices`, the same
 // `initialTab` mechanism the Kwapso screen's own `?tab=` already uses.
 
-import { Settings2 } from "@shared/ui/foundations/icons"
+import { Sliders } from "@shared/ui/foundations/icons"
 
 import { usePermissions } from "@/lib/perms"
 import { InAppLink } from "@/components/in-app-link"
@@ -30,7 +30,7 @@ export function ManageDropdownsLink({ teamId }: { teamId: string | null }) {
       href="/settings?tab=choices"
       className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
     >
-      <Settings2 className="size-3" aria-hidden />
+      <Sliders className="size-3" aria-hidden />
       {t("Manage choices")}
     </InAppLink>
   )

@@ -31,6 +31,7 @@ import {
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
+  TOOLBAR_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -2470,6 +2471,110 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R48 — THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT.
+  //
+  // Client ruling, correcting a narrower fix already shipped once: "I don't
+  // care here. You're giving me specifics, and I told you that the toolbar,
+  // including the search, should be absolutely everywhere we have a data view
+  // or a collection view. Stop hardcoding this. Just write it as a rule."
+  //
+  // Two censuses, off the disk, never a hand-list — the same shape R29's page
+  // width and R31's radius vocabulary already use:
+  //
+  //   i.  Every `BASE_RECIPES` (web/lib/screens.ts) entry whose recipe carries
+  //       a `CollectionConfig` must have `searchable: true`, the ENGINE'S own
+  //       default (`defaultCollectionConfig`, config.ts) — or be named in
+  //       `TOOLBAR_EXEMPT` with the real reason search lives elsewhere.
+  //   ii. Every `<ToolbarRow>` call site (screen-bits.tsx's own bespoke
+  //       toolbar, reached by a BOUNDED collection with no recipe search to
+  //       inherit — apps, sprints, tasks' Calendar tab, Triage, every nested
+  //       panel) must pass a `search` prop, or be named in the same registry.
+  //
+  // (ii) is a brace-depth-aware scan rather than a plain regex, because a
+  // `search={<SearchInput .../>}` prop is not the only thing between
+  // `<ToolbarRow` and its own closing `>` — `actions={<AddButton .../>}` sits
+  // there too, nested JSX and all, and a naive "first `>` wins" read would
+  // stop at the INNER element's close tag and call the outer `<ToolbarRow`
+  // self-closing with no props read at all.
+  it("toolbar-shows-search: a collection/data-view screen shows search by default (R48)", () => {
+    // i · THE RECIPE CENSUS.
+    const recipeOffenders: string[] = []
+    const recipeExemptUsed = new Set<string>()
+    for (const [key, recipe] of Object.entries(BASE_RECIPES)) {
+      if (!recipe.collection) continue // a detail recipe — nothing to search
+      if (recipe.collection.searchable) continue
+      if (key in TOOLBAR_EXEMPT) {
+        recipeExemptUsed.add(key)
+        continue
+      }
+      recipeOffenders.push(
+        `${key}: this recipe's collection.searchable is false and it is not in TOOLBAR_EXEMPT — ` +
+          `either turn search on, or name the reason (a host <PagedFind>/<ToolbarRow> that already supplies it)`
+      )
+    }
+    expect(
+      recipeOffenders,
+      `R48 — every BASE_RECIPES collection shows search by default:\n  ${recipeOffenders.join("\n  ")}`
+    ).toEqual([])
+
+    // ii · THE <ToolbarRow> CALL-SITE CENSUS.
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const rowOffenders: string[] = []
+    const rowExemptUsed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      // screen-bits.tsx DECLARES <ToolbarRow> — it is not a call site of it.
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue
+      const src = stripComments(f.source)
+      let from = 0
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        // A reference in prose (a backticked mention) rather than real JSX —
+        // stripComments already removed // and /* */ comments, so what is left
+        // here is either the genuine tag or, rarely, a JSDoc-style line this
+        // repo writes as `` `<ToolbarRow>` `` inside a /** */ block, which
+        // stripComments also removes. Nothing legitimate reaches this point
+        // that isn't the real tag.
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        // Walk to this tag's OWN closing `>` — the one at braceDepth 0, so a
+        // `search={<SearchInput onClear={() => …} />}` prop's own nested tags
+        // and braces are skipped rather than ending the scan early.
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        const hasSearch = /\bsearch\s*=/.test(tag)
+        if (!hasSearch) {
+          if (f.rel in TOOLBAR_EXEMPT) rowExemptUsed.add(f.rel)
+          else
+            rowOffenders.push(
+              `${f.rel}: a <ToolbarRow> with no \`search\` prop, and the file is not in TOOLBAR_EXEMPT`
+            )
+        }
+        from = i + 1
+      }
+    }
+    expect(
+      rowOffenders,
+      `R48 — every <ToolbarRow> call site carries a \`search\` prop, or is named in TOOLBAR_EXEMPT with a real reason:\n  ${rowOffenders.join("\n  ")}`
+    ).toEqual([])
+
+    // iii · THE RATCHET, BOTH DIRECTIONS — the same shape R29/R31/R32 already
+    // run: an entry nothing uses is a pin left behind by a screen that got
+    // fixed, and it has to go, or the list stops being able to only shrink.
+    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed])
+    const stale = Object.keys(TOOLBAR_EXEMPT).filter((k) => !usedKeys.has(k))
+    expect(
+      stale,
+      `these TOOLBAR_EXEMPT entries match nothing any more — the recipe or call site now shows search, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "declared-readers", // R42: workers/content/test/source-readers.test.ts
@@ -2519,6 +2624,7 @@ describe("RULES — the laws of the base", () => {
       "composition-coverage", // R45: the direct-import census above, over the 47 files in shared/ui/compositions/
       "assistant-coverage", // R47: workers/mcp/test/assistant-coverage.test.ts — the module census, beside R19/R22/R27/R43 on the same door census
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
+      "toolbar-shows-search", // R48: the BASE_RECIPES + <ToolbarRow> censuses below
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

@@ -26,7 +26,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "@shared/ui/foundations/icons"
+import { Alarm, StopCircle, Clock, PencilSimple, Play, Trash } from "@shared/ui/foundations/icons"
 
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
@@ -162,13 +162,13 @@ function RunawayPrompts({
           className="bg-destructive/5 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] px-3 py-2 text-sm"
         >
           <span>
-            <AlarmClockOff className="mr-1.5 inline size-3.5" />
+            <Alarm className="mr-1.5 inline size-3.5" />
             {t("A timer on")} <strong>{timer.targetLabel ?? t("something")}</strong>{" "}
             {t("has been running for")} {clockFrom(timer.elapsedSeconds)}.
           </span>
           <span className="flex gap-2">
             <Button variant="secondary" size="sm" className="gap-1" onClick={() => onAnswer(timer.id, "keep")}>
-              <CircleStop className="size-3.5" />
+              <StopCircle className="size-3.5" />
               {t("Keep it all")}
             </Button>
             <Button
@@ -177,7 +177,7 @@ function RunawayPrompts({
               className="gap-1"
               onClick={() => onAnswer(timer.id, "discard")}
             >
-              <Trash2 className="size-3.5" />
+              <Trash className="size-3.5" />
               {t("Bin it")}
             </Button>
           </span>
@@ -386,7 +386,7 @@ export function TimePanel({
                           className="shrink-0"
                           aria-label={t("Edit")}
                         >
-                          <Pencil className="size-3.5" />
+                          <PencilSimple className="size-3.5" />
                         </Button>
                       )}
                     </li>

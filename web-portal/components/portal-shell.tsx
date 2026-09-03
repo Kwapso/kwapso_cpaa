@@ -27,7 +27,7 @@ import { AppearanceMenu } from "@shared/web/appearance-menu"
 import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spacer } from "@shared/ui/components/spacer/spacer"
-import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
+import { Buildings, House, Tray, SignOut, Package, PiggyBank } from "@shared/ui/foundations/icons"
 import { Logotype } from "@shared/ui/components/brand/brand"
 import { AuthPhotograph } from "@shared/ui/compositions/templates/sign-in"
 
@@ -63,10 +63,10 @@ import { AccountSwitcher } from "@/components/account-switcher"
  * navigation, not a smaller icon. */
 const DESTINATIONS = [
   { href: "/home", label: "Home", icon: House },
-  { href: "/tickets", label: "Tickets", icon: LifeBuoy },
+  { href: "/tickets", label: "Tickets", icon: Tray },
   { href: "/impact", label: "Impact", icon: PiggyBank },
   { href: "/deliverables", label: "Deliverables", icon: Package },
-  { href: "/company", label: "My company", icon: Building2 },
+  { href: "/company", label: "My company", icon: Buildings },
 ] as const
 
 /** What every screen is handed once the shell has decided the person is real and
@@ -192,7 +192,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
               sideways. See shared/web/appearance-menu.tsx. */}
           <AppearanceMenu />
           <Button variant="ghost" size="icon" aria-label={t("Sign out")} onClick={() => void signOut()}>
-            <LogOut className="size-3.5" />
+            <SignOut className="size-3.5" />
           </Button>
         </div>
       </header>

@@ -551,10 +551,12 @@ async function scale(request: Request, env: Env): Promise<Response> {
   return json(await setScale(env, user, chosen))
 }
 
-/** WHICH SPINE THIS PERSON WANTS THE SIDEBAR PAINTED IN. `scale`'s twin, one
- * field along: both are one word about one reader, both are read off
- * `SessionUser` by `web/components/app-shell.tsx`, and both must survive a
- * device change.
+/** WHICH SPINE THIS PERSON WANTS THE APP PAINTED IN — the rail, the ground
+ * around the floating content card, everything behind the app, not the rail
+ * alone (the field reads "Background" now, renamed from "Sidebar"). `scale`'s
+ * twin, one field along: both are one word about one reader, both are read
+ * off `SessionUser` by `web/components/app-shell.tsx`, and both must survive
+ * a device change.
  *
  * R20, positionally: `body.spine` sits as `requireText`'s first argument and
  * then as `isSpine`'s only argument, and `isSpine` is a real check against
@@ -566,8 +568,8 @@ async function spine(request: Request, env: Env): Promise<Response> {
   if (!user) return fail(401, "signed_out", "Not signed in.")
 
   const body = (await request.json().catch(() => ({}))) as { spine?: unknown }
-  const chosen = requireText(body.spine, "Sidebar", 16)
-  if (!isSpine(chosen)) return fail(400, "bad_spine", "That is not a sidebar kwapso offers.")
+  const chosen = requireText(body.spine, "Background", 16)
+  if (!isSpine(chosen)) return fail(400, "bad_spine", "That is not a background kwapso offers.")
 
   return json(await setSpine(env, user, chosen))
 }

@@ -414,13 +414,13 @@ import {
 } from "../../components/tooltip/tooltip";
 import { Hint, Text } from "../../components/typography/typography";
 import {
-  ChartNoAxesColumn,
-  ChevronDown,
-  ChevronRight,
-  LibraryBig,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
+  SquaresFour,
+  CaretDown,
+  CaretRight,
+  Books,
+  CaretLineLeft,
+  CaretLineRight,
+  Gear,
 } from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
@@ -721,20 +721,19 @@ export interface RailProps
    * decision that cannot be made in the stylesheet is made here. A call site
    * that supplies its own rail node and its own spine passes both.
    *
-   * TWO VALUES SINCE 2026-09-02, NOT THREE. The client cut the spines to
-   * QUIET and MANGO; `ink` and `paper` are retired and are not aliased. It
-   * costs this file one branch: `ink` was the only ground that was dark in
-   * BOTH palettes and therefore the only one that needed the permanently
-   * reversed `unlit` cut. Quiet's ground follows the palette (#F7F2EB light,
-   * #1C1B18 dark), which is exactly what the `paper` CUT already tracks, so
-   * quiet takes it and the third branch is gone rather than re-homed.
+   * THREE VALUES AGAIN, 2026-09-03 — the client's own words, "you know, i
+   * changed my mind. i want to go back to the 3 options (sorry)", after a
+   * day with `ink` and `paper` retired as `"quiet"` and `"mango"`. Restored
+   * rather than re-derived: `ink` gets back its `unlit` cut below, the one
+   * branch the interlude cost this file.
    *
-   * NOTE THE TWO VOCABULARIES THAT STILL SHARE A WORD. `paper` below is a
-   * `brand.tsx` CUT — which artwork file to load — and it is unrelated to
-   * the retired `paper` SPINE. The cut keeps its name; the spine has lost
-   * its own.
+   * NOTE THE TWO VOCABULARIES THAT SHARE A WORD. `paper` below is a
+   * `brand.tsx` CUT — which artwork file to load — and it is a different
+   * thing from the `paper` SPINE two lines up, which is a `ScreenShell`
+   * ground. The cut and the spine happen to share a name; neither is derived
+   * from the other.
    */
-  spine?: "quiet" | "mango";
+  spine?: "ink" | "paper" | "mango";
 
   /**
    * The head of the rail. `null` draws none. Defaults to the real artwork —
@@ -804,7 +803,7 @@ export interface RailProps
 
    This is the default the shell falls back to, so it is what forty screens
    will draw, so it is the register the kit itself draws on those screens:
-   two groups called Group, four then three entries, Overview first, Settings
+   two groups called Group, four then three entries, Overview first, Gear
    last, the second entry lit. Not one word here is invented and not one is a
    product's.
 
@@ -818,7 +817,7 @@ export interface RailProps
    are the kit's own placeholders, "Collection" five times over, and a
    placeholder word takes a placeholder glyph. Each of the three distinct
    words takes the icon whose NAME in the kit's own set is the same concept —
-   a summary for Overview, a library for Collection, Settings for Settings —
+   a summary for Overview, a library for Collection, Gear for Gear —
    so nothing is coined and nothing is asserted about a real screen. All icon
    ARTWORK in this repo is still placeholder (ICON-LANGUAGE.md: "No glyph has
    been drawn"), so all three render the same rounded square today and what
@@ -830,19 +829,19 @@ const PLACEHOLDER_GROUPS: readonly RailGroup[] = [
     id: "group-1",
     heading: "Group",
     items: [
-      { id: "overview", label: "Overview", icon: <ChartNoAxesColumn aria-hidden="true" /> },
-      { id: "collection-1", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-2", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-3", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
+      { id: "overview", label: "Overview", icon: <SquaresFour aria-hidden="true" /> },
+      { id: "collection-1", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-2", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-3", label: "Collection", icon: <Books aria-hidden="true" /> },
     ],
   },
   {
     id: "group-2",
     heading: "Group",
     items: [
-      { id: "collection-4", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "collection-5", label: "Collection", icon: <LibraryBig aria-hidden="true" /> },
-      { id: "settings", label: "Settings", icon: <Settings aria-hidden="true" /> },
+      { id: "collection-4", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "collection-5", label: "Collection", icon: <Books aria-hidden="true" /> },
+      { id: "settings", label: "Settings", icon: <Gear aria-hidden="true" /> },
     ],
   },
 ];
@@ -1093,7 +1092,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
       groups = PLACEHOLDER_GROUPS,
       current = PLACEHOLDER_CURRENT,
       onSelect,
-      spine = "quiet",
+      spine = "paper",
       mark,
       wordmark = null,
       tagline = null,
@@ -1134,19 +1133,17 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
        the media query would load the reversed artwork onto #FED069. `brand`
        is the field that always draws the black cut, in both palettes, which
        is also the accent law ("charcoal on every accent, no exceptions").
-       The `paper` CUT swaps with the theme, and QUIET is the ground that
-       actually swaps — #F7F2EB in light, #1C1B18 in dark — so it takes that
-       cut and gets the right artwork in both palettes for free.
+       `unlit` is the always-reversed field the charcoal spine needs in both
+       palettes; only `paper` swaps with the theme, and only the paper spine
+       is a ground that actually swaps.
 
-       THE THIRD BRANCH IS GONE WITH THE THIRD SPINE, 2026-09-02. It read
-       `spine === "ink" ? "unlit"`, and `unlit` is the ALWAYS-reversed cut: it
-       existed because `ink` was the one ground that stayed dark while the
-       palette went light, so a theme-following cut would have put black
-       artwork on charcoal. Quiet has no such problem — its ground follows the
-       palette by definition — so `unlit` is not re-homed onto it. The cut
-       still exists in `brand.tsx` for anything else standing on a fixed dark
-       ground; nothing in this file reaches for it now. */
-    const markField = spine === "mango" ? "brand" : "paper";
+       RESTORED 2026-09-03 ALONGSIDE THE THIRD SPINE. The interlude's own note
+       here explained why the branch could go: quiet's ground follows the
+       palette by definition, so it never needed the reversed cut. Ink is
+       back and so is the reason — it is the one ground that stays dark in
+       BOTH palettes, so a theme-following cut would put black artwork on
+       charcoal. */
+    const markField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper";
 
     /* WHETHER THE EXPANDED ROWS DRAW AN ICON COLUMN — one decision for the
        whole rail, taken here, so a single glyph-less destination cannot pull
@@ -1364,9 +1361,9 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
                         read as a second, unrelated control. */}
                     <span className="min-w-0 truncate">{group.heading}</span>
                     {open ? (
-                      <ChevronDown aria-hidden="true" />
+                      <CaretDown aria-hidden="true" />
                     ) : (
-                      <ChevronRight aria-hidden="true" />
+                      <CaretRight aria-hidden="true" />
                     )}
                   </button>
                 ) : null}
@@ -1405,9 +1402,9 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             )}
           >
             {isCollapsed ? (
-              <PanelLeftOpen aria-hidden="true" />
+              <CaretLineRight aria-hidden="true" />
             ) : (
-              <PanelLeftClose aria-hidden="true" />
+              <CaretLineLeft aria-hidden="true" />
             )}
             {!isCollapsed ? (
               <span className="min-w-0 flex-1 truncate">{collapseLabel}</span>
@@ -1423,7 +1420,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             ink that rung is still the off-beige / raised chip 27.1 and 27.26
             draw at the foot; nothing here picks a colour.
 
-            26.02: "no member list (that lives in Settings)". One chip. */}
+            26.02: "no member list (that lives in Gear)". One chip. */}
         {member !== null && member !== undefined ? (
           <MemberChip member={member} collapsed={isCollapsed} />
         ) : null}

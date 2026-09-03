@@ -37,7 +37,7 @@
 // recipe. Gated by the caller holding create on at least one import target.
 
 import * as React from "react"
-import { Download, FileSpreadsheet } from "@shared/ui/foundations/icons"
+import { Download, FileXls } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -256,7 +256,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                   href={dataOps.importSampleHref(s.tableKey)}
                   className="text-foreground inline-flex items-center gap-1 underline underline-offset-2"
                 >
-                  <FileSpreadsheet className="size-3.5" aria-hidden /> {s.displayName}
+                  <FileXls className="size-3.5" aria-hidden /> {s.displayName}
                 </a>
               ))}
             </div>

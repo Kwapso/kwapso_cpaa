@@ -26,7 +26,8 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 
 import { RelationshipMap } from "@/components/relationship-map"
 import { useRemembered } from "@shared/web/remembered"
-import { Paperclip, Pencil, Power } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
@@ -289,7 +290,7 @@ export function KnowledgeDetailScreen({
       {
         value: "activity",
         label: t("Activity"),
-        icon: "history",
+        icon: "clock-counter-clockwise",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
@@ -298,9 +299,12 @@ export function KnowledgeDetailScreen({
 
   return (
     <RecordScreen
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `source`), client ruling 2026-08-31.
-      eyebrow={t("Source")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}
       chips={
         <>
@@ -331,7 +335,7 @@ export function KnowledgeDetailScreen({
             className="shrink-0"
             aria-label={t("Edit")}
           >
-            <Pencil className="size-3.5" />
+            <PencilSimple className="size-3.5" />
           </Button>
         )
       }
@@ -390,7 +394,10 @@ export function KnowledgeDetailScreen({
                       rel="noreferrer noopener"
                       className="text-primary flex w-fit max-w-full items-center gap-2 underline-offset-2 hover:underline"
                     >
-                      <Paperclip className="size-4 shrink-0" />
+                      {(() => {
+                        const FileGlyph = fileTypeIcon(item.fileName)
+                        return <FileGlyph className="size-4 shrink-0" />
+                      })()}
                       <span className="min-w-0 truncate">{item.fileName ?? t("Open the file")}</span>
                     </a>
                   )}

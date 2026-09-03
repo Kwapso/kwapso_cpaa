@@ -25,7 +25,7 @@
 
 import { Button } from "@shared/ui/components/button/button"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
-import { Paperclip } from "@shared/ui/foundations/icons"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
@@ -50,6 +50,7 @@ export function SentToUs() {
           // this path is one THIS app minted (/media/…): the seam decides, not
           // the origin of the string. A URL it refuses prints as plain text.
           const fileLink = safeHref(todo.fileUrl)
+          const FileGlyph = fileTypeIcon(todo.fileName)
           return (
             <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
               <div className="min-w-0">
@@ -71,12 +72,12 @@ export function SentToUs() {
                     rel="noreferrer noopener"
                     className="text-primary flex shrink-0 items-center gap-1 text-sm underline-offset-2 hover:underline"
                   >
-                    <Paperclip className="size-3.5" />
+                    <FileGlyph className="size-3.5" />
                     {todo.fileName}
                   </a>
                 ) : (
                   <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm">
-                    <Paperclip className="size-3.5" />
+                    <FileGlyph className="size-3.5" />
                     {todo.fileName}
                   </span>
                 )

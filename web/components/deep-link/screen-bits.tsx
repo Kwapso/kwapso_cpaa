@@ -54,7 +54,7 @@ import { cn } from "@shared/ui/lib/utils"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
-import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "@shared/ui/foundations/icons"
+import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
@@ -141,13 +141,13 @@ export function NoAccess() {
 
 export function NotFound() {
   const t = useT()
-  return <StateLine icon={SearchX}>{t("That screen doesn't exist.")}</StateLine>
+  return <StateLine icon={MagnifyingGlass}>{t("That screen doesn't exist.")}</StateLine>
 }
 
 export function LoadError({ what }: { what: string }) {
   const t = useT()
   return (
-    <StateLine icon={TriangleAlert} tone="destructive">
+    <StateLine icon={Warning} tone="destructive">
       {t("Couldn't load {what}.", { what })}
     </StateLine>
   )
@@ -305,19 +305,23 @@ export function ToolbarRow({
    * below, never a sibling of this pill inside the track. */
   filters?: React.ReactNode
   /** THE FILTER PILL'S OPEN PANEL — `useFilterBar`'s own `panel`, rendered as
-   * a real sibling BENEATH the whole track rather than floating over it
-   * (client ruling, 2 Sep 2026, third pass: "the expanded toolbar shoudl not
-   * be an overlay, but literaly expand the space"). It takes real space and
-   * pushes the collection down, while the track above keeps its own fixed
-   * shape because the panel's height feeds THIS column's box model and never
-   * the track's `rounded-pill` one. The two passes that got here — a
-   * flex-sibling panel inside the pill (which drew a giant oval) and an
-   * absolutely-positioned one (which floated over the rows) — are written up
-   * in `filter-bar.tsx`'s header. Named after the kit's own `CollectionFrame`
-   * `toolbarPanel` prop (v1.2.27), which draws the identical placement for a
-   * kit-panel collection; this is the same placement for the app's own
-   * bespoke row. `undefined`/`null` draws nothing, which is the pill closed
-   * or a caller with no facets at all. */
+   * a real sibling BENEATH the track rather than floating over it (client
+   * ruling, 2 Sep 2026, third pass: "the expanded toolbar shoudl not be an
+   * overlay, but literaly expand the space"). It takes real space and pushes
+   * the collection down. Its PRESENCE also decides the merged container's own
+   * radius (client ruling, 2026-09-03, fourth pass, below): the track no
+   * longer carries its own fill or shape, so the panel's height feeds no box
+   * model but this column's, and the column's shape is chosen by
+   * `Boolean(toolbarPanel)` rather than measured from anything. The three
+   * passes that got here — a flex-sibling panel inside the pill (a giant
+   * oval), an absolutely-positioned one (floated over the rows), and an
+   * in-flow one with a visible seam between two same-toned boxes (read as a
+   * second toolbar) — are written up in `filter-bar.tsx`'s header. Named
+   * after the kit's own `CollectionFrame` `toolbarPanel` prop (v1.2.27),
+   * which draws the identical placement for a kit-panel collection; this is
+   * the same placement for the app's own bespoke row. `undefined`/`null`
+   * draws nothing, which is the pill closed or a caller with no facets at
+   * all — and it is also what keeps the container a pill. */
   toolbarPanel?: React.ReactNode
   /** The sort control, after `filters` and before the pinned-right
    * `actions` — a `SortControl`, typically. Omitted wherever a screen has
@@ -339,24 +343,70 @@ export function ToolbarRow({
   className?: string
 }) {
   if (!search && !filters && !sort && !view && !actions) return null
+
+  // ── ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, SUPERSEDING THE
+  // "COLUMN" SHAPE ABOVE. Verbatim: "what this is doing is creating a new
+  // card underneath... it kind of creates a second toolbar. This is not the
+  // behaviour I want. I want it to look together, so merge this with the
+  // main toolbar so that it's one single background or container, more like
+  // expand behaviour rather than open-a-new-one behaviour."
+  //
+  // The column above got the OVERLAY question right (the panel is in normal
+  // flow, pushes the collection down, never floats) and got THIS question
+  // wrong: the track and the panel were two `bg-background` boxes with a
+  // `gap-2` between them — same tone, same fill, visibly separate, which
+  // reads as exactly the "second card" she is describing. Two boxes of the
+  // identical colour with air between them is not "one piece of furniture"
+  // no matter what either one is filled with.
+  //
+  // THE FIX IS THE SAME SHAPE THE HISTORY ABOVE ALREADY WARNS AGAINST
+  // REPEATING, READ THE OTHER WAY ROUND. Pass one's bug was letting the
+  // panel's own height feed the TRACK's `rounded-pill` — a shape computed
+  // FROM content, which stretched into an oval the moment the content grew
+  // tall. The fix here is NOT "put the panel back inside the pill" (that is
+  // pass one); it is "give the pill's own fill and radius to the OUTER
+  // column instead of the inner row, and pick the radius EXPLICITLY off
+  // whether a panel is open — never off how tall anything measures." A
+  // radius chosen by `Boolean(toolbarPanel)` cannot stretch: it is one of
+  // exactly two fixed values (R31), swapped by a boolean, not computed from
+  // a box's own height the way a browser's own `rounded-pill` corner radius
+  // is. `rounded-pill` (999px) collapsed, `rounded-[var(--radius)]` (24px,
+  // the OTHER of the two radii this codebase allows) expanded — never a
+  // third number, and never the two at once.
+  //
+  // WHAT MOVED: `bg-background` and the radius left the inner row (the
+  // "track") and now sit on THIS outer div — the only element that paints a
+  // fill at all. The track keeps its own padding/gap so its controls still
+  // sit where they did; the panel (`filter-bar.tsx`'s own div) lost its
+  // OWN `bg-background`/`rounded-[var(--radius)]` for the identical reason —
+  // a filled, rounded box nested one level inside another filled, rounded
+  // box of the same colour is the double-box shape CLAUDE.md's own
+  // `useKitPanel` note calls "the broken combination". One fill, one shape,
+  // for both rows — no gap between them either, because a gap is the seam
+  // she is naming.
+  const expanded = Boolean(toolbarPanel)
   return (
-    // THE COLUMN, AND WHY THE TRACK IS ONLY ITS FIRST CHILD. `toolbarPanel`
-    // is this column's second and last child, a plain sibling rather than a
-    // portal target — since v1.2.27 gave `useFilterBar` a `{ pill, panel }`
-    // split, this component no longer needs a context + portal to reach a
-    // position it can render into directly in one pass.
-    <div data-slot="toolbar-row-column" className="flex min-w-0 flex-col gap-2">
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        "flex min-w-0 flex-col bg-background",
+        // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
+        // reads as the same stadium pill every other toolbar control in this
+        // app wears; expanded switches to the box radius so a tall facet
+        // panel never has to fit inside a 999px curve.
+        expanded ? "rounded-[var(--radius)]" : "rounded-pill"
+      )}
+    >
       <div
+        data-slot="toolbar-row-track"
         className={cn(
           // THE TRACK — client, 1 Sep 2026, pointing at her own reference
-          // artifact: every control sits inside ONE visibly distinct pill,
-          // a step lighter than the panel it's drawn on (`bg-background`
-          // against the card's own `bg-surface-panel`), not floating loose
-          // chips on the panel's bare paper. `rounded-pill` at the row's own
-          // height reads as the same stadium shape every other pill in this
-          // app already uses; the inline-start padding is slightly deeper
-          // than the others so the search icon doesn't sit flush on the seam.
-          "flex flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4",
+          // artifact: every control sits in one visibly distinct row; the
+          // inline-start padding is slightly deeper than the others so the
+          // search icon doesn't sit flush on the seam. No fill and no radius
+          // of its own any more — both now belong to the merged container
+          // above, which is the whole point of this pass.
+          "flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4",
           className
         )}
       >
@@ -431,11 +481,13 @@ export function SectionWithCreate({
    * pixel of overlap where seventeen were meant: the tabs floating, their
    * feet showing. That mechanism is gone with the folder shape itself
    * (tabs-view.tsx's header has the client's 2026-09-02 ruling that killed
-   * it) — a line tab pulls nothing down and has no feet to hide. This slot
-   * still renders in a column of its own with no gap at all, now simply
-   * because the strip reads best sitting flush against its card, the way
-   * "exactly as they are already lined up" (the same ruling) describes; the
-   * decision still lives here once instead of at every call site.
+   * it) — a line tab pulls nothing down and has no feet to hide. The slot
+   * still renders in a column of its own, but the SPACE below the strip
+   * stopped being this column's business on 2026-09-03: the client ruled that
+   * a main screen's tabs must clear their content the way a detail screen's
+   * already did, so that gap is `--tab-content-gap`, carried by the strip
+   * itself in `renderFolderTabs` and read by a detail screen's
+   * `--record-tab-gap` too. One number, one owner, both halves of the app.
    *
    * TABS ALONE — never the row's action buttons beside it, and now that is the
    * SHAPE of the prop, not a rule about how to fill it. An earlier fix the
@@ -471,7 +523,7 @@ export function SectionWithCreate({
   useKitPanel?: boolean
   children: React.ReactNode
 }) {
-  const Icon = icon === "plus" ? Plus : Mail
+  const Icon = icon === "plus" ? Plus : Envelope
   const showSecondary = secondary?.show ?? false
   const showDownload = download?.show ?? false
   // See `useKitPanel` above: the panel's own toolbar carries the create
@@ -495,7 +547,7 @@ export function SectionWithCreate({
       )}
       {showSecondary && secondary && (
         <Button variant="secondary" onClick={secondary.onClick} className="gap-1">
-          <Upload className="size-4" />
+          <UploadSimple className="size-4" />
           {secondary.label}
         </Button>
       )}
@@ -527,12 +579,18 @@ export function SectionWithCreate({
         <div className="flex flex-wrap justify-end gap-2">{actionButtons}</div>
       )}
       {aboveCard}
-      {/* No gap: the strip sits flush against the top of its card — the tab
-          row is the ACTUAL next sibling of the card, no `gap-*` between them.
-          (Before v1.2.28 this zero gap was load-bearing for the folder
-          strip's pulled-down feet to melt into; the folder shape is gone, and
-          the flush look is kept on its own merits now — see the `folderTabs`
-          prop doc above.) */}
+      {/* NO `gap-*` HERE, AND IT IS NOT A DECISION ABOUT SPACE ANY MORE. This
+          column exists to hold the strip and the card OUT of the outer
+          `gap-4` above, and until 2026-09-03 that was the whole point: the
+          strip sat flush against its card, a deliberate zero written out here,
+          in `paged-find.tsx` and in `tickets-collection.tsx` — three copies of
+          one number. It was load-bearing while a folder tab pulled itself down
+          into its panel by `--folder-tab-overlap`; that shape is gone
+          (tabs-view.tsx's header, 2026-09-02 ruling), so the zero had stopped
+          protecting anything and was simply eating the space the client then
+          asked for. The gap lives on the STRIP now, once, in
+          `renderFolderTabs` — so this column stays gapless on purpose and must
+          not grow one, or the same number gets two owners again. */}
       <div className="flex flex-col">
         {/* TABS ALONE (client ruling, 2026-08-31, correcting the same day's
             earlier fix which shared this line with the row's action buttons):

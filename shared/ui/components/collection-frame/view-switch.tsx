@@ -190,19 +190,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../select/select";
-import { ViewGrid } from "../../foundations/icons";
+import { SquaresFour } from "../../foundations/icons";
 
 /* THE PLACEHOLDER GLYPH, AND IT IS ONLY THAT.
 
    Client, 2026-09-02: *"we will map this later, so far put a random icon"*.
-   `ViewGrid` is the kit's most view-shaped neutral and it is drawn for EVERY
+   `SquaresFour` is the kit's most view-shaped neutral and it is drawn for EVERY
    view until a mapping arrives, on purpose: one glyph repeated down the
    toolbar reads as "not yet assigned", where four different glyphs invented
    here would read as a decided mapping and would have to be un-decided later.
    The mapping is product vocabulary — which body is the table, which is the
    board, which is the calendar — and inventing that is a thing this project
    has already been corrected for. See `CollectionViewOption.icon`. */
-const PLACEHOLDER_VIEW_ICON = <ViewGrid size={16} />;
+const PLACEHOLDER_VIEW_ICON = <SquaresFour size={16} />;
 
 export interface CollectionViewOption {
   /** Stable key, passed back to `onValueChange`. */
@@ -222,7 +222,7 @@ export interface CollectionViewOption {
    * 2026-09-02, verbatim: *"add an icon inside tha pill that represents the
    * view (we will map this later, so far put a random icon)"*. Until she maps
    * them, every view that leaves this undefined falls back to the SAME
-   * placeholder (`ViewGrid`) — deliberately, so an unmapped toolbar reads as
+   * placeholder (`SquaresFour`) — deliberately, so an unmapped toolbar reads as
    * unmapped rather than as a mapping someone here chose.
    *
    * It is per-VIEW rather than one icon on the control because that is what
@@ -414,8 +414,31 @@ const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          {/* THE OPEN ROWS CARRY THE SAME GLYPH THE TRIGGER DOES — CLIENT,
+              2026-09-03: "when I open the dropdown, apart from the text, I
+              also see the icon." The trigger has shown a leading icon since
+              2026-09-02; the list this pill opens did not, which was the gap
+              — `SelectItem` has carried an `icon` prop since ch10 for exactly
+              this ("a module is identified by its icon, in the rail, on the
+              record AND in a picker"), and it was simply never passed here.
+
+              ONE SOURCE OF TRUTH, NOT A SECOND MAPPING. `view.icon` is the
+              same field `currentIcon` reads above, with the same placeholder
+              fallback, so the row a reader opens always shows the glyph the
+              pill will collapse back to once they pick it — no icon is
+              invented per row and none is looked up twice.
+
+              `SelectItem` already draws this `aria-hidden`, at `--icon-16`,
+              beside — not instead of — the `ItemIndicator` tick, so the
+              row's accessible name stays `view.label` and the selection mark
+              this list already drew is untouched. */}
           {views.map((view) => (
-            <SelectItem key={view.value} value={view.value} disabled={view.disabled}>
+            <SelectItem
+              key={view.value}
+              value={view.value}
+              disabled={view.disabled}
+              icon={view.icon ?? PLACEHOLDER_VIEW_ICON}
+            >
               {view.label}
             </SelectItem>
           ))}

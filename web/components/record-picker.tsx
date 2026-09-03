@@ -63,7 +63,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
-import { Check, ChevronsUpDown, X } from "@shared/ui/foundations/icons"
+import { Check, CaretUpDown, X } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
 import { useIsPhone } from "@/lib/use-is-phone"
@@ -393,7 +393,7 @@ export function RecordPicker({
           {label}
         </span>
       </span>
-      <ChevronsUpDown className="shrink-0 opacity-50" />
+      <CaretUpDown className="shrink-0 opacity-50" />
     </Button>
   )
 

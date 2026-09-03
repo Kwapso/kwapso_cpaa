@@ -19,7 +19,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Stopwatch } from "@shared/ui/components/stopwatch/stopwatch"
-import { CircleStop, Play } from "@shared/ui/foundations/icons"
+import { StopCircle, Play } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -277,7 +277,7 @@ export function RecordTimerButton({
       disabled={busy || disabled}
       onClick={() => void toggle()}
     >
-      {mine ? <CircleStop className="size-3.5" /> : <Play className="size-3.5" />}
+      {mine ? <StopCircle className="size-3.5" /> : <Play className="size-3.5" />}
       {mine ? t("Stop timer") : t("Start timer")}
     </Button>
   )

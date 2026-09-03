@@ -62,7 +62,7 @@
 // calls "the field hairline", now drawn around toolbar-plus-text as one box
 // instead of around the text alone. The strip inside it is ALWAYS there
 // (never a separate line above the border), holding one icon-only `Toggle` —
-// `TextSize`, the kit's own "Aa" glyph, the one entry in its 1,383 icons that
+// `TextAa`, the kit's own "Aa" glyph, the one entry in its 1,383 icons that
 // says "text formatting" rather than "Bold" or "Italic" specifically, which
 // is why it replaces the word "Formatting" AND the bare chevron the client
 // named as the two things to drop. `pressed={showToolbar}` on the SAME
@@ -74,8 +74,8 @@
 // same bordered box", read back verbatim.
 
 import * as React from "react"
-import { ListOrdered } from "@shared/ui/foundations/icons"
-import { Bold, FillColor, Italic, List as ListIcon, Minus, TextSize } from "@shared/ui/foundations/icons"
+import { ListNumbers } from "@shared/ui/foundations/icons"
+import { TextB, PaintBucket, TextItalic, List as ListIcon, Minus, TextAa } from "@shared/ui/foundations/icons"
 
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
@@ -176,17 +176,17 @@ function Notes({
         {showToolbar && (
           <>
             <Toggle size="sm" aria-label={t("Bold")} onPressedChange={() => run("bold")}>
-              <Bold />
+              <TextB />
             </Toggle>
             <Toggle
               size="sm"
               aria-label={t("Italic")}
               onPressedChange={() => run("italic")}
             >
-              <Italic />
+              <TextItalic />
             </Toggle>
             <Toggle size="sm" aria-label={t("Highlight")} onPressedChange={highlight}>
-              <FillColor />
+              <PaintBucket />
             </Toggle>
             <Toggle
               size="sm"
@@ -200,7 +200,7 @@ function Notes({
               aria-label={t("Numbered list")}
               onPressedChange={() => run("insertOrderedList")}
             >
-              <ListOrdered />
+              <ListNumbers />
             </Toggle>
             <Toggle
               size="sm"
@@ -218,7 +218,7 @@ function Notes({
           aria-label={t("Formatting")}
           className="ml-auto"
         >
-          <TextSize />
+          <TextAa />
         </Toggle>
       </div>
       <div

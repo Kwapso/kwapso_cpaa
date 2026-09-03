@@ -43,7 +43,10 @@ import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 
 import { cn } from "../../lib/utils";
-import { Check, ChevronRight } from "../../foundations/icons";
+import {
+  CheckFat,
+  CaretRight,
+} from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
    The floating surface. `.kw-menu`.
@@ -307,7 +310,7 @@ DropdownMenuItem.displayName = "DropdownMenuItem";
  * one icon wide, so checked and unchecked rows do not shift sideways.
  *
  * DERIVED — the kit draws no menu checkbox (GAPS-A.md MNU-1). The mark is the
- * `Check` glyph at the 16 delivery size in the row's own ink, which is the
+ * `CheckFat` glyph at the 16 delivery size in the row's own ink, which is the
  * same answer chapter 10 gives for a selection mark elsewhere; no new radius,
  * no new colour and no box were invented for it.
  *
@@ -337,7 +340,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       className="inline-flex size-[var(--icon-16)] shrink-0 items-center justify-center"
     >
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check size={16} />
+        <CheckFat size={16} />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -447,7 +450,7 @@ DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
  * The row that opens a submenu. The same pill as any other row, with a chevron
  * at the inline end.
  *
- * The chevron is `ChevronRight` rotated under `rtl:` rather than a second
+ * The chevron is `CaretRight` rotated under `rtl:` rather than a second
  * glyph, so one icon covers both directions and the marker never disagrees
  * with the side Radix actually opens on.
  *
@@ -470,7 +473,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <ChevronRight size={16} className="ms-auto rtl:rotate-180" aria-hidden="true" />
+    <CaretRight size={16} className="ms-auto rtl:rotate-180" aria-hidden="true" />
   </DropdownMenuPrimitive.SubTrigger>
 ));
 

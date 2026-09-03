@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@shared/ui/components/table/table"
 
-import { ArrowDown, CornerDownRight } from "@shared/ui/foundations/icons"
+import { ArrowDown, ArrowElbowDownRight } from "@shared/ui/foundations/icons"
 
 import type { AgentBlock } from "@shared/agent-blocks"
 
@@ -256,7 +256,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
                 // on one line reads as two labels rather than a condition and a
                 // destination — and a diagram that has to be guessed at is not one.
                 <div key={j} className="flex min-w-0 flex-wrap items-baseline gap-1 py-1 pl-3 text-xs">
-                  <CornerDownRight className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden />
+                  <ArrowElbowDownRight className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden />
                   {e.label && (
                     <>
                       <span className="text-muted-foreground">{e.label}</span>

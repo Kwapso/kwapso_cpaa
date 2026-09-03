@@ -90,12 +90,11 @@ import { cn } from "../../lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../popover/popover";
 import { selectTriggerVariants } from "../select/select";
 import {
-  Check,
-  ChevronDown,
-  Loader2,
-  Search,
-  SearchX,
-  TriangleAlert,
+  CheckFat,
+  CaretDown,
+  CircleNotch,
+  MagnifyingGlass,
+  Warning,
   X,
 } from "../../foundations/icons";
 
@@ -405,7 +404,7 @@ function FacetSearch({
         state === "disabled" && "text-ink-disabled",
       )}
     >
-      <Search size={16} aria-hidden="true" className="text-ink-tertiary" />
+      <MagnifyingGlass size={16} aria-hidden="true" className="text-ink-tertiary" />
       <input
         type="search"
         data-slot={querySlot}
@@ -987,7 +986,7 @@ function defaultFilterOption(option: FacetOption, query: string): boolean {
  *                      no options at all is the same register as no matches,
  *                      because to the reader they are the same event —
  *                      "there is nothing here to pick".
- *  8. error          — `TriangleAlert` over `errorLabel`, in place of the list.
+ *  8. error          — `Warning` over `errorLabel`, in place of the list.
  *  9. selected       — a filled mark at `--radius-select` on
  *                      `--surface-inverse`, `aria-selected` on the row.
  * 10. read-only      — `readOnly`: rows announce their state and refuse the
@@ -1092,7 +1091,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
         {error ? (
           <FacetRegister
             slot="searchable-facet-error"
-            icon={<TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />}
+            icon={<Warning size={20} aria-hidden="true" className="text-ink-tertiary" />}
           >
             {errorLabel}
           </FacetRegister>
@@ -1101,7 +1100,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
             slot="searchable-facet-loading"
             busy
             icon={
-              <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+              <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
             }
           >
             {loadingLabel}
@@ -1109,7 +1108,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
         ) : visible.length === 0 ? (
           <FacetRegister
             slot="searchable-facet-empty"
-            icon={<SearchX size={20} aria-hidden="true" className="text-ink-tertiary" />}
+            icon={<MagnifyingGlass size={20} aria-hidden="true" className="text-ink-tertiary" />}
           >
             {emptyLabel}
           </FacetRegister>
@@ -1163,7 +1162,7 @@ const SearchableFacet = React.forwardRef<HTMLDivElement, SearchableFacetProps>(
                         : "shadow-[var(--hairline-strong)] bg-background",
                     )}
                   >
-                    {isSelected ? <Check size={12} /> : null}
+                    {isSelected ? <CheckFat size={12} /> : null}
                   </span>
 
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
@@ -1369,7 +1368,7 @@ export interface CompactFacetProps
  *                      they are one event, "there is nothing here to pick".
  *                      A facet with nothing chosen is NOT empty — that is the
  *                      placeholder, and it is a resting state.
- *  8. error          — `TriangleAlert` over `errorLabel`, in place of the
+ *  8. error          — `Warning` over `errorLabel`, in place of the
  *                      list, inside the panel where the reader can retry.
  *  9. selected       — the chosen option's words replace the placeholder in
  *                      the field and go to primary ink; its row carries the
@@ -1514,7 +1513,7 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             chosen row — NOT the checkbox mark `SearchableFacet` draws. That
             box says "several of these may be on"; this facet holds one. */}
         <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
-          {isSelected ? <Check className="size-[var(--icon-button)]" /> : null}
+          {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
         </span>
       </button>
     );
@@ -1556,7 +1555,7 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             <span className={cn("min-w-0 truncate text-start", chosen ? undefined : "text-muted-foreground")}>
               {chosen ? chosen.label : placeholder}
             </span>
-            <ChevronDown
+            <CaretDown
               aria-hidden="true"
               className="size-[var(--icon-button)] shrink-0"
             />
@@ -1595,7 +1594,7 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             {error ? (
               <FacetRegister
                 slot="compact-facet-error"
-                icon={<TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />}
+                icon={<Warning size={20} aria-hidden="true" className="text-ink-tertiary" />}
               >
                 {errorLabel}
               </FacetRegister>
@@ -1604,7 +1603,7 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
                 slot="compact-facet-loading"
                 busy
                 icon={
-                  <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+                  <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
                 }
               >
                 {loadingLabel}
@@ -1612,7 +1611,7 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             ) : visible.length === 0 ? (
               <FacetRegister
                 slot="compact-facet-empty"
-                icon={<SearchX size={20} aria-hidden="true" className="text-ink-tertiary" />}
+                icon={<MagnifyingGlass size={20} aria-hidden="true" className="text-ink-tertiary" />}
               >
                 {emptyLabel}
               </FacetRegister>

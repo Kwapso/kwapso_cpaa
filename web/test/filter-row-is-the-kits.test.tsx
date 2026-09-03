@@ -286,7 +286,7 @@ describe("the app's filter row is the design kit's", () => {
     ).toEqual([])
   })
 
-  it("THE TOOLBAR SAYS A COUNT AND NEVER THE FILTERS — no chip, at any width", async () => {
+  it("THE TOOLBAR SAYS A COUNT AND NEVER THE FILTERS — no chip, at any width, at all times", async () => {
     // CLIENT RULING, 2026-09-02, verbatim: "when activce filters, do not
     // display them in the toolbar. only a count niside the filter pill (like
     // in artifact)". The kit's chip half is not rendered at all — and that is
@@ -296,6 +296,8 @@ describe("the app's filter row is the design kit's", () => {
     render(<Harness />)
     expect(pillSays()).toBe("Filter")
 
+    // `pick` opens the panel to reach the facet (there is nowhere else to
+    // click one from), so the panel is OPEN the instant this resolves.
     await pick("Filed under", "Northwind Traders International Holdings Ltd.")
     await waitFor(() =>
       expect(screen.getByTestId("values").textContent).toBe('{"compartment":"a2"}')
@@ -303,17 +305,25 @@ describe("the app's filter row is the design kit's", () => {
 
     expect(chips().length, "the toolbar draws no chip for an active facet").toBe(0)
 
-    // THE COUNT EARNS ITS PLACE ONLY WHEN THE PANEL IS SHUT: open, the fields
-    // are their own explanation, so the pill stays the bare word.
-    expect(pillSays()).toBe("Filter")
-    openPanel()
+    // THE COUNT IS VISIBLE WITH THE PANEL OPEN — CLIENT RULING, 2026-09-03,
+    // SUPERSEDING THE OLD "bare word while open" READING. Verbatim: "Even if
+    // the filter is open, I want to see the count pill at all times... When
+    // the filter toolbar modal is open, I also want the count visible." The
+    // panel is open right now (see above), and the pill already reports one.
     await waitFor(() => expect(pillSays()).toBe("Filter (1)"))
+
+    // …and it STAYS "Filter (1)" the moment the panel is shut — the count is
+    // the same fact whether the fields it describes are on screen or not.
+    openPanel()
+    await waitFor(() => expect(panelNode()).toBeNull())
+    expect(pillSays()).toBe("Filter (1)")
 
     // …and with the panel shut the WHOLE toolbar says that and nothing else.
     // Scoped to the kit bar's own root rather than to the document, because
-    // the value is of course on screen while the panel is OPEN — that is the
-    // field the person is looking at. The ruling is about the toolbar, and
-    // this is the toolbar: no chip, no facet name, no client name, one count.
+    // the value is of course ALSO on screen while the panel is open — that is
+    // the field the person is looking at. The ruling is about the toolbar,
+    // and this is the toolbar: no chip, no facet name, no client name, one
+    // count, in both states.
     const toolbar = document.querySelector('[data-slot="filter-bar"]')
     expect(toolbar, "the kit's bar draws the row").toBeTruthy()
     expect(
@@ -321,15 +331,20 @@ describe("the app's filter row is the design kit's", () => {
       "the toolbar reports a count and never what the filters are"
     ).toBe("Filter (1)")
 
-    // …and a SECOND facet moves the COUNT rather than adding a second thing to
-    // the row, which is the shape a chip cluster could not have: two chips is
+    // …and a SECOND facet moves the COUNT LIVE, rather than adding a second
+    // thing to the row (the shape a chip cluster could not have: two chips is
     // two nodes and a wider toolbar, two filters is one string one character
-    // longer.
+    // longer) and rather than waiting for the panel to close to say so (the
+    // old snapshot-on-close behaviour this pass replaces).
     await pick("Type", "From a meeting")
-    openPanel()
     await waitFor(() => expect(pillSays()).toBe("Filter (2)"))
     expect(chips().length).toBe(0)
     expect(document.querySelector('[data-slot="filter-bar"]')!.textContent).toBe("Filter (2)")
+
+    // …and TICKING A FACET OFF drops the count live too, panel still open —
+    // the client's own words, "when I'm selecting and unselecting filters".
+    await pick("Type", "Any type")
+    await waitFor(() => expect(pillSays()).toBe("Filter (1)"))
   })
 
   it("ONE VALUE PER FACET — a second pick REPLACES, it does not add", async () => {
@@ -392,70 +407,126 @@ describe("the app's filter row is the design kit's", () => {
     ).not.toContain("a2")
   })
 
-  it("THE PANEL EXPANDS THE SPACE, and the toolbar pill does not change shape", async () => {
-    // THE REGRESSION THAT HAS NOW HAPPENED TWICE, and the reason this test
-    // exists at all. Client, 2026-09-02: "the expanded toolbar shoudl not be
-    // an overlay, but literaly expand the space". The two earlier shapes each
-    // got half of it:
+  it("THE PANEL EXPANDS THE SPACE, and the container grows rather than doubling", async () => {
+    // THE REGRESSION THAT HAS NOW HAPPENED THREE TIMES, and the reason this
+    // test exists at all.
     //
     //   PASS ONE — the panel was a flex child of the toolbar's own
     //   `rounded-pill` track. It expanded the space, and a 999px-radius box
     //   that tall draws a giant oval with the controls scattered round it.
     //   Client: "lol what is this shit".
     //   PASS TWO — `position: absolute`. The pill kept its shape and the panel
-    //   floated over the rows instead of moving them, which is the ruling
-    //   above, reversed.
+    //   floated over the rows instead of moving them. Client, 2026-09-02:
+    //   "the expanded toolbar shoudl not be an overlay, but literaly expand
+    //   the space".
+    //   PASS THREE/FOUR — the panel became an in-flow sibling BENEATH the
+    //   track, in its own column: no overlay, and the track's own box was
+    //   provably untouched by how tall the panel got. That solved overlay and
+    //   left a new fault standing — the track and the panel were two
+    //   `bg-background` boxes with a gap between them, which reads as a
+    //   second toolbar. Client, 2026-09-03: "it kind of creates a second
+    //   toolbar... merge this with the main toolbar so that it's one single
+    //   background or container."
     //
-    // Both shipped green. The property that separates the fix from either is
-    // STRUCTURAL and is asserted structurally: the panel is a normal-flow
-    // sibling BENEATH the track, inside a wrapping column, so the track's own
-    // box cannot be touched by how tall the panel gets. jsdom lays nothing
-    // out, so "the pill's height does not change" is proved the only way that
-    // is honest here — the track's subtree is byte-identical open and closed,
-    // and the panel is not in it.
+    // Every one of the first three shipped green. PASS FIVE (this one) is
+    // asserted against ALL THREE failure modes at once: the panel is still
+    // never nested inside the track (pass one), still never positioned as an
+    // overlay (pass two), AND the track no longer paints a fill or shape of
+    // its own AT ALL — the single merged container does, and its shape is
+    // read off `Boolean(toolbarPanel)` rather than off anything's measured
+    // height, so it cannot repeat pass one's mistake by a different route.
     render(<ToolbarRowHarness />)
 
     const column = document.querySelector('[data-slot="toolbar-row-column"]')
-    expect(column, "the toolbar must be wrapped in its own column").toBeTruthy()
-    const track = column!.firstElementChild as HTMLElement
+    expect(column, "the toolbar must be wrapped in its own merged container").toBeTruthy()
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    expect(track, "the track is a named child of the merged container").toBeTruthy()
+    expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
+
+    // i · CLOSED: ONE CONTAINER, PILL-SHAPED, ONE FILL — and the track itself
+    // carries neither, so there is nothing left inside it to stretch.
+    expect(panelNode(), "nothing is open yet").toBeNull()
+    expect(column!.className).toContain("bg-background")
+    expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
+      "rounded-pill"
+    )
+    expect(
+      column!.className,
+      "the two radii never both apply — collapsed is pill-only"
+    ).not.toContain("rounded-[var(--radius)]")
     expect(
       track.className,
-      "the column's first child is the fixed-shape pill track"
-    ).toContain("rounded-pill")
-
-    const closed = track.outerHTML
-    expect(panelNode(), "nothing is open yet").toBeNull()
+      "the track paints no fill or shape of its own any more — the merged " +
+        "container does, which is the whole point of this pass"
+    ).not.toMatch(/rounded-pill|bg-background/)
+    const closedTrack = track.outerHTML
 
     openPanel()
     const panel = panelNode()
     expect(panel, "the panel opens").toBeTruthy()
 
-    // i · THE PILL DID NOT MOVE. Its whole subtree is what it was.
+    // ii · THE TRACK ITSELF STILL DID NOT MOVE — pass one's own guard,
+    // unweakened: opening the panel changes neither the track's markup nor
+    // its position relative to the panel.
     expect(
       track.outerHTML,
-      "opening the panel changed the pill track's own markup — pass one put the " +
-        "panel inside it and the track was drawn as a giant oval"
-    ).toBe(closed)
-    expect(track.contains(panel!), "the panel must never be inside the pill").toBe(false)
+      "opening the panel changed the track's own markup — pass one put the " +
+        "panel inside a box like this one and it was drawn as a giant oval"
+    ).toBe(closedTrack)
+    expect(track.contains(panel!), "the panel must never be inside the track").toBe(false)
 
-    // ii · IT IS IN FLOW, UNDER THE TRACK. Not an overlay: no positioning, no
-    // stacking, no floating-surface elevation, and it FOLLOWS the track in the
-    // same column, which is what makes it push the collection down.
+    // iii · IT IS IN FLOW, UNDER THE TRACK. Not an overlay: no positioning, no
+    // stacking, no floating-surface elevation, and it FOLLOWS the track in
+    // the same merged container, which is what makes it push the collection
+    // down (pass two's own guard).
     expect(
       panel!.className,
       "pass two floated the panel over the rows — an in-flow panel positions nothing"
     ).not.toMatch(/(?:^|\s)(?:absolute|fixed|sticky|top-full|inset-x-0|z-\d+)(?:\s|$)/)
     expect(panel!.className).not.toContain("shadow-[var(--shadow-overlay)]")
-    expect(column!.contains(panel!), "the panel lives in the column, beside the track").toBe(true)
+    expect(column!.contains(panel!), "the panel lives in the merged container").toBe(true)
     expect(
       track.compareDocumentPosition(panel!) & Node.DOCUMENT_POSITION_FOLLOWING,
       "…and beneath it, never before it"
     ).toBeTruthy()
 
-    // iii · AND IT CLOSES BACK TO EXACTLY THE SAME TOOLBAR.
+    // iv · AND NEITHER THE PANEL NOR THE TRACK PAINTS ITS OWN SURFACE — the
+    // merged container is the only element with a background, which is the
+    // property pass three/four's "two boxes" shape broke. `panel` here is
+    // `filter-bar.tsx`'s own div; it must carry no fill or radius, or this
+    // regresses to two same-toned boxes with a gap read as a second card.
+    expect(
+      panel!.className,
+      "the open panel must not paint its own background — one surface, not two"
+    ).not.toMatch(/bg-background/)
+    expect(
+      panel!.className,
+      "the open panel must not round its own corners — the merged container does"
+    ).not.toMatch(/rounded-\[var\(--radius\)\]/)
+
+    // v · OPEN: THE SAME CONTAINER SWITCHES SHAPE, NEVER BOTH AT ONCE. This is
+    // the one property that is NEW to this pass and did not exist under
+    // pass three/four at all — a growth cue chosen by state, never by a box's
+    // own measured height (R31: two radii, no third, never mixed).
+    expect(
+      column!.className,
+      "the merged container still owns the single background in the open state"
+    ).toContain("bg-background")
+    expect(
+      column!.className,
+      "a panel is open — the container must switch to the box radius"
+    ).toContain("rounded-[var(--radius)]")
+    expect(
+      column!.className,
+      "the two radii never both apply — expanded drops the pill"
+    ).not.toMatch(/(?:^|\s)rounded-pill(?:\s|$)/)
+
+    // vi · AND IT CLOSES BACK TO EXACTLY THE SAME PILL.
     openPanel()
     await waitFor(() => expect(panelNode()).toBeNull())
-    expect(track.outerHTML).toBe(closed)
+    expect(track.outerHTML).toBe(closedTrack)
+    expect(column!.className).toContain("rounded-pill")
+    expect(column!.className).not.toContain("rounded-[var(--radius)]")
   })
 
   it("EVERY `useFilterBar` CALL RENDERS BOTH ITS PILL AND ITS PANEL", () => {

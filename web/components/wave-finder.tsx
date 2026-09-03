@@ -27,6 +27,7 @@ import * as React from "react"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
+import { List, ChartBarHorizontal } from "@shared/ui/foundations/icons"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useT } from "@shared/web/language"
@@ -268,8 +269,8 @@ export function WaveFinder({
       {view && onViewChange ? (
         <ViewSwitch
           views={[
-            { value: "list", label: t("List") },
-            { value: "timeline", label: t("Timeline") },
+            { value: "list", label: t("List"), icon: <List size={16} /> },
+            { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
           ]}
           value={view}
           onValueChange={(v) => onViewChange(v as WaveView)}

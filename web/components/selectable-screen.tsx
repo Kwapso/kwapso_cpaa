@@ -29,7 +29,7 @@ import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
-import { Pencil, X, Check, Upload, Download, Power, Shield, ShieldOff } from "@shared/ui/foundations/icons"
+import { PencilSimple, X, Check, UploadSimple, Download, Power, Shield, ShieldSlash } from "@shared/ui/foundations/icons"
 
 import type { SortOption } from "@shared/web/screen-engine/config"
 import type { SelectableValue } from "@shared/types"
@@ -208,7 +208,7 @@ function ValueRow({
                     {
                       key: "rename",
                       label: t("Rename"),
-                      icon: <Pencil className="size-3.5" />,
+                      icon: <PencilSimple className="size-3.5" />,
                       onSelect: () => {
                         setEditingId(v.id)
                         setEditValue(v.value)
@@ -223,7 +223,7 @@ function ValueRow({
                       ? {
                           key: "undefault",
                           label: t("Stop treating as a default"),
-                          icon: <ShieldOff className="size-3.5" />,
+                          icon: <ShieldSlash className="size-3.5" />,
                           onSelect: () => void setDefault(v, false),
                         }
                       : {
@@ -577,7 +577,7 @@ export function SelectableScreen({
                 )}
                 {canCreate && onImport && (
                   <Button variant="secondary" onClick={onImport} className="gap-1">
-                    <Upload className="size-4" aria-hidden /> {t("Import CSV")}
+                    <UploadSimple className="size-4" aria-hidden /> {t("Import CSV")}
                   </Button>
                 )}
                 {canCreate && <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />}

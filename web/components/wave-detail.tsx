@@ -33,7 +33,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Pencil, Power, RotateCcw, UserMinus } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power, ArrowCounterClockwise, UserMinus } from "@shared/ui/foundations/icons"
 
 import { ActivityPanel } from "@/components/activity-panel"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -252,14 +252,14 @@ export function WaveDetailScreen({
         {
           key: "edit",
           label: t("Edit"),
-          icon: <Pencil className="size-3.5" />,
+          icon: <PencilSimple className="size-3.5" />,
           disabled: busy,
           onSelect: () => setEditOpen(true),
         },
         {
           key: "active",
           label: wave.active ? t("Switch off") : t("Bring back"),
-          icon: wave.active ? <Power className="size-3.5" /> : <RotateCcw className="size-3.5" />,
+          icon: wave.active ? <Power className="size-3.5" /> : <ArrowCounterClockwise className="size-3.5" />,
           disabled: busy,
           destructive: wave.active,
           onSelect: () => void setActive(!wave.active),
@@ -270,9 +270,12 @@ export function WaveDetailScreen({
   return (
     <RecordScreen
       leading={<RecordMark name={wave.name} />}
-      // The bare record-type word, glossary's own term (shared/glossary.ts
-      // `wave`), client ruling 2026-08-31.
-      eyebrow={t("Wave")}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
       // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. A
       // wave gained one the same day this rule split off the account-code
       // prefix (shared/workers/refs.ts) — `Wave.ref` didn't exist before that.

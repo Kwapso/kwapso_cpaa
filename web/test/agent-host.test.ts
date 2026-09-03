@@ -41,12 +41,56 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     expect(store).toContain("export function setAgentOpen")
   })
 
-  it("the open state is mirrored to sessionStorage so it survives a full page RELOAD", () => {
+  it("the open state is remembered PER PERSON, the way the rail's collapse is", () => {
     // Crossing into the /t shell is a hard reload (static export). Without the mirror the
     // panel vanished on that reload (the "panel reset" bug). It must persist + restore.
+    //
+    // `localStorage`, not `sessionStorage`, since the assistant became a COLUMN
+    // (2026-09-03): the kit says both flat columns' collapse "persists per user", and a
+    // column that is gone the next morning while the rail's collapse is still remembered
+    // is a broken mirror. The key is shaped like the rail's own (`ss-sidebar-collapsed`,
+    // app-shell.tsx) so the two furniture preferences sit together.
     const store = read("lib/agent-open.ts")
-    expect(store, "must mirror open state to sessionStorage").toContain("sessionStorage")
+    expect(store, "must mirror open state to localStorage").toContain("localStorage")
+    // The word still appears in the comment that records the change; what must be gone
+    // is the same-tab CALL.
+    expect(store, "must not read or write same-tab sessionStorage").not.toMatch(/sessionStorage\./)
     expect(store, "must READ the persisted state at load").toMatch(/getItem\(/)
+    expect(store, "the key sits beside the rail's own").toContain('"ss-assistant-open"')
+  })
+
+  it("the docked column is a PORTAL out of the root host, not a panel in the shell", () => {
+    // The whole reason the panel is mounted at the root is that it drives navigation.
+    // Docking it into ScreenShell's `aside` must not move it into the routed shell — the
+    // DOM moves, the React tree does not.
+    const panel = read("components/agent-panel.tsx")
+    expect(panel, "the column is reached through a portal").toContain("createPortal")
+    expect(panel, "into the shell's published dock node").toContain("useAgentDock")
+    const shell = read("components/app-shell.tsx")
+    expect(shell, "the shell passes an empty slot, never the panel").toContain("<AgentDockSlot />")
+    expect(shell, "and the slot is the kit's own third column").toMatch(/aside=\{/)
+  })
+
+  it("one flag drives both presentations, and the shell is CONTROLLED by it", () => {
+    // The kit holds the aside's open state itself unless it is given one. It must be
+    // given one: otherwise the column's state could not be persisted, and the phone's
+    // floating panel and the desktop column would be two answers to one question.
+    const shell = read("components/app-shell.tsx")
+    expect(shell).toContain("asideOpen={assistantOpen}")
+    expect(shell).toContain("onAsideOpenChange={setAgentOpen}")
+    expect(shell, "the flag is the panel's own store").toContain('from "@/lib/agent-open"')
+  })
+
+  it("the mango launcher is not drawn where the shell's edge handle already opens it", () => {
+    // ONE MANGO. The handle is the column's own affordance; a second mango control on a
+    // screen that already has its own create button is exactly what SHELL.md forbids.
+    // The launcher branch must be UNREACHED when docked, not merely CSS-hidden — an
+    // invisible trigger holding an open Popover beside a docked column is two assistants.
+    const host = read("components/agent-host.tsx")
+    expect(host, "the width decides, once, against the kit's own breakpoint").toContain("useShellColumns")
+    expect(host, "docked returns before the launcher is built").toMatch(
+      /if \(docked\) return <AgentPanel[^\n]*docked \/>/
+    )
   })
 
   it("the session cache is reactive, so the root-mounted launcher appears without a reload", () => {

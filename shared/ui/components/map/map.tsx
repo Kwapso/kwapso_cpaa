@@ -77,7 +77,10 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 import { imageVariants } from "../image/image";
-import { Loader2, TriangleAlert } from "../../foundations/icons";
+import {
+  CircleNotch,
+  Warning,
+} from "../../foundations/icons";
 
 /**
  * Scripts and same-origin, nothing else — a map provider's frame needs both
@@ -452,7 +455,7 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
             aria-label={loadingLabel}
             className={cn(REGISTER, "bg-surface-quiet")}
           >
-            <Loader2 size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
+            <CircleNotch size={20} aria-hidden="true" className="motion-spinner text-ink-tertiary" />
             <span aria-hidden="true" className="text-caption text-ink-secondary">
               {loadingLabel}
             </span>
@@ -473,7 +476,7 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
             aria-label={errorLabel}
             className={cn(REGISTER, "bg-surface-quiet")}
           >
-            <TriangleAlert size={20} aria-hidden="true" className="text-ink-tertiary" />
+            <Warning size={20} aria-hidden="true" className="text-ink-tertiary" />
             <span aria-hidden="true" className="text-caption text-ink-secondary">
               {errorLabel}
             </span>

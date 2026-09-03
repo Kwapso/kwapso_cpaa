@@ -12,7 +12,7 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
-import { RotateCcw } from "@shared/ui/foundations/icons"
+import { ArrowCounterClockwise } from "@shared/ui/foundations/icons"
 
 import { reportError } from "@shared/web/log"
 import { useT } from "@shared/web/language"
@@ -51,7 +51,7 @@ function Broken({ onRetry }: { onRetry: () => void }) {
         {t("We've been told about it. Try again, and if it keeps happening, raise a ticket and we'll sort it out.")}
       </p>
       <Button variant="secondary" onClick={onRetry}>
-        <RotateCcw className="size-3.5" />
+        <ArrowCounterClockwise className="size-3.5" />
         {t("Try again")}
       </Button>
     </div>

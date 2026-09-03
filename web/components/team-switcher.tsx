@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Check, ChevronsUpDown, Inbox, Plus } from "@shared/ui/foundations/icons"
+import { Check, CaretUpDown, ClipboardText, Plus } from "@shared/ui/foundations/icons"
 
 import { useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"
@@ -101,7 +101,7 @@ export function TeamSwitcher({
             <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
               {name}
             </span>
-            <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
+            <CaretUpDown className="text-muted-foreground size-4 shrink-0" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -111,7 +111,7 @@ export function TeamSwitcher({
         {pendingInvites > 0 && (
           <>
             <DropdownMenuItem onSelect={() => softNavigate("/invitations")} className="gap-2">
-              <Inbox className="size-4" />
+              <ClipboardText className="size-4" />
               <span className="min-w-0 flex-1">{t("Invites")}</span>
               <Badge variant="secondary" className="text-badge">
                 {pendingInvites}
