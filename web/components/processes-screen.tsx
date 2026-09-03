@@ -177,6 +177,8 @@ export function ProcessesScreen({
         }}
         sorts={translatedSorts("processes", t)}
         defaultSort={COLLECTION_SORTS.processes.defaultSort}
+        // R50 — the resting read's own row count, before any find.
+        restingEmpty={loaded.length === 0}
         // …and so are the filters. `app` and `archived` were the frame's until
         // 18 Aug 2026, which meant picking an app narrowed the fifty maps in
         // hand — under a badge counting every one of them. `appId` is the door's

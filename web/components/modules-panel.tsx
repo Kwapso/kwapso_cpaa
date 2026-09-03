@@ -135,6 +135,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
   return (
     <div className="flex flex-col">
       <ToolbarRow
+        empty={modules.length === 0}
         search={
           modules.length > 0 && (
             <>

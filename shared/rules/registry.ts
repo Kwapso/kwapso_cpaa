@@ -441,7 +441,7 @@ export const RULES_REGISTRY: Rule[] = [
     id: "R48",
     dimension: "ui",
     law: "THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT — NEVER A PER-SCREEN CHOICE. Every collection/data-view screen draws its toolbar's search box UNLESS a named, reasoned entry says otherwise. Two censuses, off the disk, never a hand-list: every `BASE_RECIPES` entry (`web/lib/screens.ts`) whose recipe carries a `CollectionConfig` must have `searchable: true`, or be named in `TOOLBAR_EXEMPT`; and every `<ToolbarRow>` call site across `web/` and `web-portal/` (`web/components/deep-link/screen-bits.tsx`'s own bespoke toolbar, reached by a bounded collection with no recipe search to inherit) must pass a `search` prop, or be named in the same registry. Both directions are rot-checked: an exemption whose file no longer matches the condition it was pinned for fails the build, so the list can only shrink.",
-    why: "The client's own words, correcting a narrower answer already given once: \"I don't care here. You're giving me specifics, and I told you that the toolbar, including the search, should be absolutely everywhere we have a data view or a collection view. Stop hardcoding this. Just write it as a rule.\" A recipe's `searchable` flag and a bespoke `<ToolbarRow search={…}>` prop were both ORDINARY optional fields before this law — nothing stopped a screen from omitting either, and two did, silently: Tasks' Calendar tab and Triage both drew a toolbar with a button and no search box at all, reasoned only in a code comment nothing read at build time (\"the calendar has no search of its own\"). Flipping the default is the only fix that cannot regress the same way twice — an opt-IN can always be forgotten by omission, which is exactly what happened; an opt-OUT has to be written down, named, and given a reason a reviewer can read, in the same shape R31/R32/R29 already use for their own reasoned exceptions. A collection genuinely and permanently empty of rows (`WaveFinder`'s and Sprints' own \"nothing to search yet\" fallback) is the one legitimate reason left, because a search box over zero rows is a control that cannot do anything — and that reason is now written down rather than assumed.",
+    why: "The client's own words, correcting a narrower answer already given once: \"I don't care here. You're giving me specifics, and I told you that the toolbar, including the search, should be absolutely everywhere we have a data view or a collection view. Stop hardcoding this. Just write it as a rule.\" A recipe's `searchable` flag and a bespoke `<ToolbarRow search={…}>` prop were both ORDINARY optional fields before this law — nothing stopped a screen from omitting either, and two did, silently: Tasks' Calendar tab and Triage both drew a toolbar with a button and no search box at all, reasoned only in a code comment nothing read at build time (\"the calendar has no search of its own\"). Flipping the default is the only fix that cannot regress the same way twice — an opt-IN can always be forgotten by omission, which is exactly what happened; an opt-OUT has to be written down, named, and given a reason a reviewer can read, in the same shape R31/R32/R29 already use for their own reasoned exceptions. A collection genuinely and permanently empty of rows (`WaveFinder`'s and Sprints' own \"nothing to search yet\" fallback) is the one legitimate reason left, because a search box over zero rows is a control that cannot do anything — and that reason is now written down rather than assumed. SUPERSEDED IN PART, R50 (2026-09-03): that fallback shape — a bare `<ToolbarRow actions={…}>` reached only once the collection was empty — is exactly how a create button kept escaping this law's own two censuses, because both only ever asked whether `search` was present, never whether `actions` agreed with it. Both call sites now carry one `<ToolbarRow>` gated by R50's own required `empty` prop instead, and `TOOLBAR_EXEMPT` no longer names either.",
     checkId: "toolbar-shows-search",
     status: "enforced",
   },
@@ -451,6 +451,14 @@ export const RULES_REGISTRY: Rule[] = [
     law: "THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER, PAID BY THE ROW ITSELF, NEVER A PER-SCREEN MARGIN. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) pays `--toolbar-content-gap` (`web/app/globals.css`) as its own trailing margin, on its own root, so every call site gets it for free. No call site may ALSO wrap the row in a gapped flex column or space-y stack, and no call site may pass a competing `mb-*` in its own `className` — either is the same number being spent twice, which is how it grows past what it was meant to be. Checked as a census off the disk: `ToolbarRow`'s own definition must carry the token, and no `<ToolbarRow>` call site (or the variable a screen names `*[Tt]oolbar*` and renders in its place) may sit inside a `flex-col` wrapper that ALSO declares its own `gap-*`/`space-y-*`, or pass a hardcoded `mb-*` of its own, unless named in `TOOLBAR_CONTENT_GAP_EXEMPT` with the real reason.",
     why: "The client's own words, item 5 of the 2026-09-03 spacing round: \"tehre's wahy too much space between the toolbar and the contenta\" — confirmed on every screen she checked, not a detail-screen-only thing. It had drifted into five different numbers doing the identical job: a wrapping `flex flex-col gap-N` div (`gap-2`/`gap-3`/`gap-4`/`gap-6`, 7.5–22.5px), a `space-y-3`, and a `className=\"mb-4\"` passed straight to the row — fourteen call sites, four mechanisms, no shared owner. The exact shape `--tab-content-gap` already fixed for a tab strip and its panel (R48's neighbour law in spirit, same client session), read the other way round: the STRIP pays its own trailing space so a caller cannot forget it or invent a new number, and a margin on a sibling is the thing that drifts — this law spends the same `--space-5` `--tab-content-gap` already uses, because both are 'the gap between a control strip and the content under it' and a system with one rhythm does not mint a second number for the same sentence.",
     checkId: "toolbar-content-gap",
+    status: "enforced",
+  },
+  {
+    id: "R50",
+    dimension: "ui",
+    law: "NEVER TOOLBAR ON AN EMPTY COLLECTION — NOT EVEN THE CREATE BUTTON. R48 made the search box a default; this makes the WHOLE row answer one question together. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) takes a required `empty` prop — true when the collection holds zero rows before any search or filter narrows it — and returns `null` unconditionally when it is true, before any other slot (search, filters, sort, view, or `actions`, the create button) is even considered. `<PagedFind>` (`web/components/paged-find.tsx`) takes the equivalent required `restingEmpty` prop for the same reason on the door-searched half of the app, suppressing its own search/filters/sort/match-count/actions row the identical way while a genuinely empty collection is not being searched. `<SectionWithCreate>`'s own header-drawn create button (`showCreateInHeader`) carries the same gate through an optional `empty` prop, for the one shape neither `folderTabs` nor `useKitPanel` already covers. Two censuses, off the disk: every `<ToolbarRow>` call site across `web/` and `web-portal/` must pass an `empty` prop DERIVED FROM THE COLLECTION'S OWN ROW COUNT, and every `<PagedFind>` call site must pass a `restingEmpty` prop the same way — a prop that is MISSING, or hardcoded to a bare `{true}`/`{false}` literal (the row answering the question with a constant rather than real data), must be named in `EMPTY_TOOLBAR_EXEMPT` with the real reason. Rot-checked both ways, so the list can only shrink.",
+    why: "The client's own words, verbatim, about a Time tab on a brand-new record: \"once again, when empty collection no toolbar at all - fix everywhere and set as a rule.\" \"Once again\" is the load-bearing word: R48 (2 Sep 2026) had already ruled 'NEVER TOOLBAR ON EMPTY COLLECTION' once, and `CollectionFrame`'s own `isEmptyState` branch (the recipe engine's kit-panel path) had correctly carried it since — but that law's own two censuses only ever asked whether a `search` prop was PRESENT, never whether the REST of the row agreed with it. A `<ToolbarRow search={data.length > 0 && …} actions={canCreate && <AddButton/>} />` passes R48 outright (it has a `search` prop) while still drawing a lone, floating create button the moment the collection is empty — precisely her screenshot: a Time tab with zero rows, no search box, no sort, no filter, just a circular orange \"+\" sitting above \"No time logged against this yet.\" The audit this law's own census forced turned up the identical shape SEVEN more times, each reasoned as if it were the intended design rather than the bug it was: Sprints' Overview/Calendar toolbar fell back to a bare `<ToolbarRow actions={…}>` \"the same gate waves-screen.tsx puts on its own finder\" (a comment describing the bug as a precedent); Waves' own finder did the identical fallback, precedent and all; a wave's own Sprints tab kept a `<ToolbarRow>` alive through `canCreate` alone, picker included, regardless of `sprints.length`; Deliverables, Modules, and every one of Client-org's three lists (departments/roles/tools) gated `search` on the collection's own length and left `actions` gated on nothing but a permission check; Dropdown values fell back to the exact same shape with an Import CSV button riding along; and Tickets' own Triage queue drew its toolbar from a PARENT component that could never see whether the CHILD's queue — fetched two components away — held a single row. The fix could not be a fourteenth per-call-site patch, so it is not one: `empty`/`restingEmpty` are REQUIRED props precisely because an OPTIONAL one is what let every one of these seven happen — a caller who remembers to gate `search` and forgets to gate `actions` the identical way is not a caller who forgot a rule, it is a rule that was never asked of that slot.",
+    checkId: "empty-toolbar",
     status: "enforced",
   },
 ]
@@ -1089,16 +1097,23 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   "stories.list":
     "paged (R14) — its search box is the host's own <PagedFind> in stories-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
 
-  // ── THE TWO GENUINELY-EMPTY <ToolbarRow> CALL SITES — client ruling,
-  // 2 Sep 2026, "NEVER TOOLBAR ON EMPTY COLLECTION" (the same rule
-  // `CollectionFrame`'s own `isEmptyState` branch already enforces for the
-  // kit-panel path): a search box over a collection that holds no rows at
-  // all is a control that cannot do anything, and both of these draw a real
-  // search box the MOMENT the collection has a single row.
-  "web/components/sprints-screen.tsx":
-    "the bare <ToolbarRow actions={…}> only renders when `sprints.length === 0` — the ternary's other branch is a <ToolbarRow search={<SearchInput .../>} .../> that renders whenever there is at least one sprint to search. Not a silent opt-out: a genuinely empty collection has nothing for a search box to narrow.",
-  "web/components/waves-screen.tsx":
-    "the bare <ToolbarRow actions={…}> only renders when `all.length === 0` (and only once there is a client to sell a wave to) — the sibling branch is <WaveFinder>, which carries the real search/filter/view toolbar and renders whenever the collection holds a row. Same 'never toolbar on empty collection' shape as sprints-screen.tsx.",
+  // THE TWO GENUINELY-EMPTY <ToolbarRow> CALL SITES THIS LAW USED TO NAME
+  // HERE (sprints-screen.tsx, waves-screen.tsx) ARE GONE, 2026-09-03, R50.
+  // Both used to fall back to a BARE `<ToolbarRow actions={…}>` — search
+  // gone, but the create button left standing — reasoned in a comment as a
+  // deliberate "nothing to search" opt-out rather than the lone-"+"-pill bug
+  // R50 was written for. R48's own two-clause law only ever asked "is there
+  // a `search` prop", so a `<ToolbarRow search={sprints.length > 0 && …}
+  // actions={canCreate && <AddButton/>} />` passed it outright — `search`
+  // WAS conditionally present, `actions` simply was not gated the same way.
+  // sprints-screen.tsx now carries ONE `<ToolbarRow>`, always, with a
+  // required `empty` prop (R50) deciding whether the WHOLE row draws —
+  // search included, exactly as this law still requires, and the create
+  // button along with it, which is the half this law never asked about.
+  // waves-screen.tsx dropped `<ToolbarRow>` for this collection altogether:
+  // `<WaveFinder>` (its own real toolbar) already only ever rendered once
+  // `all.length > 0`, so the bare fallback had nothing left to justify once
+  // R50 made "Add the first" `<CollectionEmptyState>`'s job instead.
 }
 
 /** R49 — reviewed exceptions: a `<ToolbarRow>` call site (or wrapper) that
@@ -1114,6 +1129,31 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
  * govern a different sibling pair and never compete with the row's own gap —
  * the census below does not even reach them. */
 export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
+
+/** R50 — reviewed exceptions: a `<ToolbarRow>` or `<PagedFind>` call site
+ * that genuinely needs to keep drawing its row (or a piece of it) even while
+ * the collection it narrows holds zero rows, with the real reason. A FILE
+ * PATH earns an entry two ways, over the law's two censuses:
+ *
+ *   · A `<ToolbarRow>` call site with no `empty` prop AT ALL, or one whose
+ *     `empty` is a hardcoded `{true}`/`{false}` literal rather than an
+ *     expression derived from the collection's own row count — a literal is
+ *     the row answering R50's own question with a constant, which is exactly
+ *     the shape a caller could otherwise use to quietly opt back out.
+ *   · A `<PagedFind>` call site with no `restingEmpty` prop, under the
+ *     identical rule.
+ *
+ * Rot-checked in both directions, the same shape `TOOLBAR_EXEMPT` above
+ * uses: an entry whose call site now derives the prop from real data fails
+ * the build, so a screen that gets fixed cannot leave its pin behind. */
+export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
+  "web/components/account-detail-panels.tsx":
+    "ContactsPanel's <ToolbarRow> carries `empty={false}` — the one collection in the app with TWO first-adds rather than one (\"Add contact\", linking a person already on the books, and \"New contact\", making one), and `CollectionEmptyState` only ever carries a single labelled `onCreate` — it cannot offer both, so the row's own two icon buttons have to stay reachable on an empty contacts list exactly as they do on a populated one.",
+  "web/components/contact-panels.tsx":
+    "all three <ToolbarRow> call sites (Companies/Tickets/Meetings, one person's read-only summary panels) carry `empty={false}` — each is reached only PAST that panel's own early `X.length === 0` return, so the row can never actually be empty by the time it renders; the literal records that guarantee rather than hides it.",
+  "web/components/tickets-collection.tsx":
+    "TriageQueue's <ToolbarRow> carries `empty={false}` — reached only past two earlier returns (`!view.yours`, `view.waiting.length === 0`), so the queue is guaranteed non-empty by the time this row renders; the literal records that guarantee rather than hides it.",
+}
 
 /** R29 — reviewed exceptions. A file listed here matches the page-container
  * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:

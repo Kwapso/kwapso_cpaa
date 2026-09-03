@@ -89,6 +89,9 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
       facets={translatedFacets("knowledge", (s) => s, {
         compartment: [{ value: "account:A_1", label: "Bergman S.A." }],
       })}
+      // R50 — this suite exercises the facet toolbar itself, over a resting
+      // collection that already has rows.
+      restingEmpty={false}
       fetchPage={fetchPage}
     >
       {(found) => <div data-testid="listkey">{found.listKey ?? "(the collection's own)"}</div>}

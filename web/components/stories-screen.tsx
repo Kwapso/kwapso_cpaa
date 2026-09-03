@@ -262,6 +262,10 @@ export function StoriesScreen({
         }}
         sorts={translatedSorts("stories", t)}
         defaultSort={COLLECTION_SORTS.stories.defaultSort}
+        // R50 — the resting backlog's own row count, before any find: the
+        // same `loaded` array the recipe engine's own `SectionWithCreate`
+        // below already reads to shape its rows.
+        restingEmpty={loaded.length === 0}
         // FOUR FILTERS, all of them the DOOR's. They were the frame's until
         // 18 Aug 2026, which is the objection this file already makes two
         // comments up about narrowing the backlog by app in the browser — made

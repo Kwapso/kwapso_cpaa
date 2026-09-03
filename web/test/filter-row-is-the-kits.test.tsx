@@ -146,7 +146,7 @@ function ToolbarRowHarness({ facets = FACETS }: { facets?: FilterFacet[] }) {
   })
   return (
     <>
-      <ToolbarRow search={<input aria-label="Search" />} filters={pill} toolbarPanel={panel} />
+      <ToolbarRow empty={false} search={<input aria-label="Search" />} filters={pill} toolbarPanel={panel} />
       <span data-testid="values">{JSON.stringify(values)}</span>
     </>
   )
@@ -487,7 +487,11 @@ describe("the app's filter row is the design kit's", () => {
     // i · CLOSED: ONE CONTAINER, PILL-SHAPED, ONE FILL — and the track itself
     // carries neither, so there is nothing left inside it to stretch.
     expect(panelNode(), "nothing is open yet").toBeNull()
-    expect(column!.className).toContain("bg-background")
+    // R50-adjacent fix (dark mode, client: "the background of tabs is wrong,
+    // should be same as background of content body"): the container's fill
+    // matches the CARD it sits in (`--surface-raised`), not the page ground
+    // (`bg-background`) — the two coincide in light mode only.
+    expect(column!.className).toContain("bg-[var(--surface-raised)]")
     expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
       "rounded-pill"
     )
@@ -499,7 +503,7 @@ describe("the app's filter row is the design kit's", () => {
       track.className,
       "the track paints no fill or shape of its own any more — the merged " +
         "container does, which is the whole point of this pass"
-    ).not.toMatch(/rounded-pill|bg-background/)
+    ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
     const closedTrack = track.outerHTML
 
     openPanel()
@@ -539,7 +543,7 @@ describe("the app's filter row is the design kit's", () => {
     expect(
       panel!.className,
       "the open panel must not paint its own background — one surface, not two"
-    ).not.toMatch(/bg-background/)
+    ).not.toMatch(/bg-background|bg-\[var\(--surface-raised\)\]/)
     expect(
       panel!.className,
       "the open panel must not round its own corners — the merged container does"
@@ -552,7 +556,7 @@ describe("the app's filter row is the design kit's", () => {
     expect(
       column!.className,
       "the merged container still owns the single background in the open state"
-    ).toContain("bg-background")
+    ).toContain("bg-[var(--surface-raised)]")
     expect(
       column!.className,
       "a panel is open — the container must switch to the box radius"

@@ -40,6 +40,7 @@ import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
 import { useConfirm } from "@shared/web/use-confirm"
 import { CollectionHeading } from "@/components/collection-heading"
@@ -530,8 +531,15 @@ export function SelectableScreen({
           floating ABOVE the card with the actions and one below it with the
           search — so the button cannot drift back onto its own row. */}
       <CollectionCard>
-        {(values.length > 0 || canCreate) && (
           <ToolbarRow
+            // R50 — never toolbar on an empty collection. This row USED TO
+            // draw regardless of `values.length` whenever `canCreate` was
+            // true — a lone "New value" (plus Import CSV, for an import-
+            // target screen) pill above "No values yet. Add your first
+            // above" pointing at a button that had just been removed from
+            // above it. `CollectionEmptyState` below now carries "Add the
+            // first" alone.
+            empty={values.length === 0}
             search={
               values.length > 0 && (
                 <>
@@ -583,14 +591,19 @@ export function SelectableScreen({
               </>
             }
           />
-        )}
 
         {grouped.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {values.length === 0
-              ? t("No values yet. Add your first above.")
-              : t("No values match your search or filter.")}
-          </p>
+          values.length === 0 ? (
+            // GENUINELY EMPTY — the toolbar above is gone, so this is the
+            // only "New value" (and "Import CSV") left on screen.
+            <CollectionEmptyState
+              title={t("No values yet.")}
+              onCreate={canCreate ? () => setAddOpen(true) : undefined}
+              onImport={canCreate && onImport ? onImport : undefined}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("No values match your search or filter.")}</p>
+          )
         ) : (
           <div className="flex flex-col gap-6">
             {grouped.map((g) => (

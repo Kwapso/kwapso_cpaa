@@ -365,6 +365,7 @@ export function ClientOrgPanel({
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">{t("Departments")}</h3>
           <ToolbarRow
+            empty={departments.length === 0}
             search={
               departments.length > 0 && (
                 <ListToolbar
@@ -438,6 +439,7 @@ export function ClientOrgPanel({
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">{t("Roles")}</h3>
           <ToolbarRow
+            empty={roles.length === 0}
             search={
               roles.length > 0 && (
                 <ListToolbar
@@ -584,6 +586,7 @@ export function ClientOrgPanel({
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">{t("Tools")}</h3>
           <ToolbarRow
+            empty={tools.length === 0}
             search={
               tools.length > 0 && (
                 <ListToolbar

@@ -142,6 +142,7 @@ export function StakeholdersPanel({
     <div className="flex flex-col">
       {ours.length + theirs.length > 1 && (
         <ToolbarRow
+          empty={ours.length + theirs.length === 0}
           search={
             <SearchInput
               value={query}

@@ -336,6 +336,15 @@ export function TasksScreen({
   //
   // AND EVERY ONE OF THEM OPENS. `onOpen` is the engine's own `open` intent, so
   // a task reached from a square lands on exactly the screen the list reaches.
+  //
+  // GENUINELY EMPTY (R50), READ BEFORE THE QUERY NARROWS IT: whether this
+  // tab's own query (the same one `tasksKey(teamId, view)` fetched) has ANY
+  // due-dated task at all — never "zero for the month currently shown"
+  // (`RecordCalendar` pages months on its own, in the browser, so a month
+  // with nothing due is the ordinary, expected shape of a perfectly healthy
+  // calendar) and never "zero after `calendarQuery` narrowed it" (that stays
+  // the toolbar's own search-box-only concern, below).
+  const hasDueDated = tasksQ.data.some((r) => r.dueOn)
   const calendarEntries: CalendarEntry[] = tasksQ.data
     .filter((r) => r.dueOn)
     // THE CALENDAR'S OWN SEARCH (see `calendarQuery` above) — the title is the
@@ -411,6 +420,7 @@ export function TasksScreen({
                 needs its OWN search box, not a reason to have none. See
                 `calendarQuery` above for the filter this narrows. */}
             <ToolbarRow
+              empty={!hasDueDated}
               search={
                 calendarEntries.length > 0 || calendarQuery !== "" ? (
                   <SearchInput

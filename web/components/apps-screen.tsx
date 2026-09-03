@@ -431,6 +431,7 @@ export function AppsScreen({
             Options come from the WHOLE collection (see above), so narrowing
             by one facet never hides the other's choices. */}
         <ToolbarRow
+          empty={appsQ.data.length === 0}
           search={
             appsQ.data.length > 0 && (
               <SearchInput

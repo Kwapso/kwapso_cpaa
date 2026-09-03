@@ -376,8 +376,15 @@ export function WaveDetailScreen({
                     (ICON-ONLY, client ruling 2026-08-31) beside "Put a sprint
                     in this wave" (a search-to-attach control, the same kind of
                     second act `ContactsPanel`'s "Add contact" is). */}
-                {sprints.length > 0 || canCreate || (canEdit && addable.length > 0) ? (
                   <ToolbarRow
+                    // R50 — never toolbar (create/attach included) on an empty
+                    // wave: a wave with no sprints in it yet named "Plan a
+                    // sprint" through this row regardless of `sprints.length`,
+                    // which is the exact lone-"+"-pill shape the client's Time
+                    // screenshot named, just with a picker riding along beside
+                    // it too. `CollectionEmptyState` below carries "Add the
+                    // first" alone once this row is gone.
+                    empty={sprints.length === 0}
                     // THE LIST'S OWN SEARCH + SORT — over the sprints ALREADY in
                     // this wave, never the attach picker's pool. Shown once
                     // there is more than one row to narrow; a wave with one
@@ -427,7 +434,6 @@ export function WaveDetailScreen({
                       </>
                     }
                   />
-                ) : null}
 
                 {sprints.length === 0 ? (
                   // No `sprints` import target at all — a wave's sprints are

@@ -295,6 +295,8 @@ export function TimePanel({
         }}
         sorts={translatedSorts("workLogs", t)}
         defaultSort={COLLECTION_SORTS.workLogs.defaultSort}
+        // R50 — the resting read's own row count.
+        restingEmpty={logs.length === 0}
         facets={translatedFacets("workLogs", t, {
           userId: members.map((m) => ({ value: m.id, label: m.name })),
         })}

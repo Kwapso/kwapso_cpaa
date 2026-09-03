@@ -283,8 +283,34 @@ export function AddButton({
  * site's — the same discipline the kit's own contract keeps. `view` was
  * added 2026-09-01, first reached by Apps' Tiles/List switch (apps-screen.tsx)
  * — CH27.13's own order (search, filters, view switcher, actions) is why it
- * sits between `sort` and `actions` rather than anywhere else. */
+ * sits between `sort` and `actions` rather than anywhere else.
+ *
+ * `empty` IS A SIXTH SLOT, AND IT IS NOT OPTIONAL (R50 — "once again, when
+ * empty collection no toolbar at all — fix everywhere and set as a rule",
+ * the client's own words, 2026-09-03, about a Time tab whose toolbar had
+ * shrunk to a lone floating "+"). R48 already made every OTHER slot here
+ * answer "does this collection have rows" — apps-screen.tsx gates `search`/
+ * `filters`/`sort`/`view` on `appsQ.data.length > 0` — but `actions` (the
+ * create button) kept its own, separate gate, usually just a permission
+ * check (`canCreate && <AddButton…/>`), because nothing FORCED it to agree
+ * with the other four. It escaped on this exact screen, on Sprints, on
+ * Deliverables, on Modules, on the client-org panels, on Wave sprints and on
+ * Work logs — seven call sites answering R48's question for search and never
+ * asking it for the button beside it. A per-slot convention that only some
+ * slots follow is not a rule, so the row itself now asks the one question
+ * that matters and answers it for every slot at once: pass the same boolean
+ * the search gate already computes — the collection's own RAW row count
+ * being zero, before any search or filter narrows it, never "zero results
+ * for this question" — and the WHOLE row disappears, the create button
+ * included, leaving the collection's own `CollectionEmptyState` (or
+ * `SectionWithCreate`'s published action) to carry "Add the first" alone.
+ * Required, not optional with a safe default: an optional prop a caller can
+ * forget is exactly how the create button kept escaping the search gate
+ * next to it. See `web/test/rules.test.ts`'s `empty-toolbar` census and
+ * `EMPTY_TOOLBAR_EXEMPT` for the few call sites that answer this
+ * differently, each with its own reason on file. */
 export function ToolbarRow({
+  empty,
   search,
   filters,
   toolbarPanel,
@@ -293,6 +319,16 @@ export function ToolbarRow({
   actions,
   className,
 }: {
+  /** R50's own gate, and the only one this component trusts: true when the
+   * collection has ZERO rows before any search or filter narrows it — the
+   * exact boolean the search slot's own `data.length > 0` gate already
+   * computes, never "zero results for the current question" (that stays a
+   * per-slot decision, e.g. a `narrowed` no-results sentence rendered
+   * beside a still-visible search box). True suppresses the WHOLE row,
+   * including `actions`, regardless of what the other props are — a caller
+   * cannot pass `empty={false}` by omission the way an optional prop would
+   * let it. See this function's own header comment for why. */
+  empty: boolean
   /** A search box, or any other left-aligned control. Omitted where the tab
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
    * Triage) — the row is then the actions alone. */
@@ -342,6 +378,10 @@ export function ToolbarRow({
   actions?: React.ReactNode
   className?: string
 }) {
+  // NEVER TOOLBAR ON EMPTY COLLECTION (R50) — checked FIRST and unconditionally,
+  // before any slot is even looked at, so a truthy `actions` (the one slot every
+  // recurrence of this bug shared) cannot keep the row alive on its own.
+  if (empty) return null
   if (!search && !filters && !sort && !view && !actions) return null
 
   // ── ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, SUPERSEDING THE
@@ -389,7 +429,16 @@ export function ToolbarRow({
     <div
       data-slot="toolbar-row-column"
       className={cn(
-        "flex min-w-0 flex-col bg-background",
+        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (client,
+        // dark mode, Apps screen: "the background of tabs is wrong. should be
+        // same as background of content body"). `bg-background` and
+        // `bg-[var(--surface-raised)]` happen to be the same colour in LIGHT
+        // mode, which is how this shipped looking right — dark mode split
+        // them apart (`--background` → `--kw-unlit-page` #141310,
+        // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
+        // genuinely different near-black tones), and this row's card-toned
+        // surroundings suddenly sat on the wrong one of the two.
+        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
         // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
         // reads as the same stadium pill every other toolbar control in this
         // app wears; expanded switches to the box radius so a tall facet
@@ -463,6 +512,7 @@ export function SectionWithCreate({
   aboveCard,
   folderTabs,
   useKitPanel,
+  empty,
   children,
 }: {
   show: boolean
@@ -531,6 +581,18 @@ export function SectionWithCreate({
    * session, not two create controls for the same act.
    */
   useKitPanel?: boolean
+  /** R50 — never toolbar (create button included) on an empty collection.
+   * Every CURRENT call site passes `folderTabs` or `useKitPanel`, so this
+   * header's own `showCreateInHeader` row below never actually draws today
+   * (the tab strip's own `<ToolbarRow>`, or the kit panel's `isEmptyState`
+   * gate, already answer R50 for those). Optional, defaulting to `false`,
+   * for exactly that reason — it costs no existing call site anything — but
+   * it is here so the NEXT screen that uses this header's own create button
+   * (neither `folderTabs` nor `useKitPanel`) cannot reintroduce the lone-"+"
+   * bug this file's `ToolbarRow` was fixed out of. Pass the same "does this
+   * collection have any rows yet" boolean `ToolbarRow`'s own `empty` prop
+   * takes. */
+  empty?: boolean
   children: React.ReactNode
 }) {
   const Icon = icon === "plus" ? Plus : Envelope
@@ -540,8 +602,11 @@ export function SectionWithCreate({
   // control, so the header row's copy of it would be a second mango for
   // one act. `folderTabs` suppresses it for the same reason a collection's
   // own tab strip is never where this button belongs any more (client ruling,
-  // 2026-08-31) — the call site draws it itself, in its own toolbar.
-  const showCreateInHeader = show && !useKitPanel && !folderTabs
+  // 2026-08-31) — the call site draws it itself, in its own toolbar. `empty`
+  // is R50's own reason: a genuinely empty collection names its next act
+  // through `CollectionEmptyState`'s "Add the first" alone, never a second
+  // mango in this header too.
+  const showCreateInHeader = show && !useKitPanel && !folderTabs && !empty
   const hasActions = showCreateInHeader || showSecondary || showDownload
   // THE ACTION BUTTONS (Export/Import/New) THEMSELVES, wherever the row below
   // ends up putting them — the buttons are decided once, here; only their ROW

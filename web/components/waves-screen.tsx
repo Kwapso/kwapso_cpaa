@@ -53,7 +53,8 @@ import {
   waveQueryIsActive,
   type WaveQuery,
 } from "@/components/wave-finder"
-import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { InAppLink } from "@/components/in-app-link"
 import { WaveFormDialog } from "@/components/wave-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -384,10 +385,15 @@ export function WaveCollection({
           like Roles and Processes), so the toolbar is the first thing inside
           the card. */}
       <CollectionCard>
-        {all.length > 0 ? (
-          // Only once there is something to look through — a search box over
-          // an empty collection is a control that cannot do anything, so the
-          // button falls back to a bare `<ToolbarRow>` below instead.
+        {/* R50 — never toolbar on an empty collection. `all.length === 0` used
+            to fall back to a BARE `<ToolbarRow>` carrying only "Sell a wave" —
+            exactly the lone-"+"-pill shape the client's Time screenshot
+            named, reasoned in a comment ("the button falls back to...
+            instead") that read as an intentional design rather than the bug
+            it was. A genuinely empty Waves screen now draws no toolbar at
+            all, below — `CollectionEmptyState` carries "Add the first"
+            alone. */}
+        {all.length > 0 && (
           <div className="mb-4">
             <WaveFinder
               query={query}
@@ -411,13 +417,6 @@ export function WaveCollection({
               }
             />
           </div>
-        ) : (
-          canCreate &&
-          clients.length > 0 && (
-            <ToolbarRow
-              actions={<AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />}
-            />
-          )
         )}
         {view === "timeline" && timeline ? (
           // ONE LANE PER ACCOUNT, one bar per wave, months across the top —
@@ -439,11 +438,23 @@ export function WaveCollection({
             }
           />
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-sm">
-            {asking
-              ? t("No waves match that.")
-              : t("No waves yet. A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.")}
-          </p>
+          asking ? (
+            <p className="text-muted-foreground py-4 text-sm">{t("No waves match that.")}</p>
+          ) : (
+            // GENUINELY EMPTY — R50's own carve-out (composition 27.21): the
+            // toolbar above is gone, so this is the only "Sell a wave" left
+            // on screen. `clients.length > 0` is the same real-world gate the
+            // toolbar's own button carried (a wave needs a client to sell it
+            // to) — offering a button that would open a dialog with nowhere
+            // to point would be worse than none.
+            <CollectionEmptyState
+              title={t("No waves yet.")}
+              description={t(
+                "A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards."
+              )}
+              onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
+            />
+          )
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map((w) => (

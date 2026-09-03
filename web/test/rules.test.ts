@@ -33,6 +33,7 @@ import {
   RULES_REGISTRY,
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
+  EMPTY_TOOLBAR_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -2695,6 +2696,176 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R50 — NEVER TOOLBAR ON AN EMPTY COLLECTION, NOT EVEN THE CREATE BUTTON.
+  //
+  // The client's own words, verbatim, about a Time tab with zero rows: "once
+  // again, when empty collection no toolbar at all - fix everywhere and set
+  // as a rule." R48 already ruled "never toolbar on empty collection" once —
+  // but its own two censuses only ever asked "does this `<ToolbarRow>` have
+  // a `search` prop", never whether the REST of the row (`actions`, the
+  // create button above everything else) agreed with it. A
+  // `<ToolbarRow search={data.length > 0 && …} actions={canCreate &&
+  // <AddButton/>} />` passed R48 outright — `search` genuinely was gated —
+  // while still drawing a lone, floating "+" the moment the collection held
+  // zero rows, because `actions` was never asked the same question. Found
+  // seven more times once this law's own census went looking: Sprints'
+  // Overview/Calendar toolbar, Waves' own finder, a wave's own Sprints tab,
+  // Deliverables, Modules, all three of Client-org's lists, Dropdown values,
+  // and Triage's toolbar (drawn by a PARENT component that could not see
+  // whether the CHILD's own fetch, two components away, held a single row).
+  //
+  // THE FIX IS CENTRAL, not fourteen more per-call-site patches: `empty` and
+  // `restingEmpty` are REQUIRED props on `<ToolbarRow>` and `<PagedFind>`
+  // respectively, checked FIRST, before any other slot — so a caller cannot
+  // gate `search` correctly and forget `actions` the way every one of the
+  // eight instances above did. Three things, off the disk, never a hand-list:
+  //
+  //   i.   Both components' OWN source still gates on the prop, unconditionally,
+  //        ahead of every other slot — the CENTRAL guard this law leans on,
+  //        so a future edit that moved the check after `actions` would be
+  //        caught here rather than trusted forever.
+  //   ii.  Every `<ToolbarRow>` call site (the same brace-depth scan R48/R49
+  //        use) passes an `empty` prop, or is named in `EMPTY_TOOLBAR_EXEMPT`.
+  //   iii. Every `<PagedFind>` call site passes a `restingEmpty` prop, or is
+  //        named in the same registry.
+  //
+  // `<SectionWithCreate>`'s own header create button is NOT censused the same
+  // way: every current call site already passes `folderTabs` or `useKitPanel`,
+  // either of which suppresses that button through its OWN, older mechanism
+  // (`showCreateInHeader`), so the shape this law is about — a create button
+  // with no gate on the collection's row count — cannot occur there today.
+  // Its `empty` prop exists for the day a call site uses neither; nothing to
+  // census until one does.
+  it("empty-toolbar: never toolbar on an empty collection, actions included (R50)", () => {
+    const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
+    // i(a) · `ToolbarRow`'s own central guard — checked BEFORE the "nothing to
+    // draw" early return, so `empty` decides ahead of every slot.
+    const toolbarRowBody = screenBits.slice(screenBits.indexOf("export function ToolbarRow("))
+    const emptyGateAt = toolbarRowBody.indexOf("if (empty) return null")
+    const noSlotsGateAt = toolbarRowBody.indexOf("if (!search && !filters && !sort && !view && !actions)")
+    expect(
+      emptyGateAt,
+      "R50 — ToolbarRow must open with `if (empty) return null` (screen-bits.tsx) — the central guard every call site leans on instead of gating its own `actions`"
+    ).toBeGreaterThan(-1)
+    expect(
+      noSlotsGateAt === -1 || emptyGateAt < noSlotsGateAt,
+      "R50 — ToolbarRow's `empty` check must run BEFORE the no-slots-truthy check, so a truthy `actions` alone can never keep the row alive on an empty collection"
+    ).toBe(true)
+
+    // i(b) · `PagedFind`'s own central guard — `genuinelyEmpty` computed from
+    // `restingEmpty` and gating the whole toolbar column, before `children`.
+    const pagedFind = stripComments(readFileSync(join(WEB, "components/paged-find.tsx"), "utf8"))
+    expect(
+      pagedFind,
+      "R50 — PagedFind must compute `genuinelyEmpty` from its own `restingEmpty` prop (paged-find.tsx)"
+    ).toMatch(/const genuinelyEmpty = restingEmpty && !active/)
+    expect(
+      pagedFind,
+      "R50 — PagedFind's toolbar column must be null when genuinely empty (paged-find.tsx: `genuinelyEmpty ? null : (…)`)"
+    ).toMatch(/genuinelyEmpty \? null : \(/)
+
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const offenders: string[] = []
+    const exemptUsed = new Set<string>()
+
+    // Brace-depth-aware scan to one tag's own closing `>` — R48's exact
+    // shape, so a nested `search={<SearchInput onClear={() => …} />}` can't
+    // be mistaken for the outer tag's own close. Extended for `<PagedFind`'s
+    // own generic (`<PagedFind<Row>`): the `<Row>` is skipped, angle-depth
+    // aware, BEFORE the brace-depth prop scan starts — without this, the
+    // scan reads the generic's own closing `>` as the whole tag's close and
+    // never sees a single prop.
+    function ownTag(src: string, at: number, tagName: string): string {
+      let i = at + tagName.length
+      if (src[i] === "<") {
+        let angleDepth = 0
+        while (i < src.length) {
+          if (src[i] === "<") angleDepth++
+          else if (src[i] === ">") {
+            angleDepth--
+            i++
+            if (angleDepth === 0) break
+            continue
+          }
+          i++
+        }
+      }
+      let braceDepth = 0
+      while (i < src.length) {
+        const ch = src[i]
+        if (ch === "{") braceDepth++
+        else if (ch === "}") braceDepth--
+        else if (ch === ">" && braceDepth === 0) break
+        i++
+      }
+      return src.slice(at, i + 1)
+    }
+
+    // A prop present but hardcoded to a boolean LITERAL is the row answering
+    // R50's own question with a constant rather than the collection's real
+    // row count — exactly the shape a caller could otherwise use to quietly
+    // opt back out, so it is held to the same "named in the registry" bar as
+    // a prop that is missing outright.
+    function propIsLiteral(tag: string, prop: string): boolean {
+      return new RegExp(`\\b${prop}\\s*=\\s*\\{\\s*(?:true|false)\\s*\\}`).test(tag)
+    }
+
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      const src = stripComments(f.source)
+
+      // ii · every real `<ToolbarRow` TAG — screen-bits.tsx DECLARES it, not a
+      // call site of it.
+      if (!f.rel.endsWith("deep-link/screen-bits.tsx")) {
+        let from = 0
+        for (;;) {
+          const at = src.indexOf("<ToolbarRow", from)
+          if (at === -1) break
+          const tag = ownTag(src, at, "<ToolbarRow")
+          const missing = !/\bempty\s*=/.test(tag)
+          const literal = propIsLiteral(tag, "empty")
+          if (missing || literal) {
+            if (f.rel in EMPTY_TOOLBAR_EXEMPT) exemptUsed.add(f.rel)
+            else
+              offenders.push(
+                `${f.rel}: a <ToolbarRow> with ${missing ? "no `empty` prop" : "a hardcoded `empty={true|false}` literal"}, and the file is not in EMPTY_TOOLBAR_EXEMPT`
+              )
+          }
+          from = at + tag.length
+        }
+      }
+
+      // iii · every real `<PagedFind` TAG — paged-find.tsx DECLARES it.
+      if (!f.rel.endsWith("components/paged-find.tsx")) {
+        let from = 0
+        for (;;) {
+          const at = src.indexOf("<PagedFind", from)
+          if (at === -1) break
+          const tag = ownTag(src, at, "<PagedFind")
+          const missing = !/\brestingEmpty\s*=/.test(tag)
+          const literal = propIsLiteral(tag, "restingEmpty")
+          if (missing || literal) {
+            if (f.rel in EMPTY_TOOLBAR_EXEMPT) exemptUsed.add(f.rel)
+            else
+              offenders.push(
+                `${f.rel}: a <PagedFind> with ${missing ? "no `restingEmpty` prop" : "a hardcoded `restingEmpty={true|false}` literal"}, and the file is not in EMPTY_TOOLBAR_EXEMPT`
+              )
+          }
+          from = at + tag.length
+        }
+      }
+    }
+    expect(
+      offenders,
+      `R50 — every <ToolbarRow>/<PagedFind> call site answers "is this collection empty", or is named in EMPTY_TOOLBAR_EXEMPT:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(EMPTY_TOOLBAR_EXEMPT).filter((k) => !exemptUsed.has(k))
+    expect(
+      stale,
+      `these EMPTY_TOOLBAR_EXEMPT entries match nothing any more — the call site now passes the prop, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "declared-readers", // R42: workers/content/test/source-readers.test.ts
@@ -2746,6 +2917,7 @@ describe("RULES — the laws of the base", () => {
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
       "toolbar-shows-search", // R48: the BASE_RECIPES + <ToolbarRow> censuses below
       "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
+      "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

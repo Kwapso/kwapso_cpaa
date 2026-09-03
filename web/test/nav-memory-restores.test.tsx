@@ -56,6 +56,9 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
         placeholder="Search knowledge base…"
         matches={{ none: "No sources match", one: "1 source matches", many: "{count} sources match" }}
         facets={translatedFacets("knowledge", (s) => s)}
+        // R50 — this suite exercises the remembered search box over a
+        // resting collection that already has rows.
+        restingEmpty={false}
         fetchPage={fetchPage}
       >
         {() => <div />}
@@ -102,6 +105,7 @@ describe("she comes back to the question she left", () => {
         placeholder="Search knowledge base…"
         matches={{ none: "No sources match", one: "1 source matches", many: "{count} sources match" }}
         facets={translatedFacets("knowledge", (s) => s)}
+        restingEmpty={false}
         fetchPage={door.fetchPage}
       >
         {() => <div />}

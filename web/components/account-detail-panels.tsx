@@ -140,6 +140,15 @@ export function ContactsPanel({
   return (
     <div className="flex flex-col">
       <ToolbarRow
+        // R50 EXEMPTION (EMPTY_TOOLBAR_EXEMPT) — never suppressed, on purpose.
+        // This is the one collection in the app with TWO first-adds rather
+        // than one: "Add contact" (link a person already on the books) and
+        // "New contact" (make one). `CollectionEmptyState` below only ever
+        // carries a SINGLE labelled `onCreate` — it cannot offer both, so an
+        // empty contacts list still needs this row's own two icon buttons to
+        // stay reachable, exactly as a populated one does. See the file
+        // header's own "offers both ways in" test.
+        empty={false}
         search={
           links.length > 0 && (
             <>
@@ -322,6 +331,7 @@ export function PortalAccessPanel({
   return (
     <div className="flex flex-col">
       <ToolbarRow
+        empty={portalUsers.length === 0}
         search={
           portalUsers.length > 0 && (
             <>

@@ -72,6 +72,9 @@ function renderFind() {
           ],
         },
       ]}
+      // R50 — this suite exercises the toolbar's own merged-container shape,
+      // which only exists to test while the row is actually drawn.
+      restingEmpty={false}
       fetchPage={fetchPage}
     >
       {() => <div data-testid="rows" />}
@@ -94,7 +97,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     // i · CLOSED: one container, pill-shaped, one fill — the track itself
     // carries neither.
     expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
-    expect(column!.className).toContain("bg-background")
+    expect(column!.className).toContain("bg-[var(--surface-raised)]")
     expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
       "rounded-pill"
     )
@@ -105,7 +108,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     expect(
       track.className,
       "the track paints no fill or shape of its own — the merged container does"
-    ).not.toMatch(/rounded-pill|bg-background/)
+    ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
     const closedTrack = track.outerHTML
 
     openPanel()
@@ -133,7 +136,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     expect(
       panelRow.className,
       "the open panel must not paint its own background — one surface, not two"
-    ).not.toMatch(/bg-background/)
+    ).not.toMatch(/bg-background|bg-\[var\(--surface-raised\)\]/)
     expect(
       panelRow.className,
       "the open panel must not round its own corners — the merged container does"
@@ -141,7 +144,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
 
     // iv · OPEN: the SAME container switches shape.
     expect(column!.className, "the container still owns the single background").toContain(
-      "bg-background"
+      "bg-[var(--surface-raised)]"
     )
     expect(
       column!.className,

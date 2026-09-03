@@ -354,6 +354,8 @@ export function MeetingsScreen({
         }}
         sorts={translatedSorts("meetings", t)}
         defaultSort={COLLECTION_SORTS.meetings.defaultSort}
+        // R50 — the resting (unfiltered, `view: "all"`) read's own row count.
+        restingEmpty={loaded.length === 0}
         // THE MEETINGS LIST'S FILTERS, asked of the door. They were the frame's until
         // 18 Aug 2026 — so "who we met" narrowed the fifty most recent meetings
         // and said nothing about the two years behind them, which is the exact

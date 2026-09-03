@@ -231,7 +231,17 @@ export function WaveFinder({
     <div
       data-slot="toolbar-row-column"
       className={cn(
-        "flex w-full min-w-0 flex-col bg-background",
+        // THE FILL MATCHES THE CARD IT SITS IN — the same latent mismatch
+        // `ToolbarRow` (screen-bits.tsx) carried and was fixed out of
+        // (client, dark mode, Apps screen: "should be same as background of
+        // content body"). This component's own single call site
+        // (waves-screen.tsx) always draws it inside `<CollectionCard>`,
+        // which paints `bg-surface-panel` — not `bg-background` (the page
+        // ground, coincidentally the same colour as a CARD only in light
+        // mode) and not `--surface-raised` either (`ToolbarRow`'s own fix,
+        // right for a row sitting directly on `ScreenShell`'s pane, which
+        // this row never does).
+        "flex w-full min-w-0 flex-col bg-surface-panel",
         filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
       )}
     >

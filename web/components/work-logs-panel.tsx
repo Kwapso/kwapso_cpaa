@@ -384,6 +384,11 @@ export function WorkLogsPanel({
           once more than one person has time on this record — a filter over a
           set of one is a control with nothing to control. */}
       <ToolbarRow
+        // R50 — the resting (unfiltered) read's own row count: this is the
+        // exact bug the client's own screenshot named ("when empty
+        // collection no toolbar at all"), a lone "Log time" pill above "No
+        // time logged against this yet." on a Time tab with zero entries.
+        empty={logsQ.data.length === 0}
         search={
           summaryQ.data && summaryQ.data.people.length > 1 && (
             <Select value={personFilter || "all"} onValueChange={(v) => setPersonFilter(v === "all" ? "" : v)}>

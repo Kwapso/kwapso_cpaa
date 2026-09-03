@@ -436,6 +436,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           // moving the action buttons up did not touch it.
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
+          // R50 — the resting read's own row count, across BOTH tabs: a team
+          // with companies but no individuals yet is not a genuinely empty
+          // Accounts collection, only an empty Contacts one (its own screen).
+          restingEmpty={loaded.length === 0}
           fixed={accountTab === "all" ? undefined : { type: "entity" }}
           // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
           // beside every other paged collection's. A `status` facet stood here
@@ -630,6 +634,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <PagedFind<KnowledgeSource>
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
+          // R50 — the resting read's own row count.
+          restingEmpty={loadedSources.length === 0}
           listKey={knowledgeKey(teamId as string)}
           placeholder={t("Search")}
           matches={{

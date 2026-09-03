@@ -61,6 +61,9 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
       // the identity, so the English in COLLECTION_SORTS is what renders.
       sorts={translatedSorts("accounts", (s) => s)}
       defaultSort={COLLECTION_SORTS.accounts.defaultSort}
+      // R50 — this suite exercises the sort control over a resting
+      // collection that already has rows.
+      restingEmpty={false}
       fetchPage={fetchPage}
     >
       {(found) => <div data-testid="listkey">{found.listKey ?? "(the collection's own)"}</div>}

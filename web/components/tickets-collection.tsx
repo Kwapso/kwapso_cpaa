@@ -181,13 +181,10 @@ export function TicketsCollection({
   // Which type of ticket she was looking at, remembered with the rest of the
   // screen — the sub-tab is as much "where she was" as the search box under it.
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
-  // TRIAGE'S OWN SEARCH — client ruling, 2026-09-03: "the toolbar, including
-  // the search, should be absolutely everywhere we have a data view or a
-  // collection view. Stop hardcoding this." Triage still has no `<PagedFind>`
-  // to share a search box with (it is a small, whole-team-fetched queue, not a
-  // paged door read), so it needs one of its own rather than none at all —
-  // see `TriageQueue`'s own `query` prop below, which is what this narrows.
-  const [triageQuery, setTriageQuery] = React.useState("")
+  // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
+  // above it has to answer "is the queue empty" to know whether to draw
+  // itself at all, and only `TriageQueue` — which fetches the queue — ever
+  // knows that. See its own header comment.
 
   // The team's own glyphs, scanned once for the whole strip rather than once
   // per tab. The vocabulary is a cache this screen's siblings already hold and
@@ -336,35 +333,28 @@ export function TicketsCollection({
 
           {facet === TRIAGE ? (
             <CollectionCard>
-              {/* THE TOOLBAR, NOW WITH ITS OWN SEARCH — CLIENT RULING,
-                  2026-09-03, SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO
-                  CARRY. Triage still has no `<PagedFind>` to share a search
-                  box with (it is a small, whole-team-fetched queue, not a
-                  paged door read) — but "no shared box" is a reason to draw
-                  its OWN, not a reason to draw none, and "Raise ticket" still
-                  lives below the tabs rather than beside them (client ruling,
-                  2026-08-31). Always drawn now (not gated on
-                  `canCreateTicket`), because search is for every reader who
-                  can see this queue, not only the ones who may raise a
-                  ticket. */}
-              <ToolbarRow
-                search={
-                  <SearchInput
-                    value={triageQuery}
-                    onChange={(e) => setTriageQuery(e.target.value)}
-                    onClear={() => setTriageQuery("")}
-                    placeholder={t("Search the triage queue…")}
-                    className="w-full"
-                  />
-                }
-                actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
-              />
+              {/* THE TOOLBAR, WITH ITS OWN SEARCH — CLIENT RULING, 2026-09-03,
+                  SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO CARRY. Triage
+                  still has no `<PagedFind>` to share a search box with (it is
+                  a small, whole-team-fetched queue, not a paged door read) —
+                  but "no shared box" is a reason to draw its own, not a
+                  reason to draw none, and "Raise ticket" still lives below
+                  the tabs rather than beside them (client ruling, 2026-08-31).
+                  DRAWN BY `TriageQueue` ITSELF NOW, NOT HERE (R50, 2026-09-03
+                  second pass) — this component only ever knows whether the
+                  reader is ON triage, never whether the queue they'd be
+                  searching has anything in it, so the toolbar used to render
+                  regardless, a lone "Raise ticket" pill above an empty queue
+                  and no message at all for whoever was not on duty this week.
+                  `TriageQueue` fetches the queue, so it is the one place that
+                  can answer "is it empty" honestly — see its own header. */}
               <TriageQueue
                 teamId={teamId}
                 canTriage={can("help", "edit")}
                 canEdit={can("help", "edit")}
                 helpTypeOptions={helpTypeOptions}
-                query={triageQuery}
+                canCreateTicket={canCreateTicket}
+                onCreate={onCreate}
                 // The engine's open intent carries a URL SEGMENT, not a permission
                 // module — its only consumer builds an address out of it
                 // (deep-link-screen.tsx). Everywhere else in the app the two words
@@ -416,6 +406,10 @@ export function TicketsCollection({
               }}
               sorts={translatedSorts("help", t)}
               defaultSort={COLLECTION_SORTS.help.defaultSort}
+              // R50 — whichever tab is open, `scopedQ` is its own resting read
+              // (the "all" list, or the sub-tab's own facet read), so this is
+              // the one honest "is THIS tab's collection empty" answer.
+              restingEmpty={scopedQ.data.length === 0}
               // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
               // overnight (2026-09-01) names Client and Module as the ticket
               // screen's own worked example of "real filter facet chips"; the
@@ -568,18 +562,19 @@ function TriageQueue({
   canTriage,
   canEdit,
   helpTypeOptions,
-  query,
+  canCreateTicket,
+  onCreate,
   onOpen,
 }: {
   teamId: string
   canTriage: boolean
   canEdit: boolean
   helpTypeOptions: string[]
-  /** The parent's own search box (see `TicketsCollection`'s `triageQuery`) —
-   * a plain in-memory match over the row's own reference + description, the
-   * two facts the row already shows, since this queue is whole-team-fetched
-   * rather than paged and has nothing to ask a door for. */
-  query: string
+  /** present = the reader may raise one, and this opens the form — the
+   * toolbar's own "Raise ticket" button, moved in from the parent along with
+   * the toolbar itself (see the header comment on why). */
+  canCreateTicket: boolean
+  onCreate: () => void
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -587,6 +582,12 @@ function TriageQueue({
   const [busy, setBusy] = React.useState<string | null>(null)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
   const [replying, setReplying] = React.useState<TriageWaiting | null>(null)
+  // THE QUEUE'S OWN SEARCH — moved in from the parent (R50, 2026-09-03 second
+  // pass): the toolbar this narrows and the row count that gates it now live
+  // in the same component, so "never toolbar on empty collection" can be
+  // answered honestly instead of drawn unconditionally one component up from
+  // the fetch that actually knows.
+  const [query, setQuery] = React.useState("")
 
   /** WHAT THE ROW IS STILL MISSING, in the reader's own language. The gaps
    * themselves are decided by the door (shared/triage-readiness.ts) and arrive
@@ -658,6 +659,13 @@ function TriageQueue({
 
   if (triageQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const view = triageQ.data
+  // GENUINELY EMPTY, TWO WAYS — NEITHER DRAWS THE TOOLBAR (R50: never toolbar
+  // on empty collection). Whoever is not on duty has no rows of THEIRS to
+  // search or raise a ticket over from here; a real empty queue has nothing
+  // to search either. Only once there is at least one waiting row does the
+  // toolbar (search + "Raise ticket") appear at all — which is also why it
+  // has to live in this component rather than the parent: the parent knows
+  // neither of these two facts.
   if (!view.yours)
     return (
       <p className="text-muted-foreground text-sm">
@@ -670,10 +678,10 @@ function TriageQueue({
     return <EmptyLine concept="triage">{t("Nothing has been sitting unread. ")}</EmptyLine>
 
   // THE TOOLBAR'S SEARCH, APPLIED — the row's own reference and description
-  // are the two facts already on screen, so a query narrows by either. NEVER
-  // TOOLBAR ON EMPTY COLLECTION still holds one level up (the ToolbarRow
-  // above this only ever draws once `view.waiting.length > 0`, checked above);
-  // this is the separate, ordinary "your search matched nothing" case.
+  // are the two facts already on screen, so a query narrows by either. This
+  // is the separate, ordinary "your search matched nothing" case — the
+  // toolbar (with its search box) stays up so it can be cleared or changed,
+  // exactly as `narrowed` does everywhere else in the app.
   const narrowed = query.trim() !== ""
   const q = query.trim().toLowerCase()
   const waiting = narrowed
@@ -682,12 +690,26 @@ function TriageQueue({
       )
     : view.waiting
 
-  if (waiting.length === 0)
-    return (
-      <EmptyLine concept="triage">{t("No entries in the triage queue match your search.")}</EmptyLine>
-    )
-
   return (
+    <>
+      <ToolbarRow
+        // Reached this line only past both genuinely-empty returns above, so
+        // the queue always has at least one waiting row here.
+        empty={false}
+        search={
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            placeholder={t("Search the triage queue…")}
+            className="w-full"
+          />
+        }
+        actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
+      />
+      {waiting.length === 0 ? (
+        <EmptyLine concept="triage">{t("No entries in the triage queue match your search.")}</EmptyLine>
+      ) : (
     <ul className="divide-border divide-y">
       {waiting.map((w) => (
         <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
@@ -791,5 +813,7 @@ function TriageQueue({
         onSubmit={sendReply}
       />
     </ul>
+      )}
+    </>
   )
 }

@@ -422,10 +422,15 @@ export function SprintsScreen({
   const data = shapeSprints(sprints, today, lang, kindMarks)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
   const askingSprints = sprintQueryIsActive(sprintQuery)
-  // THE TOOLBAR ITSELF, shared by both bespoke tabs. Only where there is
-  // something to search — a box over an empty collection cannot do anything,
-  // so an empty sprints list falls back to the bare button-only toolbar it
-  // always had (the same gate `waves-screen.tsx` puts on its own finder).
+  // THE TOOLBAR ITSELF, shared by both bespoke tabs. NEVER TOOLBAR ON EMPTY
+  // COLLECTION (R50) — an empty sprints list USED TO fall back to a bare
+  // button-only toolbar (the same gate `waves-screen.tsx`'s own finder
+  // carried), reasoned in a comment as if it were the intended shape rather
+  // than the exact lone-"+"-pill bug the client's Time screenshot named. One
+  // `<ToolbarRow>` now, always, with `empty` deciding whether it draws
+  // anything at all — the "All sprints" tab's own `CollectionEmptyState`
+  // (through the recipe engine) and `overview`'s own below are what carry
+  // "Add the first" once this row is gone.
   //
   // ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
   // approved that night). `filters` used to be a `<FilterBar>` rendered as
@@ -434,28 +439,26 @@ export function SprintsScreen({
   // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx), and
   // its open panel is the separate `toolbarPanel` slot (v1.2.27's
   // `useFilterBar` split) — never a second row this call site draws itself.
-  const sprintToolbar =
-    sprints.length > 0 ? (
-      <ToolbarRow
-        search={
-          <SearchInput
-            value={sprintQuery.q}
-            onChange={(e) => setSprintQuery((q) => ({ ...q, q: e.currentTarget.value }))}
-            onClear={() => setSprintQuery((q) => ({ ...q, q: "" }))}
-            // SAME PLACEHOLDER the "All sprints" tab's own search box uses
-            // (screens.ts's `sprintsListRecipe`) — one search box in one
-            // collection's words, wherever it appears.
-            placeholder={t("Search sprints…")}
-            className="w-full"
-          />
-        }
-        filters={filterPill}
-        toolbarPanel={filterPanel}
-        actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
-      />
-    ) : (
-      canCreate && <ToolbarRow actions={<AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />} />
-    )
+  const sprintToolbar = (
+    <ToolbarRow
+      empty={sprints.length === 0}
+      search={
+        <SearchInput
+          value={sprintQuery.q}
+          onChange={(e) => setSprintQuery((q) => ({ ...q, q: e.currentTarget.value }))}
+          onClear={() => setSprintQuery((q) => ({ ...q, q: "" }))}
+          // SAME PLACEHOLDER the "All sprints" tab's own search box uses
+          // (screens.ts's `sprintsListRecipe`) — one search box in one
+          // collection's words, wherever it appears.
+          placeholder={t("Search sprints…")}
+          className="w-full"
+        />
+      }
+      filters={filterPill}
+      toolbarPanel={filterPanel}
+      actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
+    />
+  )
 
   // R16: ONE number, on all three tabs, and it is the door's exact COUNT(*) —
   // see the note at the top of this file for why three views of one bounded

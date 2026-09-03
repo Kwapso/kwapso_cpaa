@@ -48,6 +48,10 @@ function renderFind(total: number) {
         one: "1 ticket matches",
         many: "{count} tickets match",
       }}
+      // R50 — this suite exercises the match line over a resting collection
+      // that already has rows (the search box has to be on screen to ask
+      // anything of).
+      restingEmpty={false}
       fetchPage={doorWith(total)}
     >
       {() => <div />}

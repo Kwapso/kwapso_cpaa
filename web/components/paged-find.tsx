@@ -156,6 +156,7 @@ export function PagedFind<T>({
   tabs,
   wrap,
   actions,
+  restingEmpty,
   children,
 }: {
   /** the collection's OWN cache key (accountsKey(teamId), …) */
@@ -253,6 +254,26 @@ export function PagedFind<T>({
    * default, which is every existing call site's markup, unchanged.
    */
   actions?: (ctx: { queryString: string }) => React.ReactNode
+  /** R50 — "never toolbar on empty collection", the same rule `ToolbarRow`
+   * (screen-bits.tsx) enforces for the app's other, bounded toolbar, now
+   * required here too. This file drew its own search/filters/sort/actions
+   * UNCONDITIONALLY, with no concept of "the collection is empty" at all —
+   * a genuinely empty app-detail Stories/Processes/Meetings/Tickets/Todos
+   * panel (`work-panels.tsx`'s `PagedPanelBody`, the generic seam every one
+   * of those five hangs off) drew a full search+sort+filter+create toolbar
+   * above a lone "Add the first" body, the exact shape the client's Time
+   * screenshot named. Pass the RESTING (unsearched) list's own row count
+   * being zero — `restingData.length === 0`, the same value `children`
+   * already tests to choose between its own no-results sentence and
+   * `CollectionEmptyState` — never a filtered/found count. Combined with
+   * `active` (is anything currently being asked) computed below: a genuinely
+   * empty collection that is NOT being searched loses the whole toolbar; one
+   * mid-search keeps it, so a person can still change or clear the question
+   * that found nothing. Required, not optional, for the reason `ToolbarRow`'s
+   * own `empty` prop is: an optional prop a caller can forget is exactly how
+   * this toolbar went undocked from "is the collection empty" for as long as
+   * it has existed. */
+  restingEmpty: boolean
   children: (found: Found<T>) => React.ReactNode
 }) {
   // ── WHAT SHE WAS ASKING THIS DOOR, WHEN SHE LEFT ───────────────────────────
@@ -365,6 +386,13 @@ export function PagedFind<T>({
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
 
+  // R50 — GENUINELY EMPTY, READ THE SAME WAY `collection-frame.tsx`'s
+  // `isEmptyState` IS: the resting list has nothing in it AND nothing is
+  // currently being asked. `active` (not `asked`) is deliberate — a sort with
+  // nothing typed still asks the door a different question, and the toolbar
+  // that changed it has to stay on screen for the same reason a search does.
+  const genuinelyEmpty = restingEmpty && !active
+
   // NOTHING FOUND is a sentence, not a blank. "No accounts yet." is the
   // collection's empty state and it is simply untrue mid-search — but an empty
   // TAB is not a failed search either, so the sentence follows what was asked.
@@ -410,19 +438,30 @@ export function PagedFind<T>({
   // both at once), and the track keeps only its own padding/gap. No `gap-*`
   // between the track and the panel either — a gap is the seam she is naming.
   const filterPanelOpen = showFilters && Boolean(filterPanel)
-  const toolbarAndRows = (
-    <div className="flex w-full flex-col gap-4">
+  // R50 — NEVER TOOLBAR ON EMPTY COLLECTION. `genuinelyEmpty` (computed above,
+  // above the toolbar and the `children` call, same discipline as every other
+  // value here) suppresses the WHOLE column: no search, no filters, no sort,
+  // no match count and no `actions` — leaving `children` to draw whatever
+  // empty register it uses (`CollectionEmptyState`'s "Add the first", most of
+  // the time) with nothing else on the card above it.
+  const toolbar = genuinelyEmpty ? null : (
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND — the
+        // identical fix `ToolbarRow` (screen-bits.tsx) carries, for the
+        // identical reason: `bg-background` and `bg-[var(--surface-raised)]`
+        // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
+        // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
+        // from that file inherited the same latent mismatch.
+        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
+        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
+      )}
+    >
       <div
-        data-slot="toolbar-row-column"
-        className={cn(
-          "flex min-w-0 flex-col bg-background",
-          filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
-        )}
+        data-slot="toolbar-row-track"
+        className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
       >
-        <div
-          data-slot="toolbar-row-track"
-          className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
-        >
           {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
               control sits in one visibly distinct row. No fill and no radius of
               its own any more — both now belong to the merged container above. */}
@@ -507,8 +546,12 @@ export function PagedFind<T>({
           )}
         </div>
         {showFilters && filterPanel}
-      </div>
+    </div>
+  )
 
+  const toolbarAndRows = (
+    <div className="flex w-full flex-col gap-4">
+      {toolbar}
       {children({
         active,
         rows: active ? (found.data ?? null) : null,

@@ -112,6 +112,8 @@ export function ContactsScreen({
           }}
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
+          // R50 — the resting, individuals-only read's own row count.
+          restingEmpty={loaded.length === 0}
           // ALWAYS narrowed to people — this page has no Companies/All strip to
           // switch it off with, because it IS the "people" half of that strip.
           fixed={{ type: "individual" }}

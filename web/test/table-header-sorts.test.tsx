@@ -302,6 +302,10 @@ function renderMeetingsTable() {
       }}
       sorts={translatedSorts("meetings", (s) => s)}
       defaultSort={COLLECTION_SORTS.meetings.defaultSort}
+      // R50 — this suite exercises a table header's own sort over a resting
+      // collection that already has rows (`found.rows ?? […]` falls back to
+      // one below).
+      restingEmpty={false}
       fetchPage={async (query, cursor) => {
         asked.push({ query: { ...query }, cursor })
         return { rows: [{ id: "m9", name: "From the door", when: "2026-01-01" }], nextCursor: null, total: 1 }

@@ -255,6 +255,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           (screen-bits.tsx), never a second row this call site draws for
           itself. */}
       <ToolbarRow
+        empty={q.data.length === 0}
         search={
           q.data.length > 0 && (
             <SearchInput

@@ -260,6 +260,11 @@ function PagedPanelBody<T>({
       facets={facets}
       fixed={fixed}
       actions={() => (onNew ? <AddButton label={newLabel} onClick={onNew} /> : null)}
+      // R50 — this ONE seam is every nested panel's own toolbar (Stories,
+      // Processes, App meetings, App tickets, To-dos): the resting read
+      // above is this panel's whole answer to "does it have any rows yet",
+      // computed once and forwarded rather than re-derived per panel.
+      restingEmpty={restingData.length === 0}
       fetchPage={fetchPage}
     >
       {(found) => {
