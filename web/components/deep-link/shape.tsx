@@ -5,12 +5,12 @@
 
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
-import { formatActivityWhen, formatDate, formatDateSortable, formatDateTime } from "@shared/web/format"
+import { formatDate, formatDateSortable, formatDateTime, formatRelative } from "@shared/web/format"
 import { nameInitials, personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
-import type { Language } from "@shared/i18n"
+import { translator, type Language } from "@shared/i18n"
 import type {
   Account,
   ActivityItem,
@@ -42,14 +42,30 @@ export const INVITE_STATUS: Record<Invite["status"], string> = {
  * }` block (screen-renderer.tsx) draws Team, Team member and Invite through
  * this shaper, not through `useRecordActivity`, so the initials fix that
  * landed there never reached these three screens. Same row shape, same
- * missing field, a second place to get it right. */
-export function shapeActivity(items: ActivityItem[]): Record<string, unknown>[] {
+ * missing field, a second place to get it right.
+ *
+ * `timestamp` WENT THROUGH THE SAME SECOND-PLACE FIX, 2026-09-03: it used to
+ * read `formatActivityWhen`, a raw sortable string ("2026-06-30 21:50") —
+ * `use-record-activity.ts`'s own copy of this row shape had the identical
+ * bug, fixed there by reading `formatRelative` instead, the function this
+ * screen's own RECORD column already uses (`formatDate`/`formatDateTime`
+ * above). This function has no hook to call `useLanguage()` with (it is a
+ * pure shaper, no React tree), so `t` is built with `translator(lang)` — the
+ * same plain, non-hook function `LanguageProvider` itself calls to build the
+ * hook's own `t` — rather than threading a second parameter through five call
+ * sites for a value this file can already make itself from the `lang` each of
+ * them already has. `dateTime` carries the raw instant alongside it, for the
+ * kit's own `<time datetime>` slot — the same pairing added at the other
+ * activity feed's fix. */
+export function shapeActivity(items: ActivityItem[], lang: Language): Record<string, unknown>[] {
+  const t = translator(lang)
   return items.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
     initials: nameInitials(a.actorName),
-    timestamp: formatActivityWhen(a.createdAt),
+    timestamp: formatRelative(a.createdAt, t, lang),
+    dateTime: a.createdAt,
   }))
 }
 
@@ -70,7 +86,7 @@ export function shapeTeamDetail(opts: {
       createdBy: opts.meta.creatorName || opts.meta.creatorEmail || "",
       updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
     },
-    sets: { activity: shapeActivity(opts.activity) },
+    sets: { activity: shapeActivity(opts.activity, opts.lang) },
   }
 }
 
@@ -425,7 +441,7 @@ export function shapeMemberDetail(member: TeamMember, activity: ActivityItem[], 
       joined: formatDate(member.joinedAt, lang),
       image: member.imageUrl ?? "",
     },
-    sets: { activity: shapeActivity(activity) },
+    sets: { activity: shapeActivity(activity, lang) },
   }
 }
 
@@ -446,7 +462,7 @@ export function shapeInviteDetail(
       expires: formatDate(invite.expiresAt, lang),
       accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "—",
     },
-    sets: { activity: shapeActivity(activity) },
+    sets: { activity: shapeActivity(activity, lang) },
   }
 }
 
@@ -503,7 +519,7 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[], la
       createdBy: asset.creatorName || "—",
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "—",
     },
-    sets: { activity: shapeActivity(activity) },
+    sets: { activity: shapeActivity(activity, lang) },
   }
 }
 
@@ -532,6 +548,6 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       createdBy: purpose.creatorName || "—",
       updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
     },
-    sets: { activity: shapeActivity(activity) },
+    sets: { activity: shapeActivity(activity, lang) },
   }
 }

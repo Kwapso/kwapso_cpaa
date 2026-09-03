@@ -284,6 +284,7 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
     actor: item.actor,
     initials: item.initials,
     time: item.timestamp,
+    dateTime: item.dateTime,
   }))
 }
 

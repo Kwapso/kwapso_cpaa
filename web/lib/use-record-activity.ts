@@ -22,8 +22,8 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { nameInitials } from "@/lib/identity"
 import { cursorKey } from "@/lib/live-resources"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { formatActivityWhen } from "@shared/web/format"
-import { useT } from "@shared/web/language"
+import { formatRelative } from "@shared/web/format"
+import { useLanguage } from "@shared/web/language"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ActivityItem } from "@shared/types"
 
@@ -35,13 +35,25 @@ import type { ActivityItem } from "@shared/types"
  * consumers (the record footer's Latest-activity column, the Activity tab's
  * own feed) — the SAME generic-activity-path law (R5) that keeps this one
  * fetch shared keeps its derived display fields shared too, so a mark that
- * renders blank in one place can't happen while the other gets it right. */
+ * renders blank in one place can't happen while the other gets it right.
+ *
+ * `timestamp` is `formatRelative` — "2d ago", falling back to an absolute date
+ * past a week — the SAME treatment the record footer's own audit column
+ * already used one field over (`recordAuditEntries`, record-chrome.tsx). Both
+ * consumers used to run this through `formatActivityWhen` instead (a raw,
+ * sortable "2026-08-13 13:16"), which is a table-column format and reads as
+ * a bug sitting next to a relative phrase — the client's own words, "look at
+ * the format of the dates! so wrong / i want them all like now the ones on
+ * record." `dateTime` rides alongside it, the raw ISO, for the kit's `<time
+ * datetime>` attribute — a human string needs its machine value paired with
+ * it, not thrown away. */
 export type ActivityFeedRow = {
   id: string
   description: string
   actor: string | undefined
   initials: string
   timestamp: string
+  dateTime: string
 }
 
 /** The cache key holding one record's activity rows. The same key the live
@@ -94,7 +106,7 @@ export function useRecordActivity(
    */
   addNote: (note: string) => void
 } {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const on = Boolean(table && id)
   const key = recordActivityKey(table ?? "", id ?? "")
   const query = useCached<ActivityItem[]>(on ? key : null, () =>
@@ -112,7 +124,8 @@ export function useRecordActivity(
       description: a.description,
       actor: a.actorName ?? undefined,
       initials: nameInitials(a.actorName),
-      timestamp: formatActivityWhen(a.createdAt),
+      timestamp: formatRelative(a.createdAt, t, lang),
+      dateTime: a.createdAt,
     })),
     total: useCachedValue<number>(on ? `total:${key}` : null),
     error: query.error,

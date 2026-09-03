@@ -68,6 +68,7 @@ export function ActivityPanel({
           actor: a.actor,
           initials: a.initials,
           time: a.timestamp,
+          dateTime: a.dateTime,
         }))}
       />
       {onAddNote === undefined ? null : (

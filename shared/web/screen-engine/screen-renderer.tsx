@@ -475,12 +475,14 @@ function renderBlock(
             actor?: string
             initials?: string
             timestamp?: string
+            dateTime?: string
           }>).map((a) => ({
             id: a.id,
             description: a.description,
             actor: a.actor,
             initials: a.initials,
             time: a.timestamp,
+            dateTime: a.dateTime,
           }))}
         />
       )
