@@ -31,6 +31,31 @@ export const TEAM_CREATION_CLOSED = true
  * paying client next year. Deleting it would save one nav line and cost the
  * product it is built to become.
  *
+ * OVERRULED A THIRD TIME, 3 SEPTEMBER 2026, and this one arrived costed. A
+ * design-lane brief argued the concept is HIDDEN, NOT REMOVED — correctly — and
+ * that an unused dimension in the permission spine taxes every future module and
+ * misleads every agent reading the source. The owner's ruling stands unchanged:
+ * keep it hidden and blocked, and keep the architecture multi-tenant and
+ * scalable. It is written down a third time because the argument gets better
+ * each time it is made, and the answer has not moved.
+ *
+ * THE MEASUREMENTS, so a fourth proposal starts from facts instead of re-deriving
+ * them (taken 3 Sep 2026 against origin/main):
+ *   • 231 live source files name a team, 3,596 times — but only 251 of those are
+ *     `guard.teamId`. The other ~628 read `guard.databaseId`, which any successor
+ *     guard would still have to hand them, so they are not the cost they look.
+ *   • The removal is ~8-9 days of sequential work. It is not a weekend job, and
+ *     it is not the multi-week rewrite the file count suggests either.
+ *
+ * AND THE ONE THING A REMOVAL MUST NOT TAKE WITH IT. `teams.database_id` is not
+ * only a data pointer: it is the ownership oracle `ourDatabases` in
+ * workers/tenancy/src/lib/sharding.ts filters by. This deployment shares a
+ * Cloudflare account with other companies, and the nightly size cron lists EVERY
+ * database on it before narrowing to ours. Take the table away without replacing
+ * that filter FIRST and the only thing between a cron and somebody else's
+ * production database is a fallback. Whoever proposes this next: that goes first,
+ * on its own, or the proposal is not ready.
+ *
  * So this hides two things and only two things:
  *   • the TEAM SWITCHER — the dropdown in the sidebar and the mobile top bar
  *     (web/components/team-switcher.tsx, rendered from app-shell.tsx);
