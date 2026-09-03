@@ -1387,18 +1387,37 @@ const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
    higher than the card, before either column ever grew a tab.
 
    TWO REGIONS NOW, so the tab can own the top edge the way the breadcrumb
-   does: `ASIDE_TAB` pays the inline sides and the block-start only — no
-   block-end, because the tab strip owns its own overlap
-   (`--folder-tab-overlap`) exactly as `screen-shell-breadcrumb` above does —
-   and `ASIDE_BODY` pays the sides and the block-end, no block-start, because
-   the strip's negative margin already closes that gap. Split this way, the
-   two columns' tabs start at the same measured y (both are `--shell-gutter`
-   /`--aside-inset` below the row they share) and the two containers start at
-   the same y below them (both `tab height − overlap` further down) — proven
-   in `verify/shell-chat/` (`asideTab`/`asideBody` rects against
-   `breadcrumb`/`card`). */
-const ASIDE_TAB = cn("px-[var(--aside-inset)] pt-[var(--aside-inset)]");
-const ASIDE_BODY = cn("px-[var(--aside-inset)] pb-[var(--aside-inset)]");
+   does: `ASIDE_TAB` pays the block-start only — no block-end, because the
+   tab strip owns its own overlap (`--folder-tab-overlap`) exactly as
+   `screen-shell-breadcrumb` above does — and `ASIDE_BODY` pays the
+   block-end, no block-start, because the strip's negative margin already
+   closes that gap. Split this way, the two columns' tabs start at the same
+   measured y (both are `--shell-gutter`/`--aside-inset` below the row they
+   share) and the two containers start at the same y below them (both
+   `tab height − overlap` further down) — proven in `verify/shell-chat/`
+   (`asideTab`/`asideBody` rects against `breadcrumb`/`card`).
+
+   NEITHER REGION PAYS ITS OWN INLINE SIDES ANY MORE — CLIENT, 2026-09-03,
+   ITEM 5: "there's way too much space between the content and the
+   assistant", confirmed on every screen. `screen-shell-aside-dock` (below)
+   already spends `--shell-gutter` getting from the card to this column,
+   the SAME measure `screen-shell-breadcrumb`'s own dock spends getting from
+   the rail to the CARD — and the breadcrumb pays no second inset of its own
+   once it is there, it sits flush at the column's edge. `ASIDE_TAB`/
+   `ASIDE_BODY` used to ALSO spend `--aside-inset` on top of the dock's
+   gutter, `px-[var(--aside-inset)]` on both, and because `--aside-inset`
+   and `--shell-gutter` are the same token (see above), that is the same
+   number spent twice — 45px of air between the card and the assistant's own
+   folder tab/panel where the card's every other neighbour (the rail, the
+   ground on every other side) gets 22.5. Measured in `verify/shell-chat/`:
+   the aside dock's own column started 22.5 past the dock's inner edge before
+   this line, 0 after it — the panel and its tab now start flush at the
+   dock's edge, the same way the breadcrumb starts flush at the content
+   column's. `BreadcrumbFolders` (inside `ASIDE_TAB`) keeps its own internal
+   tab padding (`px-5`) regardless — that is the label's OWN breathing room,
+   never this column's, exactly as it already is for the content trail. */
+const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
+const ASIDE_BODY = cn("pb-[var(--aside-inset)]");
 
 /** How much air each door spends. Structure is identical; only the inset moves. */
 const DENSITY_RAIL: Record<ScreenDensity, string> = {
