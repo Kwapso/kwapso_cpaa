@@ -181,10 +181,12 @@ export interface ScreenTab {
   label: React.ReactNode;
   /**
    * A live count beside the label, drawn by `TabsCount` — R-4a's line count:
-   * quiet tertiary text at rest, a small circular mango fill on the ACTIVE
-   * tab. It used to be ch14's quiet number, because this file stated
-   * `variant="folder"` under ruling E; the folder tab was retired on
-   * 2026-09-02 and the count came with it. Zero renders nothing.
+   * quiet tertiary text at rest, the title count's own round `Badge`-counter
+   * fill on the ACTIVE tab (mango, primary-ink text; `size-*` circle clause
+   * reversed 2026-09-03 — see `tabs.tsx`). It used to be ch14's quiet number,
+   * because this file stated `variant="folder"` under ruling E; the folder
+   * tab was retired on 2026-09-02 and the count came with it. Zero renders
+   * nothing.
    */
   count?: number;
   /** The tab's own body. Absent, the screen's `body` is shown for every tab. */

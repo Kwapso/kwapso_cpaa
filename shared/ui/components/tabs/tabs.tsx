@@ -591,9 +591,11 @@ export interface TabsTriggerProps
  *
  * A count rides along as a child, not as an API: `TabsCount` (below) is the
  * shaped number, so a call site never hand-rolls the count's markup and the
- * two cannot drift apart. Its shape is GAPS-RULINGS.md R-4a's ruling: quiet
- * tertiary text at rest, and on the ACTIVE tab only, a small circular mango
- * fill with primary-ink text — see `TabsCount` for the shape itself.
+ * two cannot drift apart. Its shape is GAPS-RULINGS.md R-4a's ruling, THE
+ * CIRCLE CLAUSE REVERSED 2026-09-03: quiet tertiary text at rest, and on the
+ * ACTIVE tab only, the same round mango fill the title's own count wears —
+ * `Badge`'s counter geometry, not a forced circle — with primary-ink text.
+ * See `TabsCount` for the shape itself.
  *
  * TEN STATES
  *  1. default        — secondary ink over the strip's own rule.
@@ -677,24 +679,62 @@ TabsTrigger.displayName = "TabsTrigger";
    its own fill and rise. Nothing in the kit draws a count on a breadcrumb
    crumb, so it did not move to `breadcrumbs/breadcrumb-folders.tsx` with the
    rest of the skin; it is recorded here and is not reachable.
+
+   THE CIRCLE CLAUSE REVERSED, 2026-09-03. R-4a's active shape used to be read
+   as "completely round" and drawn `size-[1.125rem]` — a fixed square forced
+   into a perfect circle by `rounded-pill`, so a two-digit count clipped
+   against its own fixed width instead of growing. The client's own words,
+   read again after she flagged it: "the circle is not correct, but rather a
+   round shape like you have on the title when they have a count… it was a
+   mistake to change it." The reference was never a geometric circle at
+   all — it was `Badge`'s own COUNTER geometry (`badge.tsx`, `size="counter"`:
+   `h-5 min-w-5 px-2`, `rounded-pill`), the exact shape the collection
+   heading's own count chip wears via `CollectionFrame`'s `countChip`
+   (`Badge count={count} …`). A fixed-circle reading of "completely round" was
+   the mistake; "round-ended and lets a wide number grow" was always the
+   ruling, and it is what ships below.
    ========================================================================= */
 
-/* R-4a. At rest: bare `text-badge` (12 — "badge, count and status text",
-   KWAPSO-SPEC ch07/ch26) in tertiary ink, no shape at all — never a pill,
-   never a stroke, matching the inactive half of the ruling exactly.
+/* R-4a, THE CIRCLE CLAUSE AS CORRECTED 2026-09-03. At rest: bare `text-badge`
+   (12 — "badge, count and status text", KWAPSO-SPEC ch07/ch26) in tertiary
+   ink, no shape at all — never a pill, never a stroke, matching the inactive
+   half of the ruling exactly (untouched by today's fix).
    On the tab THIS count lives in going active — read off `group/tab`'s own
-   `data-state`, the same attribute the strip's indicator measures off, so
-   no JS branch is needed here — the number gains a small fully circular
-   mango fill (`rounded-pill`, the kit's own name for the geometry, not a
-   literal `rounded-full`) at `1.125rem` (18px, the client's stated
-   "~16-18px" ceiling) with primary-ink (`--primary-foreground`, already
-   charcoal) text. The type size does not change between the two states —
-   "colour is the only difference" is ch14's phrase for the tab itself, and it
-   is kept here for the count too, so a count never reflows the label beside it
-   when its own tab is selected. */
+   `data-state`, the same attribute the strip's indicator measures off, so no
+   JS branch is needed here — the number takes `Badge`'s own counter box,
+   `h-5 min-w-5 px-2` (`badge.tsx`, `size="counter"`), not a fixed `size-*`
+   square: a round-ended pill that STARTS at the same 20-tall/20-wide minimum
+   a one-digit count draws and grows on its inline axis past that minimum for
+   two and three digits, exactly as `Badge` itself does at every other count
+   in the kit. `rounded-pill` is unchanged — it was never the bug; pairing it
+   with a fixed `size-*` instead of a `min-w-*` was. Mango fill and
+   primary-ink (`--primary-foreground`, already charcoal) text are also
+   unchanged: her correction was the SHAPE, not the colour. The type size does
+   not change between the two states — "colour is the only difference" is
+   ch14's phrase for the tab itself, and it is kept here for the count too, so
+   a count never reflows the label beside it when its own tab is selected.
+
+   THIS IS `badge.tsx`'s OWN COUNTER GEOMETRY, NOT AN APPROXIMATION OF IT. The
+   four size classes below (`h-5 min-w-5 px-2` plus `rounded-pill`) are the
+   literal tokens `badgeVariants({ variant: "default", size: "counter" })`
+   resolves to — verified by calling it — so a change to that size step
+   changes both places to check by eye, but the values are not free to drift:
+   `verify/tab-joint/page.tsx`'s `5_count_shape` case reads both elements'
+   computed height, width, radius and inline padding side by side and fails
+   the moment the GEOMETRY disagrees at any of one, two or three digits
+   (background and text colour are read too, but are not expected to match —
+   the mango fill is a separate, deliberate half of this same ruling). A
+   literal `<Badge>` is not
+   substituted here because the active shape has to key off `group/tab`'s own
+   `data-state` with no JS branch (this file's `TRIGGER_BASE` comment, and
+   R-4a above) — `Badge` has no such CSS-only "am I inside the active tab"
+   switch, and Tailwind's own build needs each utility written out as a
+   literal token in source rather than assembled at runtime, so the geometry
+   is restated here rather than imported as a class string. */
 const TABS_COUNT_SKIN = cn(
   "text-badge tabular-nums leading-none text-ink-tertiary",
-  "group-data-[state=active]/tab:inline-flex group-data-[state=active]/tab:size-[1.125rem]",
+  "group-data-[state=active]/tab:inline-flex group-data-[state=active]/tab:h-5",
+  "group-data-[state=active]/tab:min-w-5 group-data-[state=active]/tab:px-2",
   "group-data-[state=active]/tab:items-center group-data-[state=active]/tab:justify-center",
   "group-data-[state=active]/tab:rounded-pill group-data-[state=active]/tab:bg-primary",
   "group-data-[state=active]/tab:text-primary-foreground",

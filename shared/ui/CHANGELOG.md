@@ -77,6 +77,34 @@ part). Weight alone previewing the active state, unchanged from 2026-09-02.
 Measured in `verify/tab-joint/`, including the row's own content width at
 rest and after a real hover, to catch the weight step reflowing the strip.
 
+### Fixed — the active tab count's "circle" reversed; it wears the title count's own shape
+
+The 2026-09-02 fix for "Tickets 96" (a two-digit count reading wrong) was
+built as `size-[1.125rem]` on `TabsCount`'s active state (`components/tabs/
+tabs.tsx`) — a fixed square forced round by `rounded-pill`, so a two- or
+three-digit count clipped against a box that could not grow. Client, today:
+"You were right that the circle is not correct, but rather a round shape like
+you have on the title when they have a count. Please reverse these. It was a
+mistake to change it." The reference shape was never a geometric circle — it
+is `Badge`'s own COUNTER geometry (`badge.tsx`, `size="counter"`: `h-5
+min-w-5 px-2`, `rounded-pill`), the exact shape `CollectionFrame`'s heading
+count (`countChip`, a bare `<Badge count={…} />`) already draws. `TabsCount`'s
+active state now takes `h-5 min-w-5 px-2` instead of `size-[1.125rem]` —
+`rounded-pill` was correct all along and is unchanged; only the fixed square
+is gone, replaced by a minimum-width pill that grows on its inline axis past
+one digit exactly as `Badge` does everywhere else. `GAPS-RULINGS.md` R-4a
+carries the reversal in full, with the client's words. Not implemented as a
+literal shared component — the active shape has to key off `group/tab`'s own
+`data-state` with no JS branch, which `Badge` has no CSS-only switch for, and
+Tailwind needs each class written out literally in source rather than
+composed at runtime — so the two are kept in step by restating `Badge`'s
+counter tokens verbatim and proving it: `verify/tab-joint/page.tsx`'s
+`5_count_shape` case measures both elements' computed height, width,
+border-radius and inline padding at one/two/three digits, in both palettes —
+geometry agrees at every digit count. Background and text colour are read
+alongside and are NOT expected to match: the active tab's mango fill is
+R-4a's own separate, deliberate ruling, and nothing today asks it to change.
+
 ## v1.2.28 — 2026-09-02
 
 ### Added — `BreadcrumbFolders`, the breadcrumb drawn as a strip of folder tabs

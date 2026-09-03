@@ -561,8 +561,10 @@ export interface CollectionFrameTab {
   label: React.ReactNode;
   /**
    * A count after the label, drawn by `TabsCount` — R-4a's asymmetric line
-   * count: quiet tertiary text at rest, a small circular mango fill on the
-   * ACTIVE tab. CH14's alternative quiet number was the FOLDER tab's, and it
+   * count: quiet tertiary text at rest, the same round `Badge`-counter fill
+   * this frame's own heading count wears on the ACTIVE tab (mango,
+   * primary-ink text; `size-*` circle clause reversed 2026-09-03 — see
+   * `tabs.tsx`). CH14's alternative quiet number was the FOLDER tab's, and it
    * left with the folder variant on 2026-09-02. Zero renders nothing.
    */
   count?: number;
