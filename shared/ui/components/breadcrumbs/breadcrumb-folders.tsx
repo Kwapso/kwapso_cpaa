@@ -163,6 +163,19 @@ import { collapse, type BreadcrumbsItem } from "./breadcrumbs";
        end. The fold is what keeps a deep trail short; scrolling is the
        fallback for one very long label.
 
+   `w-full`, ADDED 2026-09-03, CLIENT-RULED — "the tabs should be as long as
+   the content container (currently is shorter)." A `flex` box with no width
+   of its own sizes to its CONTENT (shrink-to-fit), same as an inline-block;
+   `max-w-full` only ever CAPPED that content width at the container's, it
+   never asked the strip to REACH it, so a short trail ("Tickets" > "#4182")
+   stopped well short of the card it sits above, exactly her screenshot. Now
+   the strip always spans its container, and the LAST tab is what absorbs the
+   difference — see its own `grow` below — so the fill runs on the object
+   that is already the card's own colour ("the last … is same colour as the
+   big content card") rather than opening a fifth, unshaped region after it.
+   `max-w-full` stays: on a trail wide enough to need the scroller, `w-full`
+   and `max-w-full` agree and neither wins alone.
+
    The three classes it OVERRIDES on `BreadcrumbList` are named here so the
    override is legible rather than accidental: `flex-wrap` -> `flex-nowrap`,
    `items-center` -> `items-end` (a tab stands on its feet), `gap-1.5` ->
@@ -170,7 +183,7 @@ import { collapse, type BreadcrumbsItem } from "./breadcrumbs";
    merge and is the tab's own type step, so it is not restated.
    -------------------------------------------------------------------------- */
 const STRIP = cn(
-  "flex flex-nowrap items-end gap-1",
+  "flex w-full flex-nowrap items-end gap-1",
   "max-w-full overflow-x-auto scroll-p-2 [scrollbar-width:none]",
   "[&::-webkit-scrollbar]:hidden",
   "pt-1 mt-[calc(var(--space-1)*-1)]",
@@ -254,8 +267,28 @@ const TAB_REST = cn(
    an ACTIVE folder tab — so the ruling's "the same font weight rules apply as
    they already exist" is satisfied by the part, and nothing is restated here.
    It is not a link and has no hover, deliberately: a hover response on the
-   page you are already on invites a click that does nothing. */
-const TAB_LIVE = "z-[3] cursor-default";
+   page you are already on invites a click that does nothing.
+
+   `w-full` + `justify-start`, ADDED WITH THE STRIP'S OWN `w-full` ABOVE. The
+   live tab is the one `TAB_STRETCH` below lets grow (see the render), and a
+   grown flex item still sizes ITSELF to content unless told to fill the box
+   it was just given — `w-full` is that instruction. `TAB`'s shared
+   `justify-center` was tuned for a tab that is exactly as wide as its label;
+   centred in a tab that may now be stretched well past its label would float
+   the text away from the lip it is meant to read against, so the live tab
+   overrides it back to `justify-start`, the ordinary reading position every
+   rest tab already has by not being centred over empty space. */
+const TAB_LIVE = "z-[3] w-full cursor-default justify-start";
+
+/** The live `<BreadcrumbItem>`'s own flex rule — `grow` so it takes whatever
+ * width the rest tabs and the gaps between them leave unclaimed, `shrink-0`
+ * so a trail long enough to need the strip's own scroll never squeezes it
+ * below its label's content width. Kept separate from `TAB_LIVE` (the tab
+ * button's own classes) because the item and the button are two different
+ * elements in the tree — see the render, where this lands on the
+ * `<BreadcrumbItem>` and `TAB_LIVE` lands on the `<BreadcrumbPage>` inside
+ * it. */
+const ITEM_LIVE = "grow shrink-0";
 
 /** The two papers, as `color` for the shape's `currentColor`. */
 const FILL_REST = "text-[var(--kw-crumb-rest)]";
@@ -550,7 +583,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
             const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
 
             return (
-              <BreadcrumbItem key={key} className="shrink-0">
+              <BreadcrumbItem key={key} className={live ? ITEM_LIVE : "shrink-0"}>
                 {live ? (
                   <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
                     <CrumbShape fill={FILL_LIVE} />

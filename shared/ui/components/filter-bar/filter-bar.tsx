@@ -482,6 +482,19 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
   /** The add slot's label. Visible AND announced. Translatable; the kit's
    *  English is the artifact's own "+ filter". */
   addFilterLabel?: string;
+  /**
+   * A count riding beside `addFilterLabel`, inside the same slot — an
+   * additive node, never a replacement for the label. ADDED because a
+   * consuming app's own count (an active-facet total) had nowhere to go but
+   * folded into `addFilterLabel`'s plain string, which cannot carry `Badge`'s
+   * mango counter geometry (`size="counter"`: `h-5 min-w-5 px-2`,
+   * `rounded-pill`) — the same shape `TabsCount`'s active state and
+   * `CollectionFrame`'s own heading count already wear, ruled the one count
+   * shape in the system (GAPS-RULINGS.md R-4a, reversed 2026-09-03). Nothing
+   * here draws that shape itself: a caller hands it a real `<Badge count={n}
+   * variant="default" />` (or nothing) and this file only places it. Optional
+   * and additive — omitted, the slot is byte-identical to before. */
+  addFilterBadge?: React.ReactNode;
   /** The generic remove label, combined with each chip's own text. */
   removeLabel?: string;
   /**
@@ -555,6 +568,7 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
       clearLabel = "Clear filters",
       onAddFilter,
       addFilterLabel = "+ filter",
+      addFilterBadge,
       removeLabel = "Remove filter",
       formatRemoveLabel,
       label = "Filters",
@@ -664,6 +678,12 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
                 className={cn(CHIP_ADD)}
               >
                 {addFilterLabel}
+                {/* ADDITIVE — see `addFilterBadge`'s own doc. `CHIP_ADD`
+                    already carries `gap-1` between its children, the same
+                    space a tab keeps before `TabsCount`, so this needs no
+                    margin of its own. Omitted, this button is byte-identical
+                    to before. */}
+                {addFilterBadge}
               </button>
             ) : null}
 

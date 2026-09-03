@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added — `FilterBar`'s "+ filter" slot takes an optional badge node
+
+A consuming app's filter row (kwapso-system's `shared/web/screen-engine/
+filter-bar.tsx`) needs its active-facet count to always read as `Badge`'s own
+mango counter geometry (`size="counter"`: `h-5 min-w-5 px-2`, `rounded-pill`,
+the shape `TabsCount`'s active state and `CollectionFrame`'s own heading count
+already wear — GAPS-RULINGS.md R-4a, reversed 2026-09-03), inside the SAME "+
+filter" pill the count already lives beside, per the client's own ruling
+("only a count niside the filter pill"). `addFilterLabel` is typed `string`
+and rendered as bare text, so there was no slot in the button for a `Badge`
+node — the caller could not do this without either a second, adjacent pill
+(rejected: the ruling puts the count INSIDE the one pill) or copying `Badge`'s
+classes into app code (a restyled clone, forbidden by `kit-supplies-the-ui`).
+
+`components/filter-bar/filter-bar.tsx` — `FilterBarProps.addFilterBadge?:
+React.ReactNode`, rendered as an ADDITIVE sibling of `addFilterLabel` inside
+the same button. Nothing here draws the badge's shape; a caller hands it a
+real `<Badge count={n} variant="default" />` and this file only places it,
+after the label, inside `CHIP_ADD`'s own `gap-1`. Omitted, the button is
+byte-identical to before every existing call site is unaffected.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso-system before the
+app can use it (`shared/ui/` there is vendored and pinned).
+
 ## v1.2.29 — 2026-09-03
 
 ### Fixed — the leading breadcrumb tab's corner, reversed

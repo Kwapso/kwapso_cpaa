@@ -31,12 +31,14 @@ resolves here, with nothing translating it on the way in.
 
 ## Weight
 
-**Fill throughout, with four exceptions drawn at regular (outline) weight
-instead: `Plus`, `Power`, `Prohibit`, `X`.** Phosphor's fill weight renders a
-bare mark (a plus sign, a power glyph's slash-in-a-ring, a prohibit circle, a
-cross) as a solid disc or square with the mark knocked out — there is no line
-to fill, so fill wraps it in a plate instead. That reads as a heavy badge next
-to the rest of the set's lean silhouettes.
+**Fill is the default weight. The exceptions, drawn at regular (outline)
+weight instead, are `Plus`, `Power`, `Prohibit`, `X`, `DotsThree`,
+`DotsThreeVertical`, `MagnifyingGlass`, and THE WHOLE `Arrow*` FAMILY — all 96
+of them.** Phosphor's fill weight renders a bare mark (a plus sign, a power
+glyph's slash-in-a-ring, a prohibit circle, a cross, three dots) as a solid
+disc, square or plate with the mark knocked out — there is no line to fill, so
+fill wraps it in a plate instead. That reads as a heavy badge next to the rest
+of the set's lean silhouettes.
 
 THE CLIENT NAMED THREE; THE FOURTH FOLLOWS FROM HER REASON RATHER THAN FROM A
 SECOND RULING (2026-09-03). She sent `Plus`, `Power` and `Prohibit` to outline
@@ -49,8 +51,56 @@ glyph that matches it exactly is a smaller step than leaving a plate on every
 dismiss in the app and calling it fidelity to a count of three. Reversible in
 one file copy if she disagrees.
 
-Measured on `verify/icons/`: the regular exceptions rasterize to 9–22% opaque
-coverage of their viewBox; a comparable fill glyph rasterizes to 47–53%.
+THE THREE DOTS JOINED THEM ON HER OWN RULING (2026-09-03): "for the tree dots
+icon, also use the regular instead of the solid." `dots-three-fill` is the
+clearest case in the set — not a dot that got heavier, but a **rounded
+rectangle 224 units wide** with three 12-unit dots punched out of it. The
+overflow menu is one of the quietest controls in the product and it was
+drawing the widest solid plate on any toolbar. Regular is the three dots and
+nothing else.
+
+`DotsThreeVertical` is the SAME GLYPH ROTATED and is plated identically, so it
+went with it — the same one-step extension of her reason that `X` was, and
+reversible the same way. The four `DotsThreeOutline*` and `DotsThreeCircle*`
+variants are untouched: they are different marks that draw their own ring or
+outline, not the plated bare mark this rule is about.
+
+THE ARROWS AND THE MAGNIFIER, on two further rulings the same day: "for all
+arrow icons, use regular instead on solid" and "icon magnifying-glass also use
+regular instead of solid."
+
+The arrows are done as a WHOLE FAMILY rather than as the thirteen the app
+happens to draw today, because the folder is the contract (see below): she
+picks a name off phosphor.dev and it resolves here, so an `Arrow*` chosen
+tomorrow must already be the weight she ruled for. Every `Arrow*.svg` in this
+folder — 96 files, plain, bent, elbowed, fat, lined, circled, squared and
+paired — is regular. That is the only reading under which the ruling stays
+true for the NEXT arrow rather than only for the current ones.
+
+`MagnifyingGlass` is the single glyph she named, and it is the search field's
+mark in 28 places. The other four magnifiers in the pack
+(`MagnifyingGlassPlus`, `MagnifyingGlassMinus`, `FileMagnifyingGlass`,
+`ListMagnifyingGlass`) are LEFT AT FILL, and none of them is drawn anywhere in
+the product — they are different marks carrying a second element, not the
+plain lens she ruled on, so extending to them would be a guess rather than her
+reason applied. Named here so the inconsistency is a decision on the record
+rather than an oversight, and so the first screen that wants one knows to ask.
+
+THE `Caret*` FAMILY IS DELIBERATELY UNTOUCHED, and it is the one place this
+could reasonably have been read wider. Phosphor treats caret and arrow as two
+families and so has she — the word caret has never appeared in a ruling. The
+visual consequence is not cosmetic either: `caret-down-fill` is a solid
+triangle and `caret-down` regular is an open chevron, so the swap would change
+the mark on every dropdown, select, accordion, breadcrumb and pagination
+control in the product, `CaretRight` alone appearing 40 times. That is a
+design decision she should SEE rather than inherit from a rule about arrows.
+Flagged to her; not applied.
+
+Measured on `verify/icons/`: the four mark-shaped exceptions rasterize to
+9–22% opaque coverage of their viewBox; a comparable fill glyph rasterizes to
+47–53%. The dots sit far below even that — three r=12 discs cover about 2% of
+the viewBox, against roughly 31% for the plate `dots-three-fill` draws, which
+is the size of the difference she was looking at on the toolbar.
 
 Both weights ship the same `viewBox="0 0 256 256"` and `fill="currentColor"`
 on the root, so nothing needed normalising on the way in — see

@@ -24,6 +24,7 @@
 
 import * as React from "react"
 
+import { cn } from "@shared/ui/lib/utils"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
@@ -212,74 +213,89 @@ export function WaveFinder({
   // collection-frame/collection-frame.tsx`). What is NOT in the row is its
   // open panel, and that is a different question with a different answer —
   // see the column below.
+  // ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, MIRRORING THE FIX
+  // `ToolbarRow` (screen-bits.tsx) ALREADY CARRIES. Verbatim: "what this is
+  // doing is creating a new card underneath... it kind of creates a second
+  // toolbar... merge this with the main toolbar so that it's one single
+  // background or container, more like expand behaviour rather than
+  // open-a-new-one behaviour." This track used to carry its own
+  // `rounded-pill bg-background` unconditionally, with the panel one `gap-2`
+  // below it as a second sibling — two same-toned boxes with air between
+  // them, exactly the "second toolbar" she is naming. The fix is the same one
+  // `ToolbarRow` carries: the fill and the radius move to the OUTER column,
+  // chosen by `Boolean(filterPanel)` (R31 — two radii, never a third, never
+  // both at once), and the track keeps only its own padding/gap. No gap
+  // between the track and the panel either.
+  const filterPanelOpen = Boolean(filterPanel)
   return (
-    // THE COLUMN — client ruling, 2 Sep 2026, third pass: "the expanded
-    // toolbar shoudl not be an overlay, but literaly expand the space".
-    // `filterPanel` (v1.2.27's `useFilterBar` split) renders BENEATH the
-    // track as a plain sibling, so it takes real space and pushes the waves
-    // down, and its height feeds THIS box rather than the pill's — which is
-    // the whole of why the track keeps its shape (`filter-bar.tsx`'s header
-    // has the oval that taught it, and the absolute-panel pass this
-    // replaces).
-    <div className="flex w-full min-w-0 flex-col gap-2">
-    <div className="flex w-full flex-wrap items-center gap-2 rounded-pill bg-background py-1.5 pe-1.5 ps-4">
-      {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-          like in your atifact": the reference artifact's search element is
-          `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
-          pill/sort/period after it to the track's far edge instead of sitting
-          immediately after a narrow box. */}
-      <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
-        <SearchInput
-          value={query.q}
-          onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-          // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
-          // "Clear all", which was one control quietly owning two questions; the
-          // kit's bar says "Clear filters" and now means only that.
-          onClear={() => onChange({ ...query, q: "" })}
-          placeholder={t("Search waves…")}
-          className="w-full"
-        />
-      </div>
-      {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
-          normal flex child (wrapping itself in a non-growing box internally),
-          and its open PANEL is the separate `filterPanel` value, rendered
-          into the column below rather than into this row — the split
-          `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
-          never the filters themselves — client, 2026-09-02: "when activce
-          filters, do not display them in the toolbar. only a count niside
-          the filter pill". See `filter-bar.tsx`'s own header for the full
-          account. */}
-      {filterPill}
-      <SortControl
-        options={[
-          { value: "newest", label: t("Newest first") },
-          { value: "name", label: t("Name") },
-          { value: "client", label: t("Client") },
-          { value: "runs", label: t("When it runs") },
-          { value: "sprints", label: t("Sprints inside it") },
-        ]}
-        value={query.sortBy}
-        onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-        direction={query.dir}
-        onDirectionChange={(dir) => onChange({ ...query, dir })}
-        label={t("Sort by")}
-        hideLabel
-      />
-      {period}
-      {view && onViewChange ? (
-        <ViewSwitch
-          views={[
-            { value: "list", label: t("List"), icon: <List size={16} /> },
-            { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        "flex w-full min-w-0 flex-col bg-background",
+        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
+      )}
+    >
+      <div
+        data-slot="toolbar-row-track"
+        className="flex w-full flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+      >
+        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+            like in your atifact": the reference artifact's search element is
+            `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
+            pill/sort/period after it to the track's far edge instead of sitting
+            immediately after a narrow box. */}
+        <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+          <SearchInput
+            value={query.q}
+            onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+            // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+            // "Clear all", which was one control quietly owning two questions; the
+            // kit's bar says "Clear filters" and now means only that.
+            onClear={() => onChange({ ...query, q: "" })}
+            placeholder={t("Search waves…")}
+            className="w-full"
+          />
+        </div>
+        {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
+            normal flex child (wrapping itself in a non-growing box internally),
+            and its open PANEL is the separate `filterPanel` value, rendered
+            into the column below rather than into this row — the split
+            `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
+            never the filters themselves — client, 2026-09-02: "when activce
+            filters, do not display them in the toolbar. only a count niside
+            the filter pill". See `filter-bar.tsx`'s own header for the full
+            account. */}
+        {filterPill}
+        <SortControl
+          options={[
+            { value: "newest", label: t("Newest first") },
+            { value: "name", label: t("Name") },
+            { value: "client", label: t("Client") },
+            { value: "runs", label: t("When it runs") },
+            { value: "sprints", label: t("Sprints inside it") },
           ]}
-          value={view}
-          onValueChange={(v) => onViewChange(v as WaveView)}
-          label={t("View")}
+          value={query.sortBy}
+          onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+          direction={query.dir}
+          onDirectionChange={(dir) => onChange({ ...query, dir })}
+          label={t("Sort by")}
+          hideLabel
         />
-      ) : null}
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-    </div>
-    {filterPanel}
+        {period}
+        {view && onViewChange ? (
+          <ViewSwitch
+            views={[
+              { value: "list", label: t("List"), icon: <List size={16} /> },
+              { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+            ]}
+            value={view}
+            onValueChange={(v) => onViewChange(v as WaveView)}
+            label={t("View")}
+          />
+        ) : null}
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {filterPanel}
     </div>
   )
 }

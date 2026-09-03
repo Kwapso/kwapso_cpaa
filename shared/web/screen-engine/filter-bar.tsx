@@ -275,6 +275,7 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import {
   CompactFacet,
@@ -398,10 +399,16 @@ function useFilterBar<T>({
   // is still the ONLY thing the toolbar says about what is narrowing the
   // list; what changed is WHEN it says it, not what it says. `activeCount`
   // is computed fresh every render off `facets`/`values` (its own comment
-  // above), so this label — and therefore the pill in BOTH open and closed
-  // states — updates the instant a facet is ticked or cleared, never off a
-  // snapshot taken when the panel last closed.
-  const addFilterLabel = activeCount > 0 ? t("Filter ({count})", { count: activeCount }) : t("Filter")
+  // above), so the pill — in BOTH open and closed states — updates the
+  // instant a facet is ticked or cleared, never off a snapshot taken when
+  // the panel last closed.
+  //
+  // THE COUNT ITSELF MOVED OFF THIS STRING (2026-09-03) AND ONTO A REAL
+  // BADGE — see the long note beside `addFilterBadge` below for why a string
+  // ternary was a stand-in and not the shape asked for. `addFilterLabel` is
+  // back to a plain, un-numbered word because the number now has its own
+  // slot; folding it into the sentence a second time would say it twice.
+  const addFilterLabel = t("Filter")
 
   const panel = open ? (
     // NO `role="group"`/`aria-label` OF ITS OWN — the pill's own cluster
@@ -513,49 +520,30 @@ function useFilterBar<T>({
     </div>
   ) : null
 
-  // WHY THIS IS STILL A STRING, NOT THE TAB STRIP'S `TabsCount` BADGE —
-  // CLIENT RULING, 2026-09-03: "The count design should replicate the count
-  // design that we have on the top lines, like this Mango round background
-  // with no border behind the number." That number is `TabsCount`
-  // (`shared/ui/components/tabs/tabs.tsx`), and it is the kit's real export —
-  // reusing it here (rather than restyling this pill to look like it) was
-  // tried first, and it does not fit for two INDEPENDENT structural reasons,
-  // neither of them a taste call:
+  // A REAL BADGE, NOT A NUMBER FOLDED INTO THE SENTENCE — CLIENT RULING,
+  // 2026-09-03: "The count design should replicate the count design that we
+  // have on the top lines, like this Mango round background with no border
+  // behind the number." That reference shape is `Badge`'s own counter
+  // geometry (`size="counter"`: `h-5 min-w-5 px-2`, `rounded-pill`,
+  // `variant="default"` for the mango fill) — the same shape `TabsCount`'s
+  // active state and `CollectionFrame`'s heading count already wear
+  // (GAPS-RULINGS.md R-4a). `TabsCount` itself does not fit here: its
+  // mango-vs-quiet switch is `group-data-[state=active]/tab:` CSS read off a
+  // Radix `Tabs`-internal ancestor this filter row has no reason to
+  // construct, so an unwrapped `<TabsCount>` would draw only its OFF state.
+  // `Badge` needs none of that — it is already a standalone export
+  // (`CollectionFrame`'s own heading count is a bare `<Badge count={…} />`)
+  // — so this reaches for `Badge` directly rather than restyling a clone of
+  // it.
   //
-  //   1. `KitFilterBar`'s own `addFilterLabel` prop is typed `string`
-  //      (`shared/ui/components/filter-bar/filter-bar.tsx`) and rendered as
-  //      `{addFilterLabel}` — bare text content inside a `<button>`. There is
-  //      no slot in the kit's own pill for a component, a badge or any other
-  //      node; only a sentence.
-  //   2. Even with a node slot, `TabsCount`'s mango-vs-quiet SWITCH is not a
-  //      prop on the component — it is `group-data-[state=active]/tab:` CSS,
-  //      read off an ANCESTOR that carries the class `group/tab` and the
-  //      attribute `data-state="active"`. Only `TabsTrigger` sets both
-  //      (`tabs.tsx`'s own `TRIGGER_BASE`), which is Radix `Tabs`-internal
-  //      machinery this filter row has no reason to construct. Rendering the
-  //      real `<TabsCount>` here, unwrapped, would draw the OFF state forever
-  //      (quiet tertiary text, never mango) — visually nothing like what was
-  //      asked for.
-  //
-  //   Both are genuine kit-side gaps, not this file declining to look. The
-  //   upstream fix — logged for the design-kit pipeline, not built here
-  //   (`shared/ui/` is vendored and pinned; CLAUDE.md's `kit-supplies-the-ui`
-  //   forbids a hand-edit) — is to pull the "on" shape `TABS_COUNT_SKIN`
-  //   already states (`inline-flex size-[1.125rem] items-center
-  //   justify-center rounded-pill bg-primary text-primary-foreground
-  //   text-badge tabular-nums leading-none`) OUT from behind the
-  //   group-selector into its own standalone export (a `count: number`
-  //   prop, no ancestor required), have `TabsCount` itself draw that export
-  //   for the active case instead of stating the classes twice, and widen
-  //   `FilterBarProps.addFilterLabel` (or add a sibling node prop) so a
-  //   caller can hand the pill a node instead of only a sentence. Until
-  //   both land, copying `TABS_COUNT_SKIN`'s classes into this file would be
-  //   the exact "restyled clone" the ruling asks this file NOT to build, so
-  //   the pill keeps the kit's own plain-text "+ filter" shape with the
-  //   count folded into its words instead — see `addFilterLabel` above,
-  //   which is unconditional now so the words are visible and live in every
-  //   state (open or closed), even though they cannot yet wear the tab
-  //   strip's own badge.
+  // What stood between this pill and that badge was `KitFilterBar`'s own
+  // "+ filter" button: its `addFilterLabel` prop is typed `string`, rendered
+  // as bare text with no slot for a node. `addFilterBadge` (kit v1.2.33) is
+  // the fix — an ADDITIVE sibling prop beside `addFilterLabel`, so every
+  // other call site of `KitFilterBar` is byte-identical with it omitted.
+  // `Badge` already renders nothing at zero (the kit's own zero law), which
+  // is why `addFilterLabel` stays the plain, un-numbered "Filter" rather
+  // than folding the count into the sentence a second time.
   const pill = (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
       {/* NO `filters`, NO `onRemove`, NO `onClear` — client ruling,
@@ -565,6 +553,7 @@ function useFilterBar<T>({
       <KitFilterBar
         label={t("Filters")}
         addFilterLabel={addFilterLabel}
+        addFilterBadge={<Badge count={activeCount} variant="default" />}
         onAddFilter={() => setOpen((o) => !o)}
       />
       <span aria-live="polite" className="sr-only">

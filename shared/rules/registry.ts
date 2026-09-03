@@ -653,10 +653,17 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // `searchPlaceholder`) — reused here rather than invented, and its debt is
 // therefore pre-existing, surfaced rather than caused by this change. Same
 // blocked translation path every raise above cites.
+// FELL 2026-09-03, 153 → 152, ALL THREE: the count moved off the toolbar's
+// own label string onto a real `Badge` beside it (client ruling, same day:
+// "Mango round background with no border behind the number" — see
+// filter-bar.tsx), so "Filter ({count})" is no longer said anywhere and
+// dropped as an orphan on the next `npm run lang`. It was untranslated in
+// all three languages, so all three fall by exactly one and none drift apart
+// from each other.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 153,
-  es: 153,
-  ca: 153,
+  de: 152,
+  es: 152,
+  ca: 152,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

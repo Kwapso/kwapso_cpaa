@@ -185,9 +185,22 @@ async function pick(label: string, option: string) {
 const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
 
 /** WHAT THE TOOLBAR SAYS — the pill's own words, which since 2026-09-02 are
- * the only thing it says about what is narrowing the list. */
-const pillSays = () =>
-  document.querySelector('[data-slot="filter-bar-add"]')?.textContent ?? "(no pill)"
+ * the only thing it says about what is narrowing the list. The label
+ * ("Filter") and the count are two DOM nodes since 2026-09-03 — a real
+ * `Badge` beside the word, not a number folded into one string (client
+ * ruling: "Mango round background with no border behind the number") — so
+ * this reads them separately rather than concatenating textContent, which
+ * would run the two together with no space (e.g. "Filter1") and obscure
+ * which half changed. Returns `null` for the count when the badge renders
+ * nothing (`Badge`'s own zero law: `count <= 0` is `null`, not "0"). */
+const pillSays = () => {
+  const add = document.querySelector('[data-slot="filter-bar-add"]')
+  const badge = add?.querySelector('[data-slot="badge"]')
+  return {
+    label: add?.firstChild?.textContent ?? "(no pill)",
+    count: badge?.textContent ?? null,
+  }
+}
 
 /** The kit's own chip, which this app must now never draw one of. */
 const chips = () => document.querySelectorAll('[data-slot="filter-chip"]')
@@ -246,7 +259,7 @@ describe("the app's filter row is the design kit's", () => {
     ).toEqual([])
   })
 
-  it("A SELECTED FACET IS NOT MANGO — the filter row decides no colour", () => {
+  it("A SELECTED FACET IS NOT MANGO — the filter row decides no colour, except the one count it now names on purpose", () => {
     // THE OWNER'S RULING, and the reason it is checked by ABSENCE. The old row
     // drew a selected facet as `Badge variant="default"`, which is the brand
     // fill (measured rgb(254,208,105)); the kit's file says three times over
@@ -263,6 +276,22 @@ describe("the app's filter row is the design kit's", () => {
       `R32 and the kit's §2.5: the filter row names no colour. Found: ${colour?.join(", ")}`
     ).toBeNull()
 
+    // THE ONE NAMED EXCEPTION, ADDED 2026-09-03 — a COUNT is not a SELECTED
+    // FACET. The client's own words: "The count design should replicate the
+    // count design that we have on the top lines, like this Mango round
+    // background with no border behind the number" — asking FOR the mango
+    // fill on this one control, the toolbar's own count, which is a fact
+    // about how many facets are on rather than a status any one facet
+    // carries. §2.5 rules the latter; this is the former. Matched as an
+    // exact string rather than a loose pattern, so a typo'd or duplicated
+    // exemption fails loudly instead of silently widening the hole.
+    const COUNT_BADGE = '<Badge count={activeCount} variant="default" />'
+    expect(
+      src.match(new RegExp(COUNT_BADGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")),
+      "the one named mango exception must appear exactly once, as exactly this JSX"
+    ).toHaveLength(1)
+    const srcWithoutCountBadge = src.replace(COUNT_BADGE, "")
+
     // THE BLANKET `variant=` BAN IS NARROWED, and this is the narrowing rather
     // than a hole in it. It was a proxy for "no colour", because the breach it
     // was written against was `Badge variant="default"` — the brand fill under
@@ -272,17 +301,19 @@ describe("the app's filter row is the design kit's", () => {
     // default IS the mango. So the check now READS the word instead of banning
     // the prop, which is strictly stronger — `variant="default"` was invisible
     // to the old regex the moment it was written as `variant={x}` and is not
-    // spellable at all under this one.
+    // spellable at all under this one. Run on the source with the ONE named
+    // exception already removed, so it still catches a SECOND `variant=
+    // "default"` anywhere else in the file.
     const NEUTRAL = new Set(["secondary", "ghost", "text", "link"])
-    const named = [...src.matchAll(/variant="([a-zA-Z]+)"/g)].map((m) => m[1])
-    const dynamic = src.match(/variant=\{/g)
+    const named = [...srcWithoutCountBadge.matchAll(/variant="([a-zA-Z]+)"/g)].map((m) => m[1])
+    const dynamic = srcWithoutCountBadge.match(/variant=\{/g)
     expect(
       dynamic,
       "a computed variant cannot be read here — name the neutral one in the markup"
     ).toBeNull()
     expect(
       named.filter((v) => !NEUTRAL.has(v)),
-      `only a neutral variant may appear in the filter row. Found: ${named.join(", ")}`
+      `only a neutral variant may appear in the filter row, besides the one named count exception. Found: ${named.join(", ")}`
     ).toEqual([])
   })
 
@@ -294,7 +325,7 @@ describe("the app's filter row is the design kit's", () => {
     // existed precisely to carry strings this size and had its own truncation
     // bug for it. A count cannot clip.
     render(<Harness />)
-    expect(pillSays()).toBe("Filter")
+    expect(pillSays()).toEqual({ label: "Filter", count: null })
 
     // `pick` opens the panel to reach the facet (there is nowhere else to
     // click one from), so the panel is OPEN the instant this resolves.
@@ -309,42 +340,47 @@ describe("the app's filter row is the design kit's", () => {
     // SUPERSEDING THE OLD "bare word while open" READING. Verbatim: "Even if
     // the filter is open, I want to see the count pill at all times... When
     // the filter toolbar modal is open, I also want the count visible." The
-    // panel is open right now (see above), and the pill already reports one.
-    await waitFor(() => expect(pillSays()).toBe("Filter (1)"))
+    // panel is open right now (see above), and the pill already reports one
+    // — as a real `Badge` beside the label now (client ruling, 2026-09-03:
+    // "Mango round background with no border behind the number"), not a
+    // number folded into the label string.
+    await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: "1" }))
 
-    // …and it STAYS "Filter (1)" the moment the panel is shut — the count is
+    // …and the badge STAYS up the moment the panel is shut — the count is
     // the same fact whether the fields it describes are on screen or not.
     openPanel()
     await waitFor(() => expect(panelNode()).toBeNull())
-    expect(pillSays()).toBe("Filter (1)")
+    expect(pillSays()).toEqual({ label: "Filter", count: "1" })
 
     // …and with the panel shut the WHOLE toolbar says that and nothing else.
     // Scoped to the kit bar's own root rather than to the document, because
     // the value is of course ALSO on screen while the panel is open — that is
     // the field the person is looking at. The ruling is about the toolbar,
     // and this is the toolbar: no chip, no facet name, no client name, one
-    // count, in both states.
+    // count, in both states. Concatenated textContent has no space between
+    // the label and the badge (two DOM nodes, CSS `gap` between them, not a
+    // text character), which is exactly why `pillSays()` reads them apart.
     const toolbar = document.querySelector('[data-slot="filter-bar"]')
     expect(toolbar, "the kit's bar draws the row").toBeTruthy()
     expect(
       toolbar!.textContent,
       "the toolbar reports a count and never what the filters are"
-    ).toBe("Filter (1)")
+    ).toBe("Filter1")
 
     // …and a SECOND facet moves the COUNT LIVE, rather than adding a second
     // thing to the row (the shape a chip cluster could not have: two chips is
-    // two nodes and a wider toolbar, two filters is one string one character
+    // two nodes and a wider toolbar, two filters is one badge one digit
     // longer) and rather than waiting for the panel to close to say so (the
     // old snapshot-on-close behaviour this pass replaces).
     await pick("Type", "From a meeting")
-    await waitFor(() => expect(pillSays()).toBe("Filter (2)"))
+    await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: "2" }))
     expect(chips().length).toBe(0)
-    expect(document.querySelector('[data-slot="filter-bar"]')!.textContent).toBe("Filter (2)")
+    expect(document.querySelector('[data-slot="filter-bar"]')!.textContent).toBe("Filter2")
 
     // …and TICKING A FACET OFF drops the count live too, panel still open —
     // the client's own words, "when I'm selecting and unselecting filters".
     await pick("Type", "Any type")
-    await waitFor(() => expect(pillSays()).toBe("Filter (1)"))
+    await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: "1" }))
   })
 
   it("ONE VALUE PER FACET — a second pick REPLACES, it does not add", async () => {
@@ -359,7 +395,9 @@ describe("the app's filter row is the design kit's", () => {
     await pick("Type", "A note")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
     openPanel()
-    await waitFor(() => expect(pillSays(), "one facet, one count").toBe("Filter (1)"))
+    await waitFor(() =>
+      expect(pillSays(), "one facet, one count").toEqual({ label: "Filter", count: "1" })
+    )
 
     // …and TURNING THE FACET OFF is its own row, "Any type", which is what the
     // field says while nothing is on. It used to be "pick the word that is
@@ -371,7 +409,7 @@ describe("the app's filter row is the design kit's", () => {
     await pick("Type", "Any type")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe("{}"))
     openPanel()
-    await waitFor(() => expect(pillSays()).toBe("Filter"))
+    await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: null }))
   })
 
   it("AN OPTION TAKEN AWAY UNDER AN ACTIVE FACET still cannot make the row lie", async () => {
@@ -399,7 +437,10 @@ describe("the app's filter row is the design kit's", () => {
     )
     openPanel()
     await waitFor(() =>
-      expect(pillSays(), "the facet is still on, and still counted").toBe("Filter (1)")
+      expect(pillSays(), "the facet is still on, and still counted").toEqual({
+        label: "Filter",
+        count: "1",
+      })
     )
     expect(
       document.querySelector('[data-slot="filter-bar-add"]')?.textContent,
