@@ -33,12 +33,12 @@ resolves here, with nothing translating it on the way in.
 
 **Fill is the default weight. The exceptions, drawn at regular (outline)
 weight instead, are `Plus`, `Power`, `Prohibit`, `X`, `DotsThree`,
-`DotsThreeVertical`, `MagnifyingGlass`, and THE WHOLE `Arrow*` FAMILY — all 96
-of them.** Phosphor's fill weight renders a bare mark (a plus sign, a power
-glyph's slash-in-a-ring, a prohibit circle, a cross, three dots) as a solid
-disc, square or plate with the mark knocked out — there is no line to fill, so
-fill wraps it in a plate instead. That reads as a heavy badge next to the rest
-of the set's lean silhouettes.
+`DotsThreeVertical`, `MagnifyingGlass`, `Paperclip`, and THE WHOLE `Arrow*`
+FAMILY — all 96 of them.** Phosphor's fill weight renders a bare mark (a plus
+sign, a power glyph's slash-in-a-ring, a prohibit circle, a cross, three dots,
+a paperclip) as a solid disc, square or plate with the mark knocked out —
+there is no line to fill, so fill wraps it in a plate instead. That reads as a
+heavy badge next to the rest of the set's lean silhouettes.
 
 THE CLIENT NAMED THREE; THE FOURTH FOLLOWS FROM HER REASON RATHER THAN FROM A
 SECOND RULING (2026-09-03). She sent `Plus`, `Power` and `Prohibit` to outline
@@ -95,6 +95,15 @@ the mark on every dropdown, select, accordion, breadcrumb and pagination
 control in the product, `CaretRight` alone appearing 40 times. That is a
 design decision she should SEE rather than inherit from a rule about arrows.
 Flagged to her; not applied.
+
+`Paperclip` JOINED THE SAME DAY, ON HER OWN RULING: "paperclip icon - also use
+regular instead of solid." `paperclip-fill` is the same class of plate as
+`x-fill` — a filled disc (Phosphor draws this one on a round badge rather
+than a square) with the clip shape cut out of it, not a paperclip that got
+heavier. It is the attachment mark on every source chip and file row in the
+product, so it was carrying the same heaviness her earlier rulings on `X` and
+the dots were both correcting elsewhere. Regular is the bare clip line and
+nothing else.
 
 Measured on `verify/icons/`: the four mark-shaped exceptions rasterize to
 9–22% opaque coverage of their viewBox; a comparable fill glyph rasterizes to
