@@ -1222,6 +1222,29 @@ describe("RULES — the laws of the base", () => {
         // component's own start and the tag — wide enough to reach the real
         // call, narrow enough that a DIFFERENT panel's key builder elsewhere
         // in the file still cannot satisfy it.
+        // `<ActivityPanel>` IS A SHARED PAGED BODY TOO, 2026-09-03 — same
+        // argument as `PagedPanelBody` above, and it earns it the same way:
+        // it renders `<LoadMore listKey={activity.listKey}>` inside itself,
+        // which this file's own `record-detail-tabs` assertion independently
+        // requires of `activity-panel.tsx`. So a caller that hands it a real
+        // listKey HAS reached a real pager.
+        //
+        // IT NEEDS ITS OWN BRANCH rather than joining the tag list below,
+        // because it is passed its key INSIDE the tag (an `activity={{ …
+        // listKey: … }}` object literal) rather than reading a variable built
+        // earlier in the enclosing function — so the "walk back to the
+        // enclosing function" scope those tags need would look in the wrong
+        // place entirely and report a correctly-wired pager as missing.
+        //
+        // WHAT THIS RETIRES: the recipe host used to draw its own `<LoadMore>`
+        // as a SIBLING of the whole screen, which is exactly why "Load more
+        // activity" rendered underneath the Overview tab. The pager lives
+        // inside the Activity tab now. Teaching the census about that move is
+        // what keeps this law true across it — otherwise the law quietly
+        // demands the bug back.
+        [...pager.matchAll(/<ActivityPanel[\s\S]{0,1200}?\/>/g)].some((m) =>
+          m[0].includes(c.pagerKey)
+        ) ||
         [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
           const tagAt = m.index ?? 0
           const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
@@ -2442,8 +2465,14 @@ describe("RULES — the laws of the base", () => {
     // the hand-edit guard forbids fixing it, so the only response is a message
     // upstream, which is a review comment wearing a build failure's clothes.
     const ours = (f: { rel: string }) => !f.rel.startsWith(VENDORED_UI)
+    // `black`/`white` are Tailwind's own colour names too, and they carry no
+    // shade digit — `bg-black/50` slipped through for exactly that reason (a
+    // hand-rolled scrim in shared/web/screen-engine/screen-renderer.tsx,
+    // fixed alongside this widening) until a full-repo grep confirmed it was
+    // the only live instance. Same prefix list, same reasoning: neither name
+    // means anything here, only a token does.
     const RAMP =
-      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g
+      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}|black|white)\b/g
     const HEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g
     const lawBook = join(ROOT, "shared", "rules") // it quotes what it forbids
     const ramps: string[] = []

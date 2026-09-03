@@ -35,6 +35,26 @@ beforeAll(() => {
 
 afterEach(cleanup)
 
+/** THE TRACK'S SHAPE, with the one attribute that is SUPPOSED to change
+ * normalised away.
+ *
+ * This assertion exists for the client's "one container" ruling: opening the
+ * filter panel must not make the pill move, resize or repaint. `outerHTML`
+ * was a fair proxy for that — until the add-filter button gained
+ * `aria-expanded` (kit v1.2.42), which flips false→true precisely BECAUSE the
+ * panel opened. That is a state announcement for a screen reader, not a
+ * visual change: a person watching the pill sees nothing move, and a person
+ * listening finally hears that the control expands something.
+ *
+ * So the comparison drops `aria-expanded` and keeps everything else byte for
+ * byte — a class, a style, a structural change or a second attribute flipping
+ * still fails it. Normalising the whole attribute (rather than asserting one
+ * expected value) is deliberate: the point here is that the track did not
+ * move, and the aria state has its own test elsewhere. */
+const trackShape = (el: HTMLElement) =>
+  el.outerHTML.replace(/ aria-expanded="(?:true|false)"/g, "")
+
+
 const CLIENTS: Account[] = [{ id: "a1", name: "Bergman S.A." } as Account]
 
 function Harness() {
@@ -67,7 +87,7 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
       track.className,
       "the track paints no fill or shape of its own — the merged container does"
     ).not.toMatch(/rounded-pill|bg-background|bg-surface-panel/)
-    const closedTrack = track.outerHTML
+    const closedTrack = trackShape(track)
 
     openPanel()
     const panelRow = await waitFor(() => {
@@ -76,7 +96,7 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
       return node!
     })
 
-    expect(track.outerHTML, "opening the panel must not change the track's own markup").toBe(
+    expect(trackShape(track), "opening the panel must not change the track's own markup").toBe(
       closedTrack
     )
     expect(track.contains(panelRow), "the panel must never be inside the track").toBe(false)
@@ -110,7 +130,7 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
     await waitFor(() =>
       expect(document.querySelector('[data-slot="filter-bar-row"]')).toBeNull()
     )
-    expect(track.outerHTML).toBe(closedTrack)
+    expect(trackShape(track)).toBe(closedTrack)
     expect(column!.className).toContain("rounded-pill")
     expect(column!.className).not.toContain("rounded-[var(--radius)]")
   })

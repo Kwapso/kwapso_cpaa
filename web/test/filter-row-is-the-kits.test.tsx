@@ -71,6 +71,26 @@ beforeAll(() => {
 
 afterEach(cleanup)
 
+/** THE TRACK'S SHAPE, with the one attribute that is SUPPOSED to change
+ * normalised away.
+ *
+ * This assertion exists for the client's "one container" ruling: opening the
+ * filter panel must not make the pill move, resize or repaint. `outerHTML`
+ * was a fair proxy for that — until the add-filter button gained
+ * `aria-expanded` (kit v1.2.42), which flips false→true precisely BECAUSE the
+ * panel opened. That is a state announcement for a screen reader, not a
+ * visual change: a person watching the pill sees nothing move, and a person
+ * listening finally hears that the control expands something.
+ *
+ * So the comparison drops `aria-expanded` and keeps everything else byte for
+ * byte — a class, a style, a structural change or a second attribute flipping
+ * still fails it. Normalising the whole attribute (rather than asserting one
+ * expected value) is deliberate: the point here is that the track did not
+ * move, and the aria state has its own test elsewhere. */
+const trackShape = (el: HTMLElement) =>
+  el.outerHTML.replace(/ aria-expanded="(?:true|false)"/g, "")
+
+
 /** The knowledge base's own shape: a closed vocabulary and a facet over rows. */
 const CLIENTS: FacetOption[] = [
   { value: "a1", label: "Bergman S.A." },
@@ -504,7 +524,7 @@ describe("the app's filter row is the design kit's", () => {
       "the track paints no fill or shape of its own any more — the merged " +
         "container does, which is the whole point of this pass"
     ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
-    const closedTrack = track.outerHTML
+    const closedTrack = trackShape(track)
 
     openPanel()
     const panel = panelNode()
@@ -514,7 +534,7 @@ describe("the app's filter row is the design kit's", () => {
     // unweakened: opening the panel changes neither the track's markup nor
     // its position relative to the panel.
     expect(
-      track.outerHTML,
+      trackShape(track),
       "opening the panel changed the track's own markup — pass one put the " +
         "panel inside a box like this one and it was drawn as a giant oval"
     ).toBe(closedTrack)
@@ -569,7 +589,7 @@ describe("the app's filter row is the design kit's", () => {
     // vi · AND IT CLOSES BACK TO EXACTLY THE SAME PILL.
     openPanel()
     await waitFor(() => expect(panelNode()).toBeNull())
-    expect(track.outerHTML).toBe(closedTrack)
+    expect(trackShape(track)).toBe(closedTrack)
     expect(column!.className).toContain("rounded-pill")
     expect(column!.className).not.toContain("rounded-[var(--radius)]")
   })

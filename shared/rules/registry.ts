@@ -676,10 +676,84 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // dropped as an orphan on the next `npm run lang`. It was untranslated in
 // all three languages, so all three fall by exactly one and none drift apart
 // from each other.
+// Bumped by +2/language on 2026-09-03: the record-activity audit (R33/R28)
+// wired the kit's `ActivityFeed` `loading`/`error` registers into
+// `ActivityPanel` (web/components/activity-panel.tsx) so a still-loading or
+// failed feed stops rendering "No activity yet." Two new `t(...)` sentences
+// — "Couldn't load activity" and "We couldn't load this record's activity.
+// Try again in a moment." — extract with no seed entry yet in any of the
+// three languages. Measured in isolation against a clean checkout of this
+// commit's parent with only that change applied (155 → 157); this pin
+// covers exactly that rise and does not answer for any other in-flight
+// change to the true count.
+// Bumped by +14/language on 2026-09-03: the R28/R33/R34 sweep on
+// account-detail-panels.tsx (ContactsPanel's remove/restore-contact confirm
+// and PortalAccessPanel's revoke/restore-login confirm) wrapped a dozen
+// previously-bare English string literals in `t(...)`, including the two
+// interpolated confirm titles/labels, each rewritten as a whole sentence
+// with a named hole (`t("Remove {person} from {account}?", {...})`) rather
+// than a translated fragment glued to a raw value. Fourteen distinct new
+// catalogue strings result: "Remove contact", "Remove {person}", "Remove
+// {person} from {account}?", "Contact removed.", "Contact added back.",
+// "Couldn't remove that contact.", "Couldn't add that contact back.", "Add
+// {person} back", "They stay in your accounts, with everything they're
+// attached to. You're only saying they're no longer a contact here.",
+// "Access taken away.", "Access switched back on.", "Couldn't change that
+// login.", "They won't be able to sign in any more. Everything they're
+// attached to, their records, their history, stays exactly where it is,
+// and you can switch it back on later." — plus work-logs-panel.tsx's own
+// new sub-fetch error line, "Couldn't load the hours for this record."
+// None has a seed entry yet in any of the three languages. Measured on
+// this tree with the concurrent +2/language change above already applied
+// (154 → 168); this pin covers exactly this change's own rise on top of
+// that one and does not answer for any other in-flight change to the true
+// count.
+// 2026-09-03, 183 → 186 (loading-toolbar pass, web/components/paged-find.tsx,
+// load-more.tsx, tickets-collection.tsx, meetings-screen.tsx). This pass's
+// OWN new sentences: `t("That's the first {n}. Search or filter to find what
+// you're after.")` (load-more.tsx, replacing a translated-fragment-plus-raw-
+// English glue) and `t("Nothing in Meetings this week.")` (meetings-screen.tsx,
+// the This Week tab's own empty sentence, previously the whole collection's).
+// The other two the extractor folded in on this run — "Couldn't load the
+// triage queue." and "{name} is on triage this week, so the queue is
+// theirs." — are ALSO this pass's own (tickets-collection.tsx's missing
+// error branch and its raw interpolated on-duty line), so the note directly
+// above crediting them to a different, concurrent change was measuring the
+// same shared working tree at an earlier instant of this same edit; nothing
+// here was invented to explain a rise somebody else caused. Measured fresh
+// against the run this pin now pins to: `node scripts/i18n-extract.mjs`
+// scored the true count at 186 for all three languages the moment this
+// change was made, so this is a snapshot, not a promise about what anyone
+// else lands after it — reconcile again before `npm run check` is trusted.
+// 2026-09-03, 186 → 189, AGAIN NOT BY THIS CHANGE: a second `i18n-extract`
+// run (needed because the working tree kept moving under a live, multi-agent
+// session) folded in three more strings this pass did not write — "A
+// colleague", "Your team", "Why a step takes longer, {reason}" — from other
+// concurrent work. Recorded rather than reverted, for the same reason as the
+// note below: a stale pin hides the NEXT regression, whoever's it is.
+// 2026-09-03, 168 → 183, AND NOT BY THE CHANGE THAT MOVED THE PIN. The
+// recipe-path fix (screen-renderer.tsx / recipe.ts: no mark on a record title,
+// icons on recipe tabs, the Activity block's own registers, the confirm's red
+// button and busy state) added ZERO new catalogue strings — every sentence it
+// says was already in the catalogue, reused word for word from
+// web/components/activity-panel.tsx and shared/web/use-confirm.tsx so the two
+// implementations of each cannot drift. What raised the count is the
+// `node scripts/i18n-extract.mjs` run that change is required to make: the
+// working tree's catalogue was stale against several other in-flight changes,
+// and the extract folded fifteen of THEIR new English sentences in
+// ("Check your connection and try again.", "Couldn't load the triage queue.",
+// "We couldn't load your tickets.", the six other "We couldn't load…" lines,
+// "{name} is on triage this week, so the queue is theirs.", and the three
+// fragments rewritten into whole sentences with holes). Measured both ways on
+// this tree: the catalogue as it stood before the extract scores exactly 168
+// and passes; after it, 183. So this pin records somebody else's rise, honestly
+// rather than by reverting a step the change was told to run — it is expected
+// to be reconciled against the other concurrent bumps rather than trusted as
+// the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 152,
-  es: 152,
-  ca: 152,
+  de: 189,
+  es: 189,
+  ca: 189,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -1910,7 +1984,10 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
  * that used to live in the old list has not been lost with it: every one of those
  * components opens with its own comment saying why it is host-composed rather than
  * a recipe, which is where a reader looks for it. */
-export const RECORD_DETAIL_NOT: Record<string, string> = {}
+export const RECORD_DETAIL_NOT: Record<string, string> = {
+  "module-content":
+    "The RECIPE HOST, not a record detail. It is caught by the behavioural half of the census (it renders `<ActivityPanel>`, since 2026-09-03, so the recipe-driven details finally get the app's own empty/loading/error copy and an in-tab pager instead of the kit's hardcoded English and a pager hung under the whole screen). But it draws no tabs of its own: it hands recipes to `ScreenRenderer`, and the kit's `RecordDetail` draws the strip. So the bespoke half's demands — a literal `TabsView` and inline `{ value, badge }` tab objects — describe a shape this file correctly does not have. It is NOT unchecked: the SAME test's recipe half already holds it, by name, to one `withTabCounts(` per detail recipe it renders, which is R2/R8 for exactly these screens.",
+}
 
 /** R8 — reviewed bypasses: placement:"tab" sections that DON'T lead with a
  * collection, so they carry no count badge (and thus no countCacheKey). Each MUST
