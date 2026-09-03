@@ -88,6 +88,49 @@ describe("useRecordActivity", () => {
     expect(result.current.total).toBeUndefined()
     expect(formatCount(result.current.total)).toBe("")
     expect(result.current.rows).toEqual([])
+    // The exact defect this seam exists to stop: a feed with no rows yet — still
+    // loading — must not report the same shape as a record with a real, empty
+    // history. `loading` is the caller's only way to tell the two apart.
+    expect(result.current.loading).toBe(true)
+  })
+
+  // R6/ERROR-HANDLING — the audit's own defect: a still-loading record and a
+  // record whose activity fetch FAILED both used to look exactly like a record
+  // with no history at all, because neither state reached `ActivityPanel`.
+  it("clears loading and carries an empty rows array once the first page LANDS", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(2, 143))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    expect(result.current.loading).toBe(true)
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeFalsy()
+    expect(result.current.rows).toHaveLength(2)
+  })
+
+  it("surfaces the failure and stops loading when the door refuses — never silently empty", async () => {
+    const id = freshId()
+    const failure = new Error("boom")
+    recordActivity.mockRejectedValue(failure)
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    expect(result.current.loading).toBe(true)
+    // The failed request SETTLES `loading` to false — a `data === undefined`
+    // reading would stay stuck "loading" forever and bury the error behind an
+    // eternal spinner instead of ever showing it.
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe(failure)
+    // Still no rows — but this is the FAILED shape, not the empty-history one;
+    // `ActivityPanel` tells them apart by `error`, never by an empty `rows`.
+    expect(result.current.rows).toEqual([])
+  })
+
+  it("a genuinely empty history clears loading with no error — the real 'nothing happened' case", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(0, 0, null))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeFalsy()
+    expect(result.current.rows).toEqual([])
+    expect(result.current.total).toBe(0)
   })
 
   it("re-primes the total when the record changes — rows and badge can't drift apart", async () => {

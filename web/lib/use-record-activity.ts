@@ -86,6 +86,17 @@ export function useRecordActivity(
   /** The same rows, ready to hand straight to the library ActivityFeed. */
   items: ActivityFeedRow[]
   total: number | undefined
+  /** The first page is still in flight — `useCached`'s own `loading`, which
+   * goes false the moment that first request SETTLES, success or failure.
+   * Deliberately not "`rows` is empty" (a record can genuinely have no
+   * history) and not "`query.data` is `undefined`" either — that stays
+   * `undefined` forever on a failed first load, which would keep `loading`
+   * true and bury the error behind an eternal spinner instead of surfacing
+   * it. `ActivityPanel` forwards this straight to the kit's `ActivityFeed`
+   * `loading` prop: conflating any of these was the whole bug, a still-
+   * loading or failed feed drawing the same "No activity yet." as a feed
+   * that is genuinely empty. */
+  loading: boolean
   error: unknown
   listKey: string
   fetchPage: (cursor: string) => Promise<{ rows: ActivityItem[]; nextCursor: string | null }>
@@ -128,6 +139,7 @@ export function useRecordActivity(
       dateTime: a.createdAt,
     })),
     total: useCachedValue<number>(on ? `total:${key}` : null),
+    loading: query.loading,
     error: query.error,
     listKey: key,
     fetchPage: (cursor: string) =>

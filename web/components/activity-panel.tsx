@@ -37,7 +37,11 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 
 /** Structurally typed rather than importing the hook's return: the panel needs
- * three fields and no knowledge of how they were fetched. */
+ * these five fields and no knowledge of how they were fetched. `loading` and
+ * `error` ride alongside `items`/`listKey`/`fetchPage` so a feed that hasn't
+ * arrived yet or failed to arrive is never drawn as "No activity yet." — the
+ * kit's own `ActivityFeed` already knows how to draw all three states, they
+ * were simply never wired here. */
 export function ActivityPanel({
   activity,
   onAddNote,
@@ -45,6 +49,14 @@ export function ActivityPanel({
 }: {
   activity: {
     items: ActivityFeedRow[]
+    /** The first page has not arrived yet — distinct from an arrived, empty
+     * page. Forwarded straight to the kit's `ActivityFeed`, which draws its
+     * skeleton register instead of the empty one while this is true. */
+    loading?: boolean
+    /** The fetch failed. Forwarded straight to the kit's `ActivityFeed`, which
+     * draws its error register — and beats `loading`/empty either way, since a
+     * failed request has not come back, not come back empty. */
+    error?: unknown
     listKey: string
     fetchPage: (cursor: string) => Promise<{ rows: unknown[]; nextCursor: string | null }>
   }
@@ -62,6 +74,10 @@ export function ActivityPanel({
     <div className="flex flex-col gap-4">
       <ActivityFeed
         emptyLabel={t("No activity yet.")}
+        loading={activity.loading}
+        error={Boolean(activity.error)}
+        errorLabel={t("Couldn't load activity")}
+        errorBody={t("We couldn't load this record's activity. Try again in a moment.")}
         items={activity.items.map((a) => ({
           id: a.id,
           description: a.description,

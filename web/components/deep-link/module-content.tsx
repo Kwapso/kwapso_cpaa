@@ -44,10 +44,12 @@ import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bit
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { invalidate } from "@shared/web/store"
-import { LoadMore } from "@/components/load-more"
+import { ActivityPanel } from "@/components/activity-panel"
 import { tenancy } from "@/lib/api"
+import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import type { TaskView } from "@/lib/live-resources"
 import {
+  shapeActivity,
   shapeBrandDetail,
   shapeInviteDetail,
   shapeMemberDetail,
@@ -162,6 +164,7 @@ function internalDetail(
   const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
   if (!row) return <p className="text-muted-foreground text-sm">{ctx.t("That record no longer exists.")}</p>
   const data = spec.shape(row, ctx.internalActivity.rows, ctx.lang)
+  const internalActivity = ctx.internalActivity
   return (
     <div className="flex flex-col gap-6">
       <ScreenRenderer
@@ -170,13 +173,23 @@ function internalDetail(
         rights={ctx.rights}
         onAction={ctx.onAction}
         onIntent={ctx.onIntent}
-      />
-      {/* R14: the badge above counts the WHOLE history, so the feed under it
-          must be able to reach all of it. */}
-      <LoadMore
-        listKey={ctx.internalActivity.listKey}
-        label={ctx.t("Load more activity")}
-        fetchPage={ctx.internalActivity.fetchPage}
+        // R14: the badge above counts the WHOLE history, so the feed the
+        // engine draws for the `activity` block must be able to reach all of
+        // it — `ActivityPanel` carries its own in-tab pager over the same
+        // `internalActivity` the badge's total came from, rather than a
+        // sibling <LoadMore> under the whole screen (which also rendered
+        // under Overview — the bug this prop exists to retire).
+        renderActivity={() => (
+          <ActivityPanel
+            activity={{
+              items: internalActivity.items,
+              loading: internalActivity.loading,
+              error: internalActivity.error,
+              listKey: internalActivity.listKey,
+              fetchPage: internalActivity.fetchPage,
+            }}
+          />
+        )}
       />
     </div>
   )
@@ -289,15 +302,36 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       })
       return (
         <div className="flex flex-col gap-4">
-          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-          {/* R14: the team feed is the fastest-growing collection in the base —
-              every mutation writes a row — so it pages instead of stopping at 50. */}
-          <LoadMore
-            listKey={`activity:team:${teamId}`}
-            label={ctx.t("Load more activity")}
-            fetchPage={(c: string) =>
-              tenancy.activity("team", undefined, c).then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
-            }
+          <ScreenRenderer
+            recipe={recipe}
+            data={data}
+            rights={rights}
+            onAction={onAction}
+            onIntent={onIntent}
+            // R14: the team feed is the fastest-growing collection in the
+            // base — every mutation writes a row — so it pages instead of
+            // stopping at 50. `ActivityPanel` carries that pager INSIDE the
+            // Activity tab now; a sibling <LoadMore> here used to render
+            // under Overview too.
+            renderActivity={() => (
+              <ActivityPanel
+                activity={{
+                  items: shapeActivity(activityQ.data ?? [], lang) as ActivityFeedRow[],
+                  // `activityQ` is a `useCached` query — its own `loading`,
+                  // cleared in a `finally` on success OR failure. Not
+                  // `activityQ.data === undefined`, which never clears after
+                  // a failed first fetch and would hide the error forever
+                  // behind a permanent spinner.
+                  loading: activityQ.loading,
+                  error: activityQ.error,
+                  listKey: `activity:team:${teamId}`,
+                  fetchPage: (c: string) =>
+                    tenancy
+                      .activity("team", undefined, c)
+                      .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
+                }}
+              />
+            )}
           />
         </div>
       )
@@ -311,18 +345,26 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // Details ----------------------------------------------------------------
     // R14: a member's / an invite's history is the same ever-growing feed, sliced
     // — and the Activity tab badges its EXACT total (R16), so the feed under the
-    // badge must be able to reach the rest of it. The recipe renders the tabs, so
-    // this sits below the screen (like the team feed above); it disappears on its
-    // own when there is no next page. Same key the detail's page one primed.
-    const activityMore = (
-      <LoadMore
-        listKey={activityKey as string}
-        label={ctx.t("Load more activity")}
-        fetchPage={(c: string) =>
-          tenancy
-            .activity(activityScope ?? "team", recordId ?? undefined, c)
-            .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
-        }
+    // badge must be able to reach the rest of it. `ActivityPanel` carries that
+    // pager INSIDE the Activity tab the recipe renders (via `renderActivity`),
+    // rather than a sibling under the whole screen — which also rendered under
+    // Overview. Same key the detail's page one primed.
+    const renderActivityTab = (_source: string) => (
+      <ActivityPanel
+        activity={{
+          items: shapeActivity(activityQ.data ?? [], lang) as ActivityFeedRow[],
+          // `activityQ` is a `useCached` query — use ITS `loading`, cleared in
+          // a `finally` either way, not `activityQ.data === undefined` (which
+          // never clears after a failed first fetch and hides the error
+          // behind a permanent spinner).
+          loading: activityQ.loading,
+          error: activityQ.error,
+          listKey: activityKey as string,
+          fetchPage: (c: string) =>
+            tenancy
+              .activity(activityScope ?? "team", recordId ?? undefined, c)
+              .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
+        }}
       />
     )
     if (module === "members") {
@@ -339,8 +381,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       const data = shapeMemberDetail(member, activityQ.data ?? [], lang)
       return (
         <div className="flex flex-col gap-4">
-          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-          {activityMore}
+          <ScreenRenderer
+            recipe={recipe}
+            data={data}
+            rights={rights}
+            onAction={onAction}
+            onIntent={onIntent}
+            renderActivity={renderActivityTab}
+          />
           {/* THE PERSON BEHIND THE MEMBER ROW — the owner's ruling, literally:
               a profile and the certificates somebody holds go on their own page.
               Gated on `staff_profiles`, so a role without that read right sees
@@ -363,8 +411,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [], lang)
       return (
         <div className="flex flex-col gap-4">
-          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-          {activityMore}
+          <ScreenRenderer
+            recipe={recipe}
+            data={data}
+            rights={rights}
+            onAction={onAction}
+            onIntent={onIntent}
+            renderActivity={renderActivityTab}
+          />
         </div>
       )
     }
