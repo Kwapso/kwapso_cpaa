@@ -338,8 +338,21 @@ export type FolderTabStrip = {
  * `<Tabs>` is its direct child, so the sticky declaration lands one level up,
  * on `<Tabs>`, giving the browser that ancestor's real height to stick
  * within. */
+/* THE STRIP PAINTS THE CARD'S OWN SURFACE, NOT THE PAGE GROUND — client
+   screenshot, dark mode, 2026-09-03: "fix the toolbar in dark mode", a
+   collection screen whose tab strip drew a near-black band across a card that
+   is a full step lighter. This read `bg-background`, which was indistinguishable
+   from `--surface-raised` in light (both `--kw-off-beige`) and is a genuinely
+   different colour in dark since today's spine work split them
+   (`--kw-unlit-page` #141310 vs `--kw-unlit-raised` #26241F). The strip sits
+   ON the card, and its whole job while pinned is to occlude the rows scrolling
+   under it — so it has to be the card's own surface or it reads as a hole
+   punched in one. Third instance of this exact token confusion today (the
+   assistant panel and the toolbar/collection containers were the first two);
+   `--tab-content-gap` is padding on this same box, so the gap below the tabs
+   takes the corrected colour with it. */
 export const STICKY_FOLDER_TABS =
-  "bg-background sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
+  "bg-[var(--surface-raised)] sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place

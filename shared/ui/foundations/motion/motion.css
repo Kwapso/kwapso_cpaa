@@ -821,22 +821,34 @@
    The one pointer-following flourish in the system (1 direct call site,
    `CursorGlow`, mounted once by `ScreenShell`'s ground).
 
-   ONLY THE SIZE IS HERE. The glow's POSITION is written straight to
-   `transform` from a `mousemove` handler, every event, with no transition at
-   all — travel that is pointer-driven and therefore has no duration, exactly
-   the third exception §REDUCED MOTION names above. Animating position here
-   would fight that handler on every frame. What DOES take a duration is the
-   size pulse between "the pointer is moving" and "the pointer is idle": the
-   component swaps a Tailwind size utility on a 150ms timer, and this class is
-   the one line that turns that swap into a settle rather than a jump.
+   POSITION TAKES A DURATION TOO, SINCE 2026-09-03 — CLIENT RULING, "i want
+   that it has a more 'smooth' movement", which overturns this section's own
+   first answer. That answer was: position is written straight to `transform`
+   from a `mousemove` handler on every event, so it is pointer-driven travel
+   with no duration of its own (the third exception §REDUCED MOTION names
+   above), and a transition would "fight that handler on every frame."
 
-   `--duration-settle` is "something travelling a real on-screen distance and
-   coming to rest" (tokens.css) — a size easing back to its resting value on
-   an idle pointer is exactly that, read as a settle rather than a move.
+   THE PREMISE WAS WRONG, and it is worth saying why rather than just
+   deleting it. A transition on `transform` does not fight a per-event write
+   — it CHASES it: each new value restarts the ease toward the newest pointer
+   position, so the orb trails the cursor by roughly one duration instead of
+   being pinned to it. That trailing lag IS the smoothness she is asking for,
+   and it is exactly what the reference she supplied did (`transition-all
+   duration-300 ease-out`, covering position). The handler still writes every
+   event; the compositor still owns the interpolation.
+
+   ONE TOKEN FOR BOTH, deliberately: `--duration-settle` (280ms) is
+   "something travelling a real on-screen distance and coming to rest"
+   (tokens.css), which describes the trailing orb as exactly as it describes
+   the size easing back on an idle pointer. Running position and size on the
+   same duration and the same curve keeps the two halves of one flourish in
+   step — a glow that grew on a different clock than it moved would read as
+   two effects.
    ========================================================================= */
 
 .motion-cursor-glow {
   transition:
+    transform var(--duration-settle) var(--ease-move),
     width var(--duration-settle) var(--ease-move),
     height var(--duration-settle) var(--ease-move);
 }

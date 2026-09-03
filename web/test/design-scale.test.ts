@@ -131,7 +131,7 @@ describe("the tab-to-content gap", () => {
     expect(
       read("web/components/record-chrome.tsx"),
       "STICKY_TABS must spend --record-tab-gap on the pinned tablist's OWN border box, not as a flex gap between it and its TabsContent sibling — a gap between two siblings is never painted and stops meaning anything once the strip pins on scroll"
-    ).toContain("[border-bottom:var(--record-tab-gap)_solid_var(--background)]")
+    ).toContain("[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)]")
 
     expect(
       read("web/components/record-chrome.tsx"),

@@ -1444,11 +1444,19 @@ const PANEL_BELOW_TABS =
  * per-tab stretch — the mechanism `BreadcrumbFolders` was reverted away from
  * the same day; that reversal is untouched and does not apply here, this is
  * a different component with a different problem. */
+/* THE SAME DARK-MODE CORRECTION `STICKY_FOLDER_TABS` TOOK (tabs-view.tsx,
+ * 2026-09-03): both the strip's own fill and the border standing in for the
+ * gap below it read `--background`, the PAGE ground, where they need the
+ * CARD's own `--surface-raised`. Identical in light (both `--kw-off-beige`),
+ * a visible step apart in dark since today's spine work (`--kw-unlit-page`
+ * #141310 vs `--kw-unlit-raised` #26241F). The client reported it on a
+ * collection screen; this is the detail screen's own copy of the same strip,
+ * fixed in the same pass rather than left to be reported a second time. */
 export const STICKY_TABS =
-  "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
+  "[&>[role=tablist]]:bg-[var(--surface-raised)] [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
   "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
-  "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--background)] " +
+  "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +
   "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   "gap-[var(--space-6)] " +
   "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +

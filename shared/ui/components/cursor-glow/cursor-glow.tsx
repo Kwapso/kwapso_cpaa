@@ -190,9 +190,14 @@ const CursorGlow = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
           data-slot="cursor-glow-orb"
           className={cn(
             "motion-cursor-glow fixed left-0 top-0 rounded-pill",
-            // 220px / 280px in the reference, converted to rem against this
-            // kit's 16px reference (ruling 28) rather than kept as px.
-            isMoving ? "size-[13.75rem]" : "size-[17.5rem]",
+            // DOUBLED, 2026-09-03 — client ruling, "make it double as big as
+            // it currently is". The reference's own 220px / 280px (converted
+            // to rem against this kit's 16px reference, ruling 28) read as
+            // 13.75rem / 17.5rem and were too small to register as a light
+            // source on a full-width ground; 27.5rem / 35rem is exactly twice
+            // each, kept as a doubling rather than re-derived so the
+            // moving-vs-idle ratio the reference chose survives intact.
+            isMoving ? "size-[27.5rem]" : "size-[35rem]",
           )}
           style={{
             background:
