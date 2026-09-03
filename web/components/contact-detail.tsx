@@ -105,6 +105,14 @@ export function ContactDetailScreen({
   const { account, parent, companies, portalUsers } = detail
   const accountId = account.id
 
+  // THIS RECORD'S OWN ADDRESS, not the section it was reached through — see
+  // app-detail.tsx's identical `host` for why: a ticket or a meeting opened
+  // from a tab on this contact must nest UNDER them (`.../accounts/<id>/
+  // tickets/<id>`), never bounce out to the flat top-level form. Handed to
+  // both tab panels below instead of the raw `basePath` they used to rebuild
+  // a flat base from.
+  const host = { base: `${basePath}/${accountId}` }
+
   const activity = useRecordActivity("accounts", accountId)
   // A READ OF PAGE ONE STOOD HERE, for the parent picker and the statuses in
   // use. The statuses went with the column (0042) and the picker gets its own
@@ -557,10 +565,10 @@ export function ContactDetailScreen({
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
 
           if (tabItem.value === "tickets")
-            return <ContactTicketsPanel accountId={accountId} basePath={basePath} />
+            return <ContactTicketsPanel accountId={accountId} host={host} />
 
           if (tabItem.value === "meetings")
-            return <ContactMeetingsPanel accountId={accountId} basePath={basePath} />
+            return <ContactMeetingsPanel accountId={accountId} host={host} />
 
           if (tabItem.value === "activity")
             return (

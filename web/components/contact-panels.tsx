@@ -33,7 +33,7 @@ import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { formatDate } from "@shared/web/format"
 import { softNavigate } from "@/lib/nav"
 import { totalKey } from "@/lib/live-resources"
-import { sliceKey } from "@/components/work-panels"
+import { sliceKey, type PanelHost } from "@/components/work-panels"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
@@ -134,6 +134,8 @@ export function CompaniesPanel({
     <div className="flex flex-col">
       {companies.length > 1 && (
         <ToolbarRow
+          // Reached only past the `companies.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
@@ -194,10 +196,19 @@ export function CompaniesPanel({
  * record, and the whole collection has its own screen with its own paging. */
 export function ContactTicketsPanel({
   accountId,
-  basePath,
+  host,
 }: {
   accountId: string
-  basePath: string
+  /** THIS PERSON'S OWN ADDRESS (`${sectionPath}/${accountId}`) — never the flat
+   * `/tickets` base. A ticket raised for them opens NESTED under their own
+   * record, exactly like an app's own Tickets tab (work-panels.tsx's
+   * `AppTicketsPanel`): the trail is built from `route.levels`
+   * (deep-link/route.ts's `trailPath`), which can only reflect what the URL
+   * actually encodes, so a flat address here would mean "who this ticket was
+   * raised for" is silently dropped the moment somebody opens it — the same
+   * bug the owner reported on 24 Aug 2026 for Accounts → Apps → Sprints,
+   * still uncorrected on this sibling panel until now. */
+  host: PanelHost
 }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = React.useState("")
@@ -229,9 +240,14 @@ export function ContactTicketsPanel({
         description={t("Every ticket about them will show here once one is raised.")}
       />
     )
-  // Tickets live at their own top-level URL; the account list's base is the
-  // sibling form we arrived through, so the section swap keeps the same shape.
-  const ticketsBase = basePath.replace(/\/accounts$/, "/tickets")
+  // NEST, DON'T REPLACE (deep-link/route.ts) — a ticket opened from here stays
+  // inside the person it was raised for, exactly like `AppTicketsPanel`'s own
+  // tickets. This used to rebuild a flat `/tickets` base off the SECTION path
+  // (`basePath.replace(/\/accounts$/, "/tickets")`), which is the section
+  // swap the 24 Aug fix retired everywhere else: it never carried the
+  // contact's own id in the first place, so the base it swapped from was
+  // already the wrong shape to nest under.
+  const ticketsBase = `${host.base}/tickets`
   // THE STATUS OPTIONS ARE DERIVED FROM WHAT'S ON SCREEN, never a hard-coded
   // enum — the same rule `FilterFacet.options` follows when a caller leaves
   // them off (config.ts: "the distinct values are derived from the data").
@@ -250,6 +266,8 @@ export function ContactTicketsPanel({
     <div className="flex flex-col">
       {(q.data.length > 1 || statuses.length > 1) && (
         <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
@@ -302,10 +320,12 @@ export function ContactTicketsPanel({
  * shape as the tickets above, and the same reason for page one only. */
 export function ContactMeetingsPanel({
   accountId,
-  basePath,
+  host,
 }: {
   accountId: string
-  basePath: string
+  /** See `ContactTicketsPanel`'s own note — the same nested-address fix, on
+   * the sibling panel that had the identical bug. */
+  host: PanelHost
 }) {
   const { t, lang } = useLanguage()
   const [query, setQuery] = React.useState("")
@@ -337,7 +357,9 @@ export function ContactMeetingsPanel({
         description={t("Every meeting they're in will show here once one is arranged.")}
       />
     )
-  const meetingsBase = basePath.replace(/\/accounts$/, "/meetings")
+  // NEST, DON'T REPLACE — see `ContactTicketsPanel`'s own note above, the same
+  // fix on the sibling panel.
+  const meetingsBase = `${host.base}/meetings`
   const needle = query.trim().toLowerCase()
   const dirMul = sort.dir === "desc" ? -1 : 1
   const shown = q.data
@@ -352,6 +374,8 @@ export function ContactMeetingsPanel({
     <div className="flex flex-col">
       {q.data.length > 1 && (
         <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
           search={
             <>
               <SearchInput
