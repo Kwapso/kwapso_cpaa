@@ -214,6 +214,21 @@ const PANEL_SURFACE =
  * just repointed at beige — the same value by a name that is still true here. */
 const PANEL_COLUMN = "h-full w-full rounded-[var(--radius)] shadow-[var(--shadow-lifted)]"
 
+/** THE DOCKED PANEL'S OWN LEADING CORNER, SQUARED. Client, 2026-09-03:
+ * "Assistante (the name) should be a folder tab, like the breadcrumbs - then
+ * the full container for the assistant would be aligned with the main one."
+ * `screen-shell.tsx` now draws that tab (`asideLabel`, through
+ * `BreadcrumbFolders`) directly above this column, the SAME way the content
+ * card's own trail sits above IT — so this panel needs the SAME "one corner
+ * given up for the joint" move `CARD_JOINED` makes there, for the identical
+ * reason: the tab's silhouette is a fixed SVG path (`folder.tsx`) that may
+ * not be edited, and a plain CSS radius is this file's own to remove.
+ * `rounded-ss-none`, not `-tl-`, so it mirrors with the tab in RTL for free —
+ * R31 by the letter (zero is the absence of a radius, not a third one; see
+ * `RADIUS_EXCEPTION["rounded-ss-none"]`). DOCKED ONLY: the floating popover
+ * draws no tab above it and keeps all four corners, exactly as before. */
+const PANEL_COLUMN_DOCKED = cn(PANEL_COLUMN, "rounded-ss-none")
+
 function PanelFrame({ docked, children }: { docked: boolean; children: React.ReactNode }) {
   const dock = useAgentDock()
 
@@ -225,7 +240,7 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
     // thing: there is nowhere to draw, so nothing is drawn. The panel itself
     // stays mounted above, so the thread and the live run are not lost.
     if (!dock) return null
-    return createPortal(<div className={cn(PANEL_SURFACE, PANEL_COLUMN)}>{children}</div>, dock)
+    return createPortal(<div className={cn(PANEL_SURFACE, PANEL_COLUMN_DOCKED)}>{children}</div>, dock)
   }
 
   return (
@@ -469,7 +484,23 @@ export function AgentPanel({
             row would double up with this header block's own
             `shadow-[var(--hairline-under)]` underneath the quota badge.
             `size="h4"` — the "band inside a panel" step (20px), not `h2`'s
-            32px page-section size; this is a popover, not a page. */}
+            32px page-section size; this is a popover, not a page.
+
+            THE VISIBLE HEADING TEXT IS DOCKED-ONLY NOW. Client, 2026-09-03:
+            "Assistante (the name) should be a folder tab, like the
+            breadcrumbs - then the full container for the assistant would be
+            aligned with the main one." — so on a wide screen the word
+            "Assistant" moved OUT of this row and onto the folder tab
+            `screen-shell.tsx` now draws above the whole column
+            (`asideLabel`, through `BreadcrumbFolders`); saying it again here
+            would be the same word twice, stacked. The heading stays — an
+            `sr-only` span, not a removed element — because this row still
+            needs an accessible name for its own action buttons' landmark and
+            a docked screen reader shouldn't hear NOTHING where a heading was.
+            THE POPOVER KEEPS THE VISIBLE WORD: the floating panel (narrow
+            screens) draws no tab above it — there is nothing beside it to
+            align with — so its own heading is still the only place the name
+            is said, exactly as it always was. */}
         <Title
           as="h2"
           size="h4"
@@ -509,7 +540,7 @@ export function AgentPanel({
             </>
           }
         >
-          {t("Assistant")}
+          {docked ? <span className="sr-only">{t("Assistant")}</span> : t("Assistant")}
         </Title>
         {/* ITEM 6 — "remove the subtitle... for space purposes". Gone outright
             (not hidden): the vertical room it held goes to the now much

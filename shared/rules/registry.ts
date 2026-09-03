@@ -942,6 +942,8 @@ export const GLOSSARY_SYNONYM_OK: Record<string, string> = {}
 export const RADIUS_EXCEPTION: Record<string, string> = {
   "rounded-select":
     "6px, on the mark of a selection control — the checkbox. It is the one place a third number is unavoidable rather than convenient: at `rounded-xl` a 16px checkbox is a lozenge, and at `rounded-full` it is a radio button, so the two-radius vocabulary cannot express 'a square box with softened corners' at this size. Fixed at 0.375rem rather than derived from `--radius`, because it is not a smaller box — it is a different shape doing a different job.",
+  "rounded-ss-none":
+    "Not a third number — zero, on the single corner where the assistant's own folder tab attaches. `web/components/agent-panel.tsx`'s docked panel (`PANEL_COLUMN`) keeps `--radius` on all four corners and then REMOVES one of them, exactly the argument the kit's own `screen-shell.tsx` already makes for its content card's leading corner (`CARD_JOINED`, out of this file's scope because that surface is vendored): the tab's silhouette is a fixed SVG path that may not be edited, so the object it joins gives its corner up instead, and a plain CSS radius is the app's own to remove. Start-start rather than top-left so it mirrors with the tab in RTL for free. Applied ONLY when the panel is docked (the tab is only drawn there — the floating popover keeps all four corners); squaring a second corner, or this one on a surface with no tab above it, would be a different change and is not this one.",
 }
 
 /** THE VENDORED COMPONENT LIBRARY — the one directory in `shared/` that is not

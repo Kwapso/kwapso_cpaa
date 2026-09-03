@@ -722,6 +722,7 @@
 import * as React from "react";
 
 import { Badge } from "../../components/badge/badge";
+import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
 import { Title } from "../../components/title/title";
 import { Text } from "../../components/typography/typography";
@@ -1370,13 +1371,34 @@ const BODY = cn(
 const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
 
 /* ----------------------------------------------------------------------------
-   THE ASIDE COLUMN — the rail's mirror, and equally flat.
+   THE ASIDE COLUMN — the rail's mirror, split in two the same way the
+   content column already is (breadcrumb, then card).
 
-   Its own inset rather than the rail's, under its own name, because the two
-   are not the same region and a shared `--rail-inset` inside an assistant
-   column would be a name lying about where it is.
-   -------------------------------------------------------------------------- */
-const ASIDE_COLUMN = cn("p-[var(--aside-inset)]");
+   CLIENT, 2026-09-03: "Assistant (the name) should be a folder tab, like the
+   breadcrumbs — then the full container for the assistant would be aligned
+   with the main one." Before this the whole column was one padded box
+   (`p-[var(--aside-inset)]` on every side) with the caller's panel dropped
+   straight in — no furniture of its own, which is why it never lined up with
+   the content column: `--aside-inset` and `--shell-gutter` are the SAME
+   token at every density (see `DENSITY_ASIDE`/`DENSITY_GUTTER` below), but
+   the content column spends its copy as `py` on the COLUMN itself, one level
+   above the breadcrumb, while the aside used to spend its copy as `p` one
+   level BELOW the dock — so the aside's panel sat a whole tab's height
+   higher than the card, before either column ever grew a tab.
+
+   TWO REGIONS NOW, so the tab can own the top edge the way the breadcrumb
+   does: `ASIDE_TAB` pays the inline sides and the block-start only — no
+   block-end, because the tab strip owns its own overlap
+   (`--folder-tab-overlap`) exactly as `screen-shell-breadcrumb` above does —
+   and `ASIDE_BODY` pays the sides and the block-end, no block-start, because
+   the strip's negative margin already closes that gap. Split this way, the
+   two columns' tabs start at the same measured y (both are `--shell-gutter`
+   /`--aside-inset` below the row they share) and the two containers start at
+   the same y below them (both `tab height − overlap` further down) — proven
+   in `verify/shell-chat/` (`asideTab`/`asideBody` rects against
+   `breadcrumb`/`card`). */
+const ASIDE_TAB = cn("px-[var(--aside-inset)] pt-[var(--aside-inset)]");
+const ASIDE_BODY = cn("px-[var(--aside-inset)] pb-[var(--aside-inset)]");
 
 /** How much air each door spends. Structure is identical; only the inset moves. */
 const DENSITY_RAIL: Record<ScreenDensity, string> = {
@@ -2060,12 +2082,30 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 data-slot="screen-shell-aside"
                 data-level="aside"
                 aria-label={asideLabel}
-                className={cn(
-                  "flex w-[23.75rem] min-h-0 max-w-[40vw] flex-none flex-col overflow-y-auto",
-                  ASIDE_COLUMN,
-                )}
+                className="flex w-[23.75rem] min-h-0 max-w-[40vw] flex-none flex-col overflow-y-auto"
               >
-                {aside}
+                {/* THE TAB — `asideLabel` drawn as ONE folder tab, through the
+                    same component the content trail uses rather than a second
+                    drawing of the shape: a single, non-interactive crumb is
+                    exactly `BreadcrumbFolders`' own "one tab, nothing to its
+                    left" state (its TEN STATES #1), so nothing about that
+                    component changes for this call site. `label` reuses
+                    `asideLabel` too — the landmark's name is the same word
+                    the tab shows, not a second string to translate.
+
+                    UNPADDED AT THE BLOCK-END, same reasoning as
+                    `screen-shell-breadcrumb`: the strip's own negative margin
+                    (`--folder-tab-overlap`) is the whole attachment mechanic,
+                    so padding here would be subtracted from it. */}
+                <div data-slot="screen-shell-aside-tab" className={cn("min-w-0 shrink-0", ASIDE_TAB)}>
+                  <BreadcrumbFolders items={[{ label: asideLabel }]} label={asideLabel} />
+                </div>
+                {/* THE PANEL'S OWN SLOT. Still "paper on the ground, painting
+                    nothing" — the caller's node fills this exactly as it
+                    filled the old single wrapper; only the padding moved. */}
+                <div data-slot="screen-shell-aside-body" className={cn("min-h-0 flex-1", ASIDE_BODY)}>
+                  {aside}
+                </div>
               </div>
             ) : null}
             <EdgeHandle
