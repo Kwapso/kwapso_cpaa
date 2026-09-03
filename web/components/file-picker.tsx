@@ -38,6 +38,12 @@ import { useT } from "@shared/web/language"
  * who picked a 400 MB video is told before they spend two minutes uploading it. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
+/** The cap, said the way a person says it — binary, an exact multiple of
+ * 1024×1024, so this is always a whole number ("25 MB"). Both sentences below
+ * read their number off this one constant rather than typing "25 MB" twice,
+ * which is how a cap and its own copy drift apart. */
+const MAX_UPLOAD_LABEL = `${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB`
+
 export function FilePicker({
   id,
   value,
@@ -68,7 +74,7 @@ export function FilePicker({
     e.target.value = "" // let the same file be re-picked after a remove
     if (!file) return
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(t("That file is over 25 MB, please pick a smaller one."))
+      toast.error(t("That file is over {limit}, please pick a smaller one.", { limit: MAX_UPLOAD_LABEL }))
       return
     }
     setUploading(true)
@@ -125,7 +131,7 @@ export function FilePicker({
         {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
         {uploading ? t("Uploading…") : t("Choose a file")}
       </Button>
-      <span className="text-muted-foreground text-xs">{t("Up to 25 MB.")}</span>
+      <span className="text-muted-foreground text-xs">{t("Up to {limit}.", { limit: MAX_UPLOAD_LABEL })}</span>
     </div>
   )
 }

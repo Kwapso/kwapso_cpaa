@@ -104,7 +104,8 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { formatDate } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
 
 
@@ -121,7 +122,7 @@ export function ProcessDetailScreen({
   teamId: string
   processId: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // WHICH VERSION IS BEING READ. `null` is "the current one", which is what the
   // record cache holds and what every live ping is about — so the default costs
   // no extra read and stays row-level live. Choosing an older one reads a slice
@@ -705,7 +706,7 @@ export function ProcessDetailScreen({
                           )}
                         </span>
                         <span className="text-muted-foreground block text-xs">
-                          {new Date(v.createdAt).toLocaleDateString()}
+                          {formatDate(v.createdAt, lang)}
                           {v.createdByName ? ` · ${v.createdByName}` : ""}
                         </span>
                       </span>
@@ -721,9 +722,21 @@ export function ProcessDetailScreen({
               <Comments
                 items={(commentsQ.data?.comments ?? []).map((c) => ({
                   id: c.id,
-                  author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-                  body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
-                  timestamp: new Date(c.createdAt).toLocaleDateString(),
+                  // THREE SENTENCES THAT SHIPPED IN ENGLISH TO EVERY READER,
+                  // on BOTH front doors — this map and the client portal's own
+                  // (web-portal/components/impact-screen.tsx) are a three-line
+                  // clone of each other, and all three strings were bare
+                  // literals in both. R28/R33 missed them because they sit in
+                  // an object-literal property position rather than one of the
+                  // seven the extractor's walk reads. The "why" line takes a
+                  // named hole rather than gluing a translated fragment onto
+                  // `c.body`: a fragment plus a value is the one shape a
+                  // translator cannot reorder.
+                  author: c.createdByName ?? (c.fromStaff ? t("Your team") : t("A colleague")),
+                  body: c.explainsStepKey
+                    ? t("Why a step takes longer, {reason}", { reason: c.body })
+                    : c.body,
+                  timestamp: formatDate(c.createdAt, lang),
                 }))}
                 composer="inline"
                 onSend={

@@ -78,11 +78,19 @@ function isFollowable(url: string): boolean {
   return safeHref(url) !== undefined
 }
 
-/** Bytes, said the way a person says them. */
+/** Bytes, said the way a person says them. BINARY (1024), because that is the
+ * base `TICKET_FILE_MAX_BYTES` itself is defined in — so a file's listed size
+ * and the number the refusal below quotes, both read off this one function,
+ * can never disagree the way a decimal KB and a binary "10MB" typed into copy
+ * once did. */
 function spellSize(bytes: number | null): string {
   if (!bytes) return ""
   return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+/** The cap itself, said the same way — `TICKET_FILE_MAX_BYTES` is an exact
+ * binary multiple, so this is always a whole number ("10 MB"), never "10.0". */
+const MAX_SIZE_LABEL = `${Math.round(TICKET_FILE_MAX_BYTES / 1024 / 1024)} MB`
 
 export function StoryAttachmentsPanel({
   storyId,
@@ -156,7 +164,7 @@ export function StoryAttachmentsPanel({
     // Checked here as well as at the door: a 10MB upload that fails after the
     // whole file has been read and base64'd is a minute of somebody's morning.
     if (file.size > TICKET_FILE_MAX_BYTES) {
-      toast.error(t("That file is too big. The limit is 10MB."))
+      toast.error(t("That file is too big. The limit is {limit}.", { limit: MAX_SIZE_LABEL }))
       return null
     }
     // THE READ IS INSIDE ITS OWN TRY, not folded into `run`'s. A file the browser

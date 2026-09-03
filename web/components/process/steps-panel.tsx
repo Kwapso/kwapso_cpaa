@@ -37,11 +37,12 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
+import { useLanguage } from "@shared/web/language"
+import { formatDate } from "@shared/web/format"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ProcessSaving } from "@shared/workers/savings"
 import { tenancy } from "@/lib/api"
-import { useT } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import type {
   ProcessDetail,
@@ -138,7 +139,7 @@ export function StepsPanel({
   run: (what: () => Promise<unknown>, done: string, fallback: string) => Promise<boolean>
   refresh: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // OWNED HERE, because nothing outside this panel reads it: which of the three
   // ways to look at the steps is showing. It was host state only because the
   // block used to live there.
@@ -235,10 +236,14 @@ export function StepsPanel({
           not the lock. */}
       {!isCurrent && (
         <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] p-3 text-xs">
-          {t("This is how the work was described when")}{" "}
-          {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
-          {t("was cut")}
-          {shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.{" "}
+          {shownVersion
+            ? t("This is how the work was described when {version} was cut on {date}.", {
+                version: versionLabel(shownVersion).toLowerCase(),
+                date: formatDate(shownVersion.createdAt, lang),
+              })
+            : t("This is how the work was described when {version} was cut.", {
+                version: t("this version"),
+              })}{" "}
           {t("Older versions can be read but never edited, every saving is a subtraction from them, so they stay exactly as they were agreed.")}
         </p>
       )}
