@@ -474,78 +474,139 @@
         level, which IS the arrangement here. It draws no control, no rail
         content and no header content: all three arrive as nodes. THE ONE
         EXCEPTION, ADMITTED 2026-09-02, IS THE EDGE HANDLE — see its own
-        section below for why a 3px bar had to be drawn here and could not be
-        a node.
+        section below for why a round button had to be drawn here and could
+        not be a node.
      3. PUTTING IT IN A ROUTE WOULD DUPLICATE IT ~40 TIMES. The instruction
         was explicit — do not duplicate the body pane into every route. There
         is exactly one place the four levels are written down, and this is it.
 
    ─────────────────────────────────────────────────────────────────────────
-   THE EDGE HANDLES — CLIENT-APPROVED 2026-09-02, AND PRECISE
+   THE EDGE HANDLES — CLIENT-APPROVED 2026-09-02, RESKINNED 2026-09-03
    ─────────────────────────────────────────────────────────────────────────
    Both flat columns collapse, by the same control, mirrored across the card.
+   THE TOGGLE ITSELF DID NOT CHANGE ON 2026-09-03 — one button, one
+   `onClick`, both directions, `aria-expanded` and `data-state` exactly as
+   2026-09-02 left them. Owner, verbatim, on the bar this section used to
+   describe: "i don't like the vertical line we did to open close assistant
+   and navbar... return the floating round yellow button for opening the
+   assistant / return the round button to close/open the navbar / make them
+   same size and exact same height position, kinda symmetric." That is a
+   RESKIN — a shape and a fill, not a second control and not a new direction
+   of travel — read against her own reference for the shape: the assistant's
+   OWN mobile launcher (`web/components/agent-host.tsx`'s `PopoverTrigger`)
+   and this kit's OWN `copilot-overlay.tsx`, which already draws the identical
+   mark — `Button variant="default" size="icon"` at `shadow-lg`, `Sparkle`
+   inside a 40 mango well. This handle borrows that fill and that elevation,
+   not that component: `size="icon"` is `--control-height-button` (2.5rem),
+   a REM token, and the ADR two paragraphs down is what stops this control
+   from ever being sized off one.
 
-   IT IS A 3px x 34px ROUNDED BAR AND THERE IS NO CHEVRON. A glyph does not
-   fit in three pixels and was not wanted; the affordance is carried entirely
-   by WHERE THE BAR IS:
+   THE POSITION IS UNCHANGED AND STILL CARRIES THE WHOLE AFFORDANCE. A glyph
+   could not fit on a 3px bar; it fits fine on a circle, so the button now
+   ALSO carries a directional icon (see below) — but WHERE IT STANDS still
+   says which way it is about to move, and that has not stopped being true:
 
-       OPEN → the bar is at the column's OUTER RIM.
-       SHUT → the bar is at the column's INNER EDGE.
+       OPEN → the button is at the column's OUTER RIM.
+       SHUT → the button is at the column's INNER EDGE.
 
-   So the bar always sits on the side the column is about to travel toward,
-   and it says which way it will go by standing there. That is the whole
-   mechanism; nothing else on the handle carries meaning.
+   So the button always sits on the side the column is about to travel
+   toward, exactly as the bar did, with a caret now saying the same thing a
+   second way for the one edge (the rail) that already had a glyph for it.
 
-   THE COLOUR IS `--spine-ink` AND IT MAY NEVER BE A FIXED CHARCOAL. Measured,
-   because this is the one value on the handle that can make it disappear: a
-   literal charcoal #1A1918 on what was the quiet spine's DARK ground #1C1B18
-   (now ink-dark's) measured **1.02** — an invisible control. `--spine-ink`
-   itself never comes near that: it is off-beige on ink in both palettes,
-   `--foreground` on paper (charcoal light, off-beige dark) and charcoal on
-   mango, measured against each spine's own ground on all six:
+   THE FILL IS `--btn-primary-fill` / `--btn-primary-label`, NOT `--spine-ink`.
+   The bar's whole colour argument was about staying legible while being
+   nearly INVISIBLE — a hairline that had to hold contrast against six
+   different grounds because it never draws attention to itself, it only
+   avoids disappearing into them. A filled mango circle does not have that
+   problem: it is meant to be seen, on every ground, the way `Button`'s own
+   default variant already is everywhere else in the kit. So it takes the
+   SAME two tokens `Button` does — already contrast-proved there, already the
+   one brand fill chapter 19 draws for the assistant specifically — rather
+   than re-deriving a second contrast case for a colour this file no longer
+   uses. (The six-ground `--spine-ink` measurements stayed in this file
+   because the CARD section's dark-mode note, further down, still cites them
+   for its own shadow argument — they describe the spine's ink now, not this
+   handle.)
 
-       INK · LIGHT    17.386   INK · DARK    17.056
-       PAPER · LIGHT  15.763   PAPER · DARK  13.621
-       MANGO (both palettes)   12.072
+   THE HIT AREA AND THE PAINTED SHAPE ARE THE SAME BOX NOW. The bar's button
+   was a 20 x 44 INVISIBLE target with a 3px bar floating inside it — the
+   button had to be bigger than the thing it drew, because a 3px line is not
+   a target. A 32px circle IS the target: nothing is invisible any more, so
+   there is no separate hit area to keep in step with a separately-drawn
+   mark. THE FOCUS RING LANDS ON THIS SAME BOX, exactly as it did on the old
+   20 x 44 pill (tokens.css §8 rings every control on its own box) — and
+   because the box is a true circle now (`rounded-pill` at equal width and
+   height) the ring reads as a circle instead of the stadium shape the old
+   asymmetric hit area gave it.
 
-   The same token every nav label in the rail already takes, for the same
-   reason.
+   WHY 32, NOT `Button`'s OWN 40 (`--control-height-button`, 2.5rem). The bar
+   section argued this in px for a reason that has not gone away: ruling 28
+   authors against a 16px reference, tokens.css §1 sets the real root to 15px
+   (ruling 18), and `data-scale` moves it again — 13 at small, 17 at large —
+   so a rem token that reads "40" in this file's own source can render as
+   little as 32.5px on a reader who has turned the type scale down, which is
+   exactly the reader WCAG 2.5.5's target-size minimum exists to protect. So
+   this button keeps the bar's OWN departure from ruling 28's rem ladder: a
+   LITERAL 32px, in both dimensions, that does not move with the scale.  32
+   over 44 (the bar's old hit-height) because the circle is now the visible
+   mark and not a hit area wrapping one: the rail's own `--rail-inset`
+   padding is 18.75–24px depending on density, and a 44px circle flush to the
+   column's outer rim would print mango over the leading edge of whatever
+   nav row sits at the vertical centre — the exact "never covers a row"
+   guarantee the bar section stated for its own 20px width. 32 keeps that
+   guarantee in the common case and trims the worst case (calm density, a
+   row exactly centred) to a few px of the row's own leading whitespace,
+   never its icon or label — a bar's-eye-view 44 would not have held that
+   line, so it is not carried over just because `Button` and the launcher
+   both happen to use it elsewhere.
 
-   THE HIT AREA IS 20 x 44 AND IT IS NOT THE BAR. A 3px pointer target is not
-   a target. The `<button>` IS the 20 x 44 box — invisible, centred on the bar
-   — and the bar is an `aria-hidden` span inside it. TWO THINGS FOLLOW AND
-   BOTH ARE THE POINT:
+   THE COLOUR NEVER CHANGES ON HOVER OR PRESS, THE FILL DOES. `Button`'s own
+   two tokens, `--btn-primary-hover` / `--btn-primary-pressed` — a fill swap,
+   never a size change now, which brings this control INTO motion.css §13's
+   general hover rule ("a fill swap and nothing else") instead of the
+   bespoke grow-on-hover the bar needed because it was otherwise nearly
+   impossible to see. `shadow-lg` (bridged to `--shadow-lifted`, same as the
+   kit's own launcher) is a CONSTANT elevation, not a hover gain: motion.css
+   §13 names exactly three things allowed to gain elevation on hover — "a
+   card that is a link, a draggable card, the copilot launcher" — and this
+   handle is none of them, so its shadow is drawn once and left alone rather
+   than becoming a fourth exception nobody asked for.
 
-     · HOVER IS ON THE HIT AREA AND PAINTS THE BAR. The bar thickens to 5px
-       and lengthens to 44 on the system's own colour duration and curve
-       (`--duration-colour`, 120ms, `ease-kwapso`) — inside the 120–200ms band
-       everything else in the kit moves in. It never changes colour: at
-       `--spine-ink` it is already at full contrast and there is nowhere to go.
-     · THE FOCUS RING LANDS ON THE HIT AREA, NOT ON THE BAR. tokens.css §8
-       rings every control at once, on the control's own box — and the control
-       is the 20 x 44 pill, so the ring is a sensible shape. A ring drawn
-       round a 3px line would be a 3px-wide outline nobody could read as a
-       focus state.
+   THE ICON DIFFERS BY EDGE, THE SHAPE AND SIZE DO NOT. THE ASIDE takes
+   `Sparkle` — the assistant's own brand mark everywhere else it appears
+   (chapter 19's header mark, the composer's send mark, the mobile launcher),
+   so the docked toggle finally carries the same glyph the floating one
+   always did. THE RAIL takes `CaretLineRight` collapsed / `CaretLineLeft`
+   expanded — not a new choice: `rail.tsx`'s OWN foot-collapse row (see
+   "AND THE RAIL'S FOOT TOGGLE GOES AWAY", next) already drew exactly that
+   pair for exactly this meaning, and this handle reuses it rather than
+   inventing a second visual language for "collapse/expand" on the same
+   column. Both icons render at `--icon-button` (1rem) — the same size a
+   nav row's own icon takes, so nothing on the handle out-scales the column
+   it sits beside.
 
-   IT IS A REAL `<button>` WITH A REAL LABEL. "Collapse the navbar" / "Open
-   the navbar", "Open the assistant" / "Close the assistant" — the kit's own
-   nouns (`SHELL.md` and the client both say *navbar*; ch19 and 27.10 both say
-   *the assistant*), and verbs rather than product words. A 3px line tells a
-   screen reader nothing at all, so the name is not optional and neither is
-   the `aria-expanded` beside it.
+   IT IS STILL A REAL `<button>` WITH A REAL LABEL. "Collapse the navbar" /
+   "Open the navbar", "Open the assistant" / "Close the assistant" — the
+   kit's own nouns (`SHELL.md` and the client both say *navbar*; ch19 and
+   27.10 both say *the assistant*), and verbs rather than product words,
+   unchanged by the reskin: `aria-label` and `aria-expanded` are exactly the
+   props 2026-09-02 wired and are not touched here.
 
-   THE TWO COLUMNS COLLAPSE TO DIFFERENT THINGS, DELIBERATELY.
+   THE TWO COLUMNS COLLAPSE TO DIFFERENT THINGS, DELIBERATELY, AND THAT ALSO
+   DID NOT CHANGE.
 
      · THE RAIL collapses to THE ICON RAIL it already collapsed to — 26.02's
        "collapsible to an icon rail", unchanged behaviour, unchanged width
        mechanism. A collapsed rail is still usable navigation, so it stays.
      · THE ASIDE collapses to NOTHING AT ALL. Client, verbatim: *"closed
-       asstant show nothing. it's literally only the bar."* Zero width, no
-       strip, no icons, no element — the column is not rendered — and the card
-       takes the space back. The handle remains, at the inner side of the
-       ground's own gutter, which is where the mirrored rule puts it: a shut
-       aside has no inner edge of its own, so the gutter's is the one it
-       borrows.
+       asstant show nothing. it's literally only the bar."* — a sentence this
+       file keeps quoting on purpose even though the shape it names is gone,
+       because the RULE it states (zero width, no strip, no icons, no
+       element — the column is not rendered — and the card takes the space
+       back) is still exactly what happens. The handle remains, at the inner
+       side of the ground's own gutter, which is where the mirrored rule
+       puts it: a shut aside has no inner edge of its own, so the gutter's is
+       the one it borrows.
 
    AND THE RAIL'S FOOT TOGGLE GOES AWAY. `Rail` has drawn an opt-in collapse
    row at its foot since before v1.2.23 pinned it there; the client has
@@ -724,9 +785,16 @@ import * as React from "react";
 import { Badge } from "../../components/badge/badge";
 import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
+import { CursorGlow } from "../../components/cursor-glow/cursor-glow";
 import { Title } from "../../components/title/title";
 import { Text } from "../../components/typography/typography";
-import { PencilSimple, Plus } from "../../foundations/icons";
+import {
+  CaretLineLeft,
+  CaretLineRight,
+  PencilSimple,
+  Plus,
+  Sparkle,
+} from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { Rail } from "./rail";
 import { StatStrip, type StatStripFigure } from "./stat-strip";
@@ -1426,7 +1494,7 @@ const DENSITY_RAIL: Record<ScreenDensity, string> = {
 };
 
 const DENSITY_ASIDE: Record<ScreenDensity, string> = {
-  comfortable: "[--aside-inset:var(--space-6)]",
+  comfortable: "[--aside-inset:var(--space-5)]",
   calm: "[--aside-inset:var(--space-5)]",
 };
 
@@ -1437,21 +1505,32 @@ const DENSITY_ASIDE: Record<ScreenDensity, string> = {
    rail's inset already spends, so the air outside the card and the air inside
    the rail are the same measure and the window reads as one rhythm.
 
-   IT IS ALSO WHAT A HANDLE STANDS IN, so it is worth knowing how much room
-   there actually is. MEASURED, at the kit's own 15px root (ruling 18, not
-   ruling 28's 16px authoring reference): comfortable spends `--space-6` =
-   22.5, calm `--space-5` = 18.75. The handle's target is a fixed 20px, so:
+   STEPPED DOWN ONE RUNG ON 2026-09-03, COMFORTABLE ONLY. Owner, on the live
+   product: "this margin between navbar and content — so reduce the spacing
+   there", said in the same breath as the ruling above it ("same margins
+   everywhere") — read together, the ONE shared value was too big, not just
+   the rail edge she happened to name, and shrinking only that edge would
+   have broken the uniformity the sentence before it asked for. So the token
+   itself moves, one step on the scale already in `tokens.css` (`--space-6`,
+   24, down to `--space-5`, 20) rather than an invented pixel value, and it
+   moves at every one of the gutter's call sites at once — the rail-to-content
+   gap, the card's own four sides, the content-to-assistant gap and the new
+   assistant-to-window edge (see the aside dock, below) all read the same
+   smaller number after this line, because they were always one token.
 
-     · COMFORTABLE — the target sits inside the gutter with 2.5 to spare.
-     · CALM — it overhangs by 1.25, onto the outermost 1.25px of the card's
-       own rounded corner region, where there is no content to intercept.
+   COMFORTABLE NOW EQUALS CALM ON THIS ONE PROPERTY, AND THAT IS AS FAR AS
+   THIS CHANGE GOES. Calm was already `--space-5`; nothing here says whether
+   it should step down again to keep a gap between the two densities — that
+   is a separate call the owner has not made, so calm is untouched.
 
-   That overhang is recorded rather than designed out. Widening calm's gutter
-   to match comfortable's would delete the density distinction on the one
-   measure the reshape added; narrowing the target below 20 would trade a
-   1.25px overlap for a target-size failure. It is the right way round. */
+   MEASURED, at the kit's own 15px root (ruling 18, not ruling 28's 16px
+   authoring reference): both densities now spend `--space-5` = 18.75. The
+   handle's target is a fixed 20px, so both densities now carry the 1.25
+   overhang onto the outermost 1.25px of the card's own rounded corner
+   region (no content there to intercept) that used to be calm-only — see
+   `verify/shell-chat/` for the measured before/after on both densities. */
 const DENSITY_GUTTER: Record<ScreenDensity, string> = {
-  comfortable: "[--shell-gutter:var(--space-6)]",
+  comfortable: "[--shell-gutter:var(--space-5)]",
   calm: "[--shell-gutter:var(--space-5)]",
 };
 
@@ -1503,62 +1582,56 @@ const TITLE_STEP_CHILD: Record<ScreenDensity, "h3" | "h4"> = {
 const ROOT_DEPTH = 1;
 
 /* ----------------------------------------------------------------------------
-   THE EDGE HANDLE — a 3px bar, a 20 x 44 target, and a position that means
-   something. See the file header for the whole ruling.
+   THE EDGE HANDLE — a 32px mango circle, and a position that means
+   something. See the file header for the whole ruling, including WHY 32
+   and not `Button`'s own 40.
 
-   EVERY NUMBER HERE IS THE CLIENT'S, AND EVERY ONE IS WRITTEN IN px. THAT IS
-   THE ONE PLACE THIS FILE DEPARTS FROM ruling 28's rem, AND IT IS ARGUED.
+   EVERY NUMBER HERE IS STILL THE CLIENT'S, AND EVERY ONE IS STILL WRITTEN IN
+   px. THAT IS THE ONE PLACE THIS FILE DEPARTS FROM ruling 28's rem, AND IT
+   IS ARGUED, AND THE RESKIN DID NOT REOPEN THE ARGUMENT.
 
    Ruling 28 authors against a 16px reference; tokens.css §1 then sets the
    real root to 15px (ruling 18), and `data-scale` moves it again — 13 at
-   small, 17 at large. So a `2.75rem` target measures 41.25 at the default
-   scale and 35.75 at small, and a `0.1875rem` bar measures 2.81 and 2.44. In
-   rem the client's approved 3 x 34 and 20 x 44 are numbers that never
-   actually appear on screen.
-
-   TWO REASONS THAT MATTERS HERE AND NOWHERE ELSE IN THE FILE:
-
-     · 44 IS A TARGET-SIZE MINIMUM, NOT A MEASURE. WCAG 2.5.5 states target
-       size in CSS pixels, so a target that shrinks with the type scale is a
-       target that fails the check for the readers most likely to have set the
-       scale small. It has to be 44 at every scale, which means px.
-     · A 3px BAR IS A HAIRLINE, NOT TYPE. The kit already writes this class of
-       thing in px and says so: `--focus-width: 1px`, `--focus-offset: 0px`.
-       Scaling a 3px line by the reader's text size gives 2.44 at small — a
-       sub-3px line that anti-aliases into the ground it is supposed to stand
-       on, which is the one failure mode this control cannot afford.
+   small, 17 at large. A rem-sized control shrinks with that scale — the
+   ORIGINAL reason this handle never took `Button`'s own `size="icon"`
+   (`--control-height-button`, 2.5rem: 41.25px at the default scale, 32.5px
+   at small) — and shrinking is exactly the failure mode WCAG 2.5.5's
+   target-size minimum exists to catch, for the reader most likely to have
+   turned the scale down. So the circle keeps a LITERAL 32px, in both
+   dimensions, which does not move with the scale, in place of the bar's own
+   3 x 34 and 20 x 44 literals.
 
    Everything else the shell draws — the gutter, the insets, the radius —
    stays on the rem ladder, because all of it IS measure.
 
-   They are literals rather than tokens because none of them is on a ladder
-   the kit ships — there is no 3px rung, and inventing four token names for
-   one control would be four things to keep in step instead of one.
+   It is a literal rather than a token for the same reason the bar was: none
+   of it is on a ladder the kit ships, and there is no 32px rung to reach for
+   instead of writing the number down.
    -------------------------------------------------------------------------- */
 
-/** The target. Invisible, pill-shaped so the global focus ring is one too. */
-const HANDLE_HIT = cn(
-  "group absolute top-1/2 z-10 -translate-y-1/2",
-  "flex h-[44px] w-[20px] items-center justify-center",
-  "cursor-pointer rounded-pill border-0 bg-transparent p-0",
-);
-
 /**
- * The bar. `--spine-ink` and never a literal charcoal — measured at 1.02 on
- * what was the quiet spine's dark ground (now ink-dark's), which is an
- * invisible control. See "THE EDGE HANDLES" in this file's header for the
- * six-way measure of `--spine-ink` against every spine's own ground; none
- * comes near that.
+ * The button IS the target now — no separate invisible hit area wrapping a
+ * smaller mark, because nothing here is invisible any more. `rounded-pill`
+ * at equal width and height is a true circle, so the global focus ring
+ * (tokens.css §8) reads as one too.
  *
- * Hover thickens AND lengthens, on `--duration-colour` (120ms) and
- * `ease-kwapso`, which is inside the 120–200ms band the rest of the kit
- * moves in. It does not change colour: at `--spine-ink` there is nowhere
- * darker to go.
+ * `--btn-primary-fill` / `--btn-primary-label` / `--btn-primary-hover` /
+ * `--btn-primary-pressed` are `Button`'s OWN default-variant tokens — the
+ * one brand fill the kit already contrast-proved, reused rather than
+ * re-derived. `shadow-lg` (→ `--shadow-lifted`) is constant, not a hover
+ * gain: motion.css §13 names exactly three things allowed to gain elevation
+ * on hover and this handle is not a fourth. Hover and press are a fill swap
+ * only — motion.css §13's general rule, now that the mark itself is the
+ * whole affordance and does not also need to grow to be seen.
  */
-const HANDLE_BAR = cn(
-  "block h-[34px] w-[3px] rounded-pill bg-[var(--spine-ink)]",
-  "transition-[height,width] duration-[var(--duration-colour)] ease-kwapso",
-  "group-hover:h-[44px] group-hover:w-[5px]",
+const HANDLE_HIT = cn(
+  "absolute top-1/2 z-10 -translate-y-1/2",
+  "flex size-[32px] shrink-0 items-center justify-center",
+  "cursor-pointer rounded-pill border-0 p-0",
+  "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)] shadow-lg",
+  "transition-[background-color] duration-[var(--duration-colour)] ease-kwapso",
+  "hover:bg-[var(--btn-primary-hover)] active:bg-[var(--btn-primary-pressed)]",
+  "[&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0",
 );
 
 interface EdgeHandleProps {
@@ -1568,6 +1641,14 @@ interface EdgeHandleProps {
   open: boolean;
   /** The accessible name for the press that is about to happen. */
   label: string;
+  /**
+   * WHICH GLYPH, chosen by the caller: `Sparkle` for the aside (the
+   * assistant's own brand mark, constant across states) or the rail's own
+   * `CaretLineRight` / `CaretLineLeft` pair, flipped by the caller's current
+   * state — see "THE ICON DIFFERS BY EDGE" in the file header. Always
+   * `aria-hidden`; the accessible name is `label`, not the glyph.
+   */
+  icon: React.ReactNode;
   onToggle: () => void;
   /**
    * WHERE IT STANDS, and this is the whole affordance. One logical inset
@@ -1577,7 +1658,7 @@ interface EdgeHandleProps {
   placement: string;
 }
 
-function EdgeHandle({ edge, open, label, onToggle, placement }: EdgeHandleProps) {
+function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandleProps) {
   return (
     <button
       type="button"
@@ -1589,7 +1670,7 @@ function EdgeHandle({ edge, open, label, onToggle, placement }: EdgeHandleProps)
       onClick={onToggle}
       className={cn(HANDLE_HIT, placement)}
     >
-      <span aria-hidden="true" data-slot="screen-shell-handle-bar" className={HANDLE_BAR} />
+      {icon}
     </button>
   );
 }
@@ -1605,16 +1686,16 @@ function EdgeHandle({ edge, open, label, onToggle, placement }: EdgeHandleProps)
  *                      it, the quiet line — then the figures and the body,
  *                      and the footer last when one is declared; the aside
  *                      when one is passed; an edge handle per column.
- *  2. hover          — the edge handles only. The bar thickens from 3px to
- *                      5px and lengthens from 34 to 44 on the kit's own
- *                      colour duration and curve. Nothing else here is
- *                      pressable; the band's own controls, the rail's and the
- *                      body's own theirs.
+ *  2. hover          — the edge handles only, a fill swap
+ *                      (`--btn-primary-hover`) on the kit's own colour
+ *                      duration and curve, same as `Button`'s. Nothing else
+ *                      here is pressable; the band's own controls, the
+ *                      rail's and the body's own theirs.
  *  3. focus-visible  — tokens.css §8 rings every control at once, and the
- *                      controls here are the handle's 20 x 44 hit area (never
- *                      the 3px bar it contains — a ring round a 3px line
- *                      would be unreadable as a focus state) and the band's
- *                      own mango, which is a `Button` and carries its own.
+ *                      control here is the handle's own 32px circle (the
+ *                      button IS the mark now, so the ring rings the same
+ *                      box it paints) and the band's own mango, which is a
+ *                      `Button` and carries its own.
  *  4. active/pressed — none of the shell's. A handle's press MOVES the
  *                      handle, which is a louder answer than a 1px nudge, and
  *                      the band's mango is a `Button`.
@@ -1939,6 +2020,32 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             `relative isolate` decides where it can reach. */}
         {fieldSuppressed ? null : ambient}
 
+        {/* THE CURSOR GLOW — client ruling 2026-09-03, "bring back the mango
+            glow that follows the mouse … would be on the background layer,
+            never over the body." MOUNTED HERE, UNCONDITIONALLY, RATHER THAN
+            AS A SLOT: unlike `ambient` this is not a per-screen flourish a
+            route opts into, it is a property of the shell itself, on every
+            screen this shell ever draws.
+
+            THE STACKING PROOF, NOT AN ASSUMPTION. `CursorGlow`'s own wrapper
+            carries `-z-10` (see that file), which is a NEGATIVE stack level —
+            CSS2.1 §E.2 step 2, painted before this SCREEN's own in-flow
+            content (step 3+) and before every positioned descendant at
+            stack level >= 0, which is everything else this shell draws: the
+            rail dock and its `EdgeHandle` (`z-auto`/`z-10`), the content
+            column carrying the breadcrumb, and the CARD itself
+            (`relative z-[2]`, see the `CARD` comment below). A negative
+            z-index inside THIS element's own `relative isolate` (the SCREEN
+            div, immediately below) cannot ever paint above a z-0-or-higher
+            sibling — that is what "negative" means in the stacking algorithm,
+            not a convention this file has to maintain by keeping the glow
+            first in the JSX. Measured in `verify/cursor-glow/`: the orb's
+            resolved `z-index` is negative, the card's is positive, and a
+            simulated `mousemove` over the card's own coordinates never
+            changes the card's rendered pixels. Same guarantee `ambient`
+            already relies on for this exact slot. */}
+        <CursorGlow />
+
         {/* THE RAIL DOCK — the column PLUS the gutter after it, in one
             positioned box, and that pairing is what makes the handle's rule
             expressible in two classes.
@@ -1950,8 +2057,11 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             dock's trailing edge is exactly the COLUMN's inner edge, whatever
             width the icon rail happens to be.
 
-            Either way the 20-wide target lands inside the column's own
-            `--rail-inset` padding, so it never covers a row. */}
+            Either way the 32px circle lands mostly inside the column's own
+            `--rail-inset` padding (18.75–24px depending on density), close
+            enough to it that it never reaches a row's own icon or label —
+            see "WHY 32, NOT `Button`'s OWN 40" in the file header for the
+            arithmetic and the honest edge case it does not fully clear. */}
         {railNode ? (
           <div
             data-slot="screen-shell-rail-dock"
@@ -1982,6 +2092,13 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               edge="rail"
               open={!isRailCollapsed}
               label={isRailCollapsed ? railExpandLabel : railCollapseLabel}
+              icon={
+                isRailCollapsed ? (
+                  <CaretLineRight aria-hidden="true" />
+                ) : (
+                  <CaretLineLeft aria-hidden="true" />
+                )
+              }
               onToggle={toggleRail}
               placement={isRailCollapsed ? "end-[var(--shell-gutter)]" : "start-0"}
             />
@@ -2082,19 +2199,73 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
         </div>
 
         {/* THE ASIDE DOCK — the gutter BEFORE the column, mirroring the rail
-            dock exactly, and the mirror is what makes the shut case work.
+            dock — AND, OPEN ONLY, A SECOND GUTTER AFTER IT, which the rail
+            deliberately does not carry.
 
-            OPEN, the handle takes `end-0`: the dock's trailing edge is the
-            aside's outer rim, flush to the window.
+            THE RAIL'S OUTER EDGE STAYS FLUSH ON PURPOSE (see `screen-shell-
+            rail-dock`, above): the client's spine screenshots pin that edge
+            to the window with no gutter at all, and this file leaves it
+            alone. THE ASIDE'S OUTER EDGE IS A DIFFERENT RULING. Owner,
+            2026-09-03, on the live product: "the same spacing that is at
+            the bottom of the content and between the content and the
+            assistant — I want it on the right of the assistant / so same
+            margins everywhere." Today that edge is flush to the window with
+            NO margin at all — the one edge of the card's whole neighbourhood
+            that was not `--shell-gutter` — so `pe-[var(--shell-gutter)]`
+            joins the dock's own `ps-[var(--shell-gutter)]` when the column is
+            open, spending the SAME token a second time rather than a new
+            number: card-to-assistant and assistant-to-window are now the one
+            measure, exactly as content-to-rail and content-to-window
+            (window-to-rail, rather — the rail's flush edge) already read as
+            one measure apiece.
+
+            IT IS CONDITIONAL ON `isAsideOpen`, NOT A PERMANENT CLASS, because
+            the SHUT case has its own settled invariant one paragraph down
+            ("the dock IS the gutter" — one `--shell-gutter`, not two) and
+            widening it unconditionally would double the window-edge gap
+            every time the column is closed, which nobody asked for.
+
+            OPEN, the handle takes `end-[var(--shell-gutter)]`: the new
+            padding sits OUTSIDE the handle's containing block's coordinate
+            system (insets are measured from the padding edge, so `end-0`
+            would still have landed at the window regardless of the new
+            padding) — so the placement has to move in step with it, from
+            the window's edge to the ASIDE COLUMN's own outer edge, one
+            gutter in. This is the identical formula the rail's own SHUT
+            state already uses to find ITS column's edge past a `pe-gutter`
+            (`placement={isRailCollapsed ? "end-[var(--shell-gutter)]" : ...}`
+            above) — read here for the open case instead of the collapsed
+            one, because this dock's extra padding is on the open case.
             SHUT, the column is not rendered at all — zero width, no strip, no
-            icons, client verbatim — so the dock IS the gutter, and `start-0`
-            puts the handle at that gutter's inner side, against the card
-            which has just taken the space back. */}
+            icons, client verbatim — so the dock IS the gutter, ONLY
+            `--shell-gutter` (18.75–20px) wide with no buffer past it to the
+            window's true edge, unlike the open case above.
+
+            THIS IS WHERE THE CIRCLE GENUINELY CHANGED THE GEOMETRY, so it
+            gets its own placement rather than the bar's `start-0`. The bar
+            was 20px wide and the gutter was ~18.75–24, so `start-0` (pinned
+            to the dock's card-facing edge, extending TOWARD the window)
+            landed inside the dock with at most a sub-pixel spillage nobody
+            could see. The circle is 32px — wider than the gutter at every
+            density — so the same `start-0` would push its far edge PAST the
+            window's true edge (measured: 13.25px off-canvas at 1440 wide),
+            which is not an overlap, it is the button getting cropped by the
+            viewport. `end-0` instead: the circle's WINDOW-facing edge is
+            what is pinned now, flush to the true edge exactly the way the
+            kit's own floating launcher is (`fixed right-4 …` in
+            `web/components/agent-host.tsx`), and it is the card that eats
+            the extra width, the same direction the old 20px box already
+            spilled into by 1.25px — a floating round button sitting slightly
+            over the card's own rounded corner is the shape a floating button
+            is supposed to take, not a defect to hide. */}
         {hasAside ? (
           <div
             data-slot="screen-shell-aside-dock"
             data-state={isAsideOpen ? "open" : "shut"}
-            className="relative hidden flex-none ps-[var(--shell-gutter)] md:flex"
+            className={cn(
+              "relative hidden flex-none ps-[var(--shell-gutter)] md:flex",
+              isAsideOpen && "pe-[var(--shell-gutter)]",
+            )}
           >
             {isAsideOpen ? (
               <div
@@ -2131,8 +2302,9 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               edge="aside"
               open={isAsideOpen}
               label={isAsideOpen ? asideCloseLabel : asideOpenLabel}
+              icon={<Sparkle aria-hidden="true" />}
               onToggle={toggleAside}
-              placement={isAsideOpen ? "end-0" : "start-0"}
+              placement={isAsideOpen ? "end-[var(--shell-gutter)]" : "end-0"}
             />
           </div>
         ) : null}

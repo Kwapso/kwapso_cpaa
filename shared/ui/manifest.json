@@ -798,6 +798,24 @@
         "CopilotTouched"
       ]
     },
+    "cursor-glow": {
+      "file": "components/cursor-glow/cursor-glow.tsx",
+      "exports": [
+        "CursorGlow"
+      ],
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ]
+    },
     "data-preview-table": {
       "file": "components/data-preview-table/data-preview-table.tsx",
       "exports": [

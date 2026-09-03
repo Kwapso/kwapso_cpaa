@@ -1102,7 +1102,16 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
             ) : (
               <Button
                 type="button"
-                variant="inverse"
+                // MANGO, IN EVERY STATE — client ruling, 2026-09-03: "the
+                // send button to the assistant, make it mango in all modes
+                // and variations." `variant="default"` is this kit's one
+                // mango fill (R32), and `Button`'s own state machine already
+                // keeps a variant's fill through `loading` (a spinner over
+                // the same fill) and `disabled` (the one state that dims it,
+                // deliberately, on every variant) -- so the single prop
+                // change carries every mode this control has, nothing further
+                // to wire.
+                variant="default"
                 size="sm"
                 disabled={disabled}
                 loading={streaming}
