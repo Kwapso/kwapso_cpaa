@@ -399,7 +399,7 @@ export function TasksScreen({
         useKitPanel={view !== "calendar"}
       >
         {view === "calendar" ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col">
             {/* THE TOOLBAR, NOW WITH ITS OWN SEARCH — CLIENT RULING,
                 2026-09-03, SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO
                 CARRY. Verbatim: "the toolbar, including the search, should be

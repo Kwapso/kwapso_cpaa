@@ -532,7 +532,6 @@ export function SelectableScreen({
       <CollectionCard>
         {(values.length > 0 || canCreate) && (
           <ToolbarRow
-            className="mb-4"
             search={
               values.length > 0 && (
                 <>

@@ -348,7 +348,6 @@ export function TicketsCollection({
                   can see this queue, not only the ones who may raise a
                   ticket. */}
               <ToolbarRow
-                className="mb-4"
                 search={
                   <SearchInput
                     value={triageQuery}

@@ -628,7 +628,7 @@ export function SprintsScreen({
           useKitPanel={view === "all"}
         >
           {view === "overview" ? (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col">
               {/* THE TOOLBAR, carrying real search + filter now (by name/app,
                   by state, by kind) rather than only the button — Overview and
                   Calendar are bespoke bodies that never touch `CollectionFrame`,
@@ -639,7 +639,7 @@ export function SprintsScreen({
               {overview}
             </div>
           ) : view === "calendar" ? (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col">
               {sprintToolbar}
               <RecordCalendar
                 entries={calendarEntries}

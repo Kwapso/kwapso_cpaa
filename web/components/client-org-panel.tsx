@@ -357,28 +357,34 @@ export function ClientOrgPanel({
   return (
     <div className="flex flex-col gap-6">
       {/* ── departments ──────────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">{t("Departments")}</h3>
-        <ToolbarRow
-          search={
-            departments.length > 0 && (
-              <ListToolbar
-                query={deptQuery}
-                onQuery={setDeptQuery}
-                status={deptStatus}
-                onStatus={setDeptStatus}
-                placeholder={t("Search departments…")}
-                sortOptions={[
-                  { value: "name", label: t("Name") },
-                  { value: "roleCount", label: t("Roles") },
-                ]}
-                sort={deptSort}
-                onSort={setDeptSort}
-              />
-            )
-          }
-          actions={canCreate && <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />}
-        />
+      <section className="flex flex-col">
+        {/* Heading-to-toolbar rhythm is this pair's own — gap-2, unrelated to
+            R49's toolbar-content-gap, which `<ToolbarRow>` now pays itself
+            as its own trailing margin. Nested so the two numbers stay
+            independent instead of one flex-col gap spending both. */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium">{t("Departments")}</h3>
+          <ToolbarRow
+            search={
+              departments.length > 0 && (
+                <ListToolbar
+                  query={deptQuery}
+                  onQuery={setDeptQuery}
+                  status={deptStatus}
+                  onStatus={setDeptStatus}
+                  placeholder={t("Search departments…")}
+                  sortOptions={[
+                    { value: "name", label: t("Name") },
+                    { value: "roleCount", label: t("Roles") },
+                  ]}
+                  sort={deptSort}
+                  onSort={setDeptSort}
+                />
+              )
+            }
+            actions={canCreate && <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />}
+          />
+        </div>
         {departments.length === 0 ? (
           // No import target — a department is a fact about the client's own
           // org chart, added one at a time as it comes up.
@@ -426,28 +432,32 @@ export function ClientOrgPanel({
       </section>
 
       {/* ── roles ────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">{t("Roles")}</h3>
-        <ToolbarRow
-          search={
-            roles.length > 0 && (
-              <ListToolbar
-                query={roleQuery}
-                onQuery={setRoleQuery}
-                status={roleStatus}
-                onStatus={setRoleStatus}
-                placeholder={t("Search roles…")}
-                sortOptions={[
-                  { value: "name", label: t("Name") },
-                  { value: "cost", label: t("Cost an hour") },
-                ]}
-                sort={roleSort}
-                onSort={setRoleSort}
-              />
-            )
-          }
-          actions={canCreate && <AddButton onClick={() => setAddingRole(true)} label={t("Add role")} />}
-        />
+      <section className="flex flex-col">
+        {/* Heading-to-toolbar rhythm is this pair's own — see the identical
+            note on the Departments section above. */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium">{t("Roles")}</h3>
+          <ToolbarRow
+            search={
+              roles.length > 0 && (
+                <ListToolbar
+                  query={roleQuery}
+                  onQuery={setRoleQuery}
+                  status={roleStatus}
+                  onStatus={setRoleStatus}
+                  placeholder={t("Search roles…")}
+                  sortOptions={[
+                    { value: "name", label: t("Name") },
+                    { value: "cost", label: t("Cost an hour") },
+                  ]}
+                  sort={roleSort}
+                  onSort={setRoleSort}
+                />
+              )
+            }
+            actions={canCreate && <AddButton onClick={() => setAddingRole(true)} label={t("Add role")} />}
+          />
+        </div>
         {roles.length === 0 ? (
           // No import target — a role's cost is set by hand, deliberately
           // (the file's own header: overwriting it from a sheet is exactly
@@ -568,28 +578,32 @@ export function ClientOrgPanel({
       </section>
 
       {/* ── tools ────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">{t("Tools")}</h3>
-        <ToolbarRow
-          search={
-            tools.length > 0 && (
-              <ListToolbar
-                query={toolQuery}
-                onQuery={setToolQuery}
-                status={toolStatus}
-                onStatus={setToolStatus}
-                placeholder={t("Search tools…")}
-                sortOptions={[
-                  { value: "name", label: t("Name") },
-                  { value: "price", label: t("Price") },
-                ]}
-                sort={toolSort}
-                onSort={setToolSort}
-              />
-            )
-          }
-          actions={canCreate && <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} />}
-        />
+      <section className="flex flex-col">
+        {/* Heading-to-toolbar rhythm is this pair's own — see the identical
+            note on the Departments section above. */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium">{t("Tools")}</h3>
+          <ToolbarRow
+            search={
+              tools.length > 0 && (
+                <ListToolbar
+                  query={toolQuery}
+                  onQuery={setToolQuery}
+                  status={toolStatus}
+                  onStatus={setToolStatus}
+                  placeholder={t("Search tools…")}
+                  sortOptions={[
+                    { value: "name", label: t("Name") },
+                    { value: "price", label: t("Price") },
+                  ]}
+                  sort={toolSort}
+                  onSort={setToolSort}
+                />
+              )
+            }
+            actions={canCreate && <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} />}
+          />
+        </div>
         {tools.length === 0 ? (
           // No import target — a tool's price is set from its own dated form
           // (the file's own header explains why), never bulk-loaded.

@@ -104,6 +104,33 @@
 }
 
 /* ============================================================================
+   ONE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE.
+   ============================================================================
+   The client, correcting item 5 of the 2026-09-03 spacing round: "there's way
+   too much space between the toolbar and the content" — confirmed on every
+   screen she checked, not a detail-screen-only thing.
+
+   Exactly the shape `--tab-content-gap` above already fixed for a tab strip
+   and its panel, read the other way round: `<ToolbarRow>`
+   (`web/components/deep-link/screen-bits.tsx`) is the app's one bespoke
+   toolbar, and every call site used to pay its OWN trailing gap by hand — a
+   wrapping `flex flex-col gap-N` div, a `space-y-N`, or a `className="mb-4"`
+   passed straight to the row — four different mechanisms and five different
+   numbers (7.5/11.25/15/22.5px) for what is, everywhere it appears, the same
+   relationship. So the row pays it itself now, once, as its own trailing
+   margin — a call site that wraps it in a gapped column any more is a second
+   hand on the same number.
+
+   One value, not a new one: the same `--space-5` `--tab-content-gap` already
+   spends, because both are "the gap between a control strip and the content
+   under it" and a system with one rhythm does not mint a second number for
+   the same sentence.
+   ========================================================================= */
+:root {
+  --toolbar-content-gap: var(--space-5);
+}
+
+/* ============================================================================
    THE PAGE DOES NOT SCROLL SIDEWAYS. EVER.
    ============================================================================
    The owner, more than once and finally in capitals: "there should be no scope

@@ -415,7 +415,6 @@ export function WaveCollection({
           canCreate &&
           clients.length > 0 && (
             <ToolbarRow
-              className="mb-4"
               actions={<AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />}
             />
           )

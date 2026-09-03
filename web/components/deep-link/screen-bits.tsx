@@ -394,7 +394,17 @@ export function ToolbarRow({
         // reads as the same stadium pill every other toolbar control in this
         // app wears; expanded switches to the box radius so a tall facet
         // panel never has to fit inside a 999px curve.
-        expanded ? "rounded-[var(--radius)]" : "rounded-pill"
+        expanded ? "rounded-[var(--radius)]" : "rounded-pill",
+        // THE GAP TO WHATEVER COMES NEXT — R49, `--toolbar-content-gap`
+        // (web/app/globals.css). Baked into the row's OWN root rather than
+        // left for a call site to add, exactly as `--tab-content-gap` is
+        // baked into the tab strip's own box rather than a sibling's margin:
+        // a call site that ALSO wraps this row in a gapped column is paying
+        // the same gap twice, which is how five different numbers
+        // (7.5/11.25/15/22.5px) ended up doing the identical job across the
+        // app's fourteen call sites. This is the ONLY place that number is
+        // spent now — see web/test/rules.test.ts's `toolbar-content-gap`.
+        "mb-[var(--toolbar-content-gap)]"
       )}
     >
       <div

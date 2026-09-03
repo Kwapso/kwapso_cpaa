@@ -133,7 +133,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     )
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col">
       <ToolbarRow
         search={
           modules.length > 0 && (

@@ -246,7 +246,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       {/* ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
           approved that night). `filters` used to be a `<FilterBar>` rendered
           as this row's own sibling below it — the same shape her Apps

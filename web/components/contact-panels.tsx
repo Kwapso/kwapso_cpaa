@@ -131,7 +131,7 @@ export function CompaniesPanel({
   )
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {companies.length > 1 && (
         <ToolbarRow
           search={
@@ -247,7 +247,7 @@ export function ContactTicketsPanel({
         (tk.helpType ?? "").toLowerCase().includes(needle))
   )
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {(q.data.length > 1 || statuses.length > 1) && (
         <ToolbarRow
           search={
@@ -349,7 +349,7 @@ export function ContactMeetingsPanel({
     )
     .sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1) * dirMul)
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {q.data.length > 1 && (
         <ToolbarRow
           search={

@@ -363,7 +363,7 @@ export function WaveDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "sprints")
             return (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col">
                 {/* TWO VERBS, AND THEY ARE DIFFERENT ONES. "Plan a sprint" writes
                     a NEW block of work and drops it straight into this package —
                     which is the order the work actually happens in, because a

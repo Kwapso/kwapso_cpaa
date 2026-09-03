@@ -376,7 +376,7 @@ export function WorkLogsPanel({
       .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       {/* The same control every other collection tab in the app puts above
           its list, so "add one of these" looks like one act wherever a person
           meets it (UI-CONVENTIONS §4) — now through the canonical toolbar
@@ -404,95 +404,101 @@ export function WorkLogsPanel({
         actions={canLog && <AddButton label={t("Log time")} onClick={() => setAdding(true)} />}
       />
 
-      {/* The numbers wait for the second read rather than flashing a zero: an
-          "0 hours" that becomes "14 hours" a moment later is a number somebody
-          might act on. */}
-      {summaryQ.data && summaryQ.data.total > 0 && (
-        <>
-          <Numbers summary={summaryQ.data} />
-          <Pictures summary={summaryQ.data} />
-        </>
-      )}
+      {/* Numbers-to-rows rhythm is its own — gap-6, unrelated to R49's
+          toolbar-content-gap, which the row above now pays itself as its
+          own trailing margin. Nested so the two numbers stay independent
+          instead of one flex-col gap spending both. */}
+      <div className="flex flex-col gap-6">
+        {/* The numbers wait for the second read rather than flashing a zero: an
+            "0 hours" that becomes "14 hours" a moment later is a number somebody
+            might act on. */}
+        {summaryQ.data && summaryQ.data.total > 0 && (
+          <>
+            <Numbers summary={summaryQ.data} />
+            <Pictures summary={summaryQ.data} />
+          </>
+        )}
 
-      {rows === null ? (
-        <Skeleton variant="list" lines={3} />
-      ) : rows.length === 0 ? (
-        personFilter ? (
-          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        {rows === null ? (
+          <Skeleton variant="list" lines={3} />
+        ) : rows.length === 0 ? (
+          personFilter ? (
+            <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+          ) : (
+            // No `work_logs` import target — time against one record is logged
+            // live, never bulk-loaded.
+            <CollectionEmptyState
+              title={t("No time logged against this yet.")}
+              onCreate={canLog ? () => setAdding(true) : undefined}
+            />
+          )
         ) : (
-          // No `work_logs` import target — time against one record is logged
-          // live, never bulk-loaded.
-          <CollectionEmptyState
-            title={t("No time logged against this yet.")}
-            onCreate={canLog ? () => setAdding(true) : undefined}
-          />
-        )
-      ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-          {rows.map((l) => (
-            <li
-              key={l.id}
-              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
-                l.discarded ? "opacity-60" : ""
-              }`}
-            >
-              {/* WHO AND WHEN, and that is the whole sentence. It carried the
-                  kind of work and the note as well — seven units with the
-                  duration, the Discarded badge and the Edit button, which is the
-                  same eight-fact row the Work logs SCREEN had and the same fix
-                  (N1, K1). The kind is a STATE, so it is a badge at the end of
-                  the line; the note is a paragraph somebody wrote, and a list is
-                  not where anybody reads one — it is in the correction dialog,
-                  which is where it was written.
+          <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+            {rows.map((l) => (
+              <li
+                key={l.id}
+                className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
+                  l.discarded ? "opacity-60" : ""
+                }`}
+              >
+                {/* WHO AND WHEN, and that is the whole sentence. It carried the
+                    kind of work and the note as well — seven units with the
+                    duration, the Discarded badge and the Edit button, which is the
+                    same eight-fact row the Work logs SCREEN had and the same fix
+                    (N1, K1). The kind is a STATE, so it is a badge at the end of
+                    the line; the note is a paragraph somebody wrote, and a list is
+                    not where anybody reads one — it is in the correction dialog,
+                    which is where it was written.
 
-                  Fixing it here fixes it FOUR times: this panel is hung on a
-                  story, a ticket, a task and a meeting, which is the whole
-                  reason the list was written once. */}
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {[l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
-              </span>
-              {l.kind && (
-                <Badge variant="secondary" className="shrink-0 text-badge">
-                  {l.kind}
-                </Badge>
-              )}
-              {l.discarded && (
-                <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
-                  {t("Discarded")}
-                </Badge>
-              )}
-              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                {l.endedAt ? spell(l.seconds) : t("running")}
-              </span>
-              {/* FIX A LINE. Only on time that has FINISHED and has not been
-                  binned: a running timer is corrected by stopping it (the control
-                  for that is on the header bar, on every screen), and a start time
-                  you can edit while the clock is still counting is two people
-                  writing the same number.
+                    Fixing it here fixes it FOUR times: this panel is hung on a
+                    story, a ticket, a task and a meeting, which is the whole
+                    reason the list was written once. */}
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {[l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
+                </span>
+                {l.kind && (
+                  <Badge variant="secondary" className="shrink-0 text-badge">
+                    {l.kind}
+                  </Badge>
+                )}
+                {l.discarded && (
+                  <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
+                    {t("Discarded")}
+                  </Badge>
+                )}
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {l.endedAt ? spell(l.seconds) : t("running")}
+                </span>
+                {/* FIX A LINE. Only on time that has FINISHED and has not been
+                    binned: a running timer is corrected by stopping it (the control
+                    for that is on the header bar, on every screen), and a start time
+                    you can edit while the clock is still counting is two people
+                    writing the same number.
 
-                  Icon only, in the trailing slot, for the same reason as the Work
-                  logs screen: the word "Edit" beside a pencil on every row is one
-                  word repeated as many times as there are rows. */}
-              {canEdit && l.endedAt && !l.discarded && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingLog(l)}
-                  className="shrink-0"
-                  aria-label={t("Edit")}
-                >
-                  <PencilSimple className="size-3.5" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                    Icon only, in the trailing slot, for the same reason as the Work
+                    logs screen: the word "Edit" beside a pencil on every row is one
+                    word repeated as many times as there are rows. */}
+                {canEdit && l.endedAt && !l.discarded && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditingLog(l)}
+                    className="shrink-0"
+                    aria-label={t("Edit")}
+                  >
+                    <PencilSimple className="size-3.5" />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
 
-      {/* R14: the badge above counts ALL of this record's time, so the list under
-          it has to be able to reach the rest of it — the filtered question's
-          own cursor while a person is picked, the record's own otherwise. */}
-      <LoadMore listKey={activeListKey} label={t("Load more time")} fetchPage={activeFetchPage} />
+        {/* R14: the badge above counts ALL of this record's time, so the list under
+            it has to be able to reach the rest of it — the filtered question's
+            own cursor while a person is picked, the record's own otherwise. */}
+        <LoadMore listKey={activeListKey} label={t("Load more time")} fetchPage={activeFetchPage} />
+      </div>
       <TimeFormDialog
         open={adding}
         onOpenChange={setAdding}

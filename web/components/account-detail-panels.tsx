@@ -138,7 +138,7 @@ export function ContactsPanel({
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       <ToolbarRow
         search={
           links.length > 0 && (
@@ -320,7 +320,7 @@ export function PortalAccessPanel({
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       <ToolbarRow
         search={
           portalUsers.length > 0 && (

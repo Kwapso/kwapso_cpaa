@@ -445,6 +445,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "toolbar-shows-search",
     status: "enforced",
   },
+  {
+    id: "R49",
+    dimension: "ui",
+    law: "THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER, PAID BY THE ROW ITSELF, NEVER A PER-SCREEN MARGIN. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) pays `--toolbar-content-gap` (`web/app/globals.css`) as its own trailing margin, on its own root, so every call site gets it for free. No call site may ALSO wrap the row in a gapped flex column or space-y stack, and no call site may pass a competing `mb-*` in its own `className` — either is the same number being spent twice, which is how it grows past what it was meant to be. Checked as a census off the disk: `ToolbarRow`'s own definition must carry the token, and no `<ToolbarRow>` call site (or the variable a screen names `*[Tt]oolbar*` and renders in its place) may sit inside a `flex-col` wrapper that ALSO declares its own `gap-*`/`space-y-*`, or pass a hardcoded `mb-*` of its own, unless named in `TOOLBAR_CONTENT_GAP_EXEMPT` with the real reason.",
+    why: "The client's own words, item 5 of the 2026-09-03 spacing round: \"tehre's wahy too much space between the toolbar and the contenta\" — confirmed on every screen she checked, not a detail-screen-only thing. It had drifted into five different numbers doing the identical job: a wrapping `flex flex-col gap-N` div (`gap-2`/`gap-3`/`gap-4`/`gap-6`, 7.5–22.5px), a `space-y-3`, and a `className=\"mb-4\"` passed straight to the row — fourteen call sites, four mechanisms, no shared owner. The exact shape `--tab-content-gap` already fixed for a tab strip and its panel (R48's neighbour law in spirit, same client session), read the other way round: the STRIP pays its own trailing space so a caller cannot forget it or invent a new number, and a margin on a sibling is the thing that drifts — this law spends the same `--space-5` `--tab-content-gap` already uses, because both are 'the gap between a control strip and the content under it' and a system with one rhythm does not mint a second number for the same sentence.",
+    checkId: "toolbar-content-gap",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -1092,6 +1100,20 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   "web/components/waves-screen.tsx":
     "the bare <ToolbarRow actions={…}> only renders when `all.length === 0` (and only once there is a client to sell a wave to) — the sibling branch is <WaveFinder>, which carries the real search/filter/view toolbar and renders whenever the collection holds a row. Same 'never toolbar on empty collection' shape as sprints-screen.tsx.",
 }
+
+/** R49 — reviewed exceptions: a `<ToolbarRow>` call site (or wrapper) that
+ * genuinely needs its own spacing decision beside the row's own baked-in
+ * `--toolbar-content-gap`, with the real reason. Rot-checked: an entry whose
+ * file no longer matches the condition it was pinned for fails the build, so
+ * the list can only shrink. Empty today — every call site's OWN
+ * toolbar-to-content boundary now reads the one token; the handful of
+ * `flex-col gap-*` wrappers that still exist beside a `<ToolbarRow>` (a
+ * heading-to-toolbar rhythm in `client-org-panel.tsx`, a group-to-group one in
+ * `stakeholders-panel.tsx`, a numbers-to-rows one in `work-logs-panel.tsx`)
+ * are nested INSIDE a plain, gap-less wrapper around the row itself, so they
+ * govern a different sibling pair and never compete with the row's own gap —
+ * the census below does not even reach them. */
+export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
 
 /** R29 — reviewed exceptions. A file listed here matches the page-container
  * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:

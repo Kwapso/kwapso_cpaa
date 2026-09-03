@@ -139,7 +139,7 @@ export function StakeholdersPanel({
   const shownTheirs = theirs.filter(matches)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col">
       {ours.length + theirs.length > 1 && (
         <ToolbarRow
           search={
@@ -153,28 +153,34 @@ export function StakeholdersPanel({
           }
         />
       )}
-      <Group
-        title={t("Ours")}
-        people={shownOurs}
-        empty={
-          query.trim()
-            ? t("Nobody on our side matches that.")
-            : t("Nobody from our side is on this yet.")
-        }
-        // "Team lead" is the word the app already uses for this person on the
-        // form that sets them — not "main", which is the client side's word.
-        mainLabel={t("Team lead")}
-      />
-      <Group
-        title={t("Theirs")}
-        people={shownTheirs}
-        empty={
-          query.trim()
-            ? t("Nobody on the client's side matches that.")
-            : t("Nobody from the client's side is on this yet.")
-        }
-        mainLabel={t("Main")}
-      />
+      {/* Group-to-group rhythm is its own — gap-6, unrelated to R49's
+          toolbar-content-gap, which `<ToolbarRow>` above now pays itself as
+          its own trailing margin. Nested so the two numbers stay
+          independent instead of one flex-col gap spending both. */}
+      <div className="flex flex-col gap-6">
+        <Group
+          title={t("Ours")}
+          people={shownOurs}
+          empty={
+            query.trim()
+              ? t("Nobody on our side matches that.")
+              : t("Nobody from our side is on this yet.")
+          }
+          // "Team lead" is the word the app already uses for this person on the
+          // form that sets them — not "main", which is the client side's word.
+          mainLabel={t("Team lead")}
+        />
+        <Group
+          title={t("Theirs")}
+          people={shownTheirs}
+          empty={
+            query.trim()
+              ? t("Nobody on the client's side matches that.")
+              : t("Nobody from the client's side is on this yet.")
+          }
+          mainLabel={t("Main")}
+        />
+      </div>
     </div>
   )
 }

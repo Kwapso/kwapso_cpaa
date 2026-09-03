@@ -32,6 +32,7 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TOOLBAR_EXEMPT,
+  TOOLBAR_CONTENT_GAP_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -2575,6 +2576,125 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R49 — THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER.
+  //
+  // The client, item 5 of the 2026-09-03 spacing round: "tehre's wahy too much
+  // space between the toolbar and the contenta" — confirmed on every screen.
+  // It had drifted into five numbers (gap-2/3/4/6, space-y-3, mb-4) doing the
+  // identical job across fourteen call sites. `<ToolbarRow>` now pays the gap
+  // itself, as its own trailing margin (`mb-[var(--toolbar-content-gap)]` on
+  // its root, screen-bits.tsx) — so the census here is anti-regression: no
+  // call site may hand the SAME row a second, competing spacing decision.
+  //
+  // Two shapes of offence, both derived off disk, never a hand-list:
+  //   i.  A `<ToolbarRow>` tag's OWN `className` prop hard-codes a `mb-*` —
+  //       the same brace-depth scan R48 uses, so a `search={<X onClear={…}/>}`
+  //       prop nested inside the tag can't be mistaken for its own close.
+  //   ii. The nearest OPEN `<div>`/`<section>` wrapper immediately before the
+  //       row (or before a `{someToolbar}` variable a screen renders in its
+  //       place — sprints-screen.tsx's own shape) still carries its own
+  //       `gap-*`/`space-y-*` on a `flex-col` — the same double-spend the row
+  //       used to leave to callers.
+  it("toolbar-content-gap: <ToolbarRow> pays its own trailing gap, never a call site (R49)", () => {
+    const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
+    expect(
+      screenBits,
+      "R49 — <ToolbarRow>'s own root must carry `mb-[var(--toolbar-content-gap)]` (screen-bits.tsx) — every call site inherits it from there, so a call site never has to ask for it"
+    ).toContain("mb-[var(--toolbar-content-gap)]")
+
+    // A wrapper's className, read backward from a `<ToolbarRow` (or a toolbar
+    // variable) occurrence: the nearest preceding `<div`/`<section` opening
+    // tag that is still OPEN at that point (nothing else opened after it —
+    // stripComments turns a JSX `{/* … */}` into a bare `{ }`, and a
+    // `{cond && (` guard, so both are tolerated in the gap between).
+    const WRAPPER_OPEN = /<(?:div|section)\s+className="([^"]*)"\s*>\s*$/
+    const BETWEEN_OK = /^(?:\{\s*\}|\{\s*[\w.]+(?:\s*&&\s*\(?)?|\s|\/\/[^\n]*\n)*$/
+
+    function wrapperGapOffence(before: string): string | null {
+      // Walk backward over "nothing but whitespace / an emptied comment / an
+      // opened `{cond && (`" until a JSX opening tag is reached — if it is a
+      // gapped flex-col div/section, that gap is a second hand on this row's
+      // own number.
+      const tail = before.slice(-400)
+      if (!BETWEEN_OK.test(tail.replace(WRAPPER_OPEN, ""))) return null
+      const m = WRAPPER_OPEN.exec(tail)
+      if (!m) return null
+      const cls = m[1]
+      if (!/flex-col/.test(cls)) return null
+      const gapMatch = cls.match(/\b(?:gap|space-y)-(\[[^\]]+\]|[0-9]+(?:\.5)?)\b/)
+      if (!gapMatch) return null
+      if (gapMatch[0].includes("--toolbar-content-gap")) return null
+      return gapMatch[0]
+    }
+
+    const roots = [WEB, join(ROOT, "web-portal")]
+    const offenders: string[] = []
+    const exemptUsed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue // declares the row, not a call site
+      const src = stripComments(f.source)
+
+      // i · every real `<ToolbarRow` TAG (brace-depth scan, R48's shape).
+      let from = 0
+      const tagStarts: number[] = []
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        tagStarts.push(at)
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        const classNameMatch = tag.match(/\bclassName\s*=\s*"([^"]*)"/)
+        if (classNameMatch && /\bmb-(?!\[var\(--toolbar-content-gap\)\])/.test(classNameMatch[1])) {
+          if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) exemptUsed.add(f.rel)
+          else
+            offenders.push(
+              `${f.rel}: <ToolbarRow className="${classNameMatch[1]}"> hard-codes its own \`mb-*\` — the row already pays --toolbar-content-gap itself, so this doubles it`
+            )
+        }
+        from = i + 1
+      }
+
+      // ii · the nearest OPEN flex-col wrapper before each tag, and before a
+      // `{xToolbar}`-shaped variable this file also defines from a real
+      // `<ToolbarRow` (sprints-screen.tsx's own indirection).
+      const checkpoints = [...tagStarts]
+      for (const m of src.matchAll(/\{(\w*[Tt]oolbar\w*)\}/g)) {
+        if (new RegExp(`\\b(?:const|let)\\s+${m[1]}\\s*=[\\s\\S]{0,600}?<ToolbarRow\\b`).test(src)) {
+          checkpoints.push(m.index ?? 0)
+        }
+      }
+      for (const at of checkpoints) {
+        const offence = wrapperGapOffence(src.slice(0, at))
+        if (!offence) continue
+        if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) {
+          exemptUsed.add(f.rel)
+          continue
+        }
+        offenders.push(
+          `${f.rel}: a flex-col wrapper immediately around a <ToolbarRow> (or the toolbar it renders) still carries its own \`${offence}\` — the row already pays --toolbar-content-gap itself, so this doubles it`
+        )
+      }
+    }
+    expect(
+      offenders,
+      `R49 — every <ToolbarRow> call site leaves the gap to the row itself, never a second hand on the same number:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(TOOLBAR_CONTENT_GAP_EXEMPT).filter((k) => !exemptUsed.has(k))
+    expect(
+      stale,
+      `these TOOLBAR_CONTENT_GAP_EXEMPT entries match nothing any more — the call site no longer double-spends the gap, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "declared-readers", // R42: workers/content/test/source-readers.test.ts
@@ -2625,6 +2745,7 @@ describe("RULES — the laws of the base", () => {
       "assistant-coverage", // R47: workers/mcp/test/assistant-coverage.test.ts — the module census, beside R19/R22/R27/R43 on the same door census
       "component-coverage", // R46: the reachability walk below, over components + foundations (compositions are R45's)
       "toolbar-shows-search", // R48: the BASE_RECIPES + <ToolbarRow> censuses below
+      "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
