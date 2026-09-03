@@ -1,32 +1,60 @@
-# Brimba
+# Kwapso
 
-**The multi-tenant SaaS base by Swift Struck.** (Two names, one repo: **Brimba**
-is the reusable BASE this document describes; **kwapso** is the product built on
-it that this checkout ships — hence `package.json` says kwapso and every
-hostname below is kwapso's. A fork keeps the base and replaces the brand.) Not an app for one industry,
-the reusable foundation every future app (ERP, CRM, portal…) is built on: login
-(an email code or Google), teams, Member roles (module key `member_roles`), invites,
-tickets, dropdown management, CSV data import, and an in-app **AI
-agent** that acts AS the signed-in user through the same gated endpoints (never
-exceeding their rights), all hosted on Cloudflare.
+**Kwapso's own operating system.** Two front doors over one shared foundation:
 
-**Eight workers are on disk**, six shared brains (auth, tenancy, realtime,
-**content** (tickets, the work engine, the knowledge base), **data-ops** (import + the AI agent), and **mcp**)
-under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gateway`
-(the client portal, `web-portal/`). The mcp worker is the external machine
-surface: personal access tokens (hashed, shown-once, team-pinned, revocable;
-managed under Settings → Access tokens) bridged to short-lived team-pinned
-sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's model is
-swappable but no longer silent: a Workers AI model named by `AGENT_MODEL`, and with
-no key there is no assistant at all rather than a quietly weaker one; it confirms on destructive + bulk actions and is metered
-by a credit quota, **the app's own daily allowance** (the `AGENT_FREE_DAILY` var:
-code default 25, both environments ship **50**, and staging's
-`AGENT_NO_DAILY_CAP` props the refusal door open so the 50 is enforced on
-production only — OPERATIONS.md has both vars) plus a purchasable balance.
+- **The agency app** (`web/`) is where Kwapso's staff work — ticket triage,
+  stories and sprints, one-click timers, process maps and their savings math,
+  money and margins, the knowledge base, and an in-app AI agent at their side.
+- **The client portal** (`web-portal/`) is for Kwapso's customers, the companies
+  the agency serves — where they see the impact created for them, raise and
+  track tickets, follow sprint status, get to-dos, browse their files, and, once
+  the team trusts it, ask the knowledge base a question.
 
-The team area (Overview, Members, Member roles, Invites) lives at `/t/<teamId>/…`
-deep-link URLs, rendered by the screen engine, not under Settings; top-level
-`/members` and `/roles` are thin redirects there.
+**Staff use the system; customers use the portal.** That is the whole shape.
+
+Everyone who signs in holds a **role**, and the role decides which door they
+belong at. Staff hold a staff role (Admin, Ops, …). A customer's people hold
+the **Client** role and are tied to one of the agency's **accounts** — the
+customer spine (`accounts` + `account_links` + `portal_users`) — which fences
+them to their own company's records and sends them to the portal. This is built
+for Kwapso and Kwapso's own customers; it is not a product sold to other
+companies.
+
+**Eight workers are on disk** (a count `web/test/doc-claims.test.ts` checks
+against `workers/` itself, so it cannot quietly rot): six private brains —
+**auth**; **tenancy** (the customer spine — accounts, contact links, portal
+logins; staff roles and invites; the screen-recipe store; process maps; and the
+money, the three rate cards + margin); **realtime**; **content** (tickets and
+the work engine, the knowledge base); **data-ops** (import + the AI agent); and
+**mcp** — behind **two public front doors**: `gateway` (the agency app, `web/`)
+and `portal-gateway` (the client portal, `web-portal/`). Every other worker
+sets `workers_dev:false`, so no public route can reach `/internal/*`, the agent,
+or the act-as-user surface.
+
+The **mcp** worker is the external machine surface: personal access tokens
+(hashed, shown-once, revocable; managed under Settings → Access tokens) bridged
+to short-lived sessions that expose the same gated doors as MCP tools at
+`/mcp` — an outside tool acts *as* a real person, capped by their live role.
+
+The **AI agent** acts as the signed-in user through those same gated endpoints
+and never exceeds their rights. Its model is swappable but never silent: a
+Workers AI model named by `AGENT_MODEL`, and with no key there is no assistant
+at all rather than a quietly weaker one. It confirms on destructive and bulk
+actions, and is metered by a daily allowance (the `AGENT_FREE_DAILY` var: code
+default 25, both environments ship **50**, and staging's `AGENT_NO_DAILY_CAP`
+props the refusal door open so the 50 is enforced on production only —
+OPERATIONS.md has both vars) plus a purchasable balance.
+
+One piece of plumbing you will meet in the code: the permission spine is
+currently scoped by a team id — `shared/workers/gating.ts` resolves rights from
+`(teamId, userId)`, and the agency app's deep-link URLs are
+`/t/<teamId>/<module>/<id>`. Nobody at either front door ever sees it (the
+surface is switched off in `shared/product.ts`), and it is scheduled for
+removal.
+
+Staff manage the roster — Overview, Members, Member roles, Invites — rendered
+by the screen engine rather than living under Settings. A customer's portal
+login is granted separately, through the accounts flow, never through Invites.
 
 *This section says what is true now.* When each piece landed is in
 [BASE-IMPROVEMENTS.md](BASE-IMPROVEMENTS.md) § *When each piece landed*: dated
@@ -107,7 +135,7 @@ they may be written down at all.
 
 **Rebuilding the whole base from nothing?** Follow
 **[BOOTSTRAP.md](BOOTSTRAP.md)**, the day-zero, command-by-command runbook that takes
-a fresh Cloudflare account to a live staging + production Brimba. It is the concrete
+a fresh Cloudflare account to a live staging + production Kwapso System. It is the concrete
 answer to "with only these docs and the repo, could I recreate the base?", yes: run
 that list. For the **one-command** version, the `new-app` build skill lives in the operator's
 global skills (`~/.claude/skills/new-app/` — deliberately not vendored here, so a
@@ -116,10 +144,10 @@ a fresh, branded, deployed fork automatically. If that skill is missing on this
 machine, BOOTSTRAP.md is the same journey by hand.
 
 **The rulebook, what governs the base (read before you change it).** Every rule for
-modifying, recreating, or building on Brimba lives in one of these, and each is
+modifying, recreating, or building on the Kwapso System lives in one of these, and each is
 concrete + checkable:
 
-- **The global habits every Swift Struck build follows**, [SWIFT-STRUCK-WAY.md](SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
+- **The global habits every Kwapso build follows**, [SWIFT-STRUCK-WAY.md](SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
 - **The two prime directives** (stay lean; obey the Laws), [CLAUDE.md](CLAUDE.md), the entry point.
 - **The Laws of the Base** (R1–R47), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: all 115 named components plus the 3 foundations (icons, tokens, motion) are either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
 - **Code house style**, [CONVENTIONS.md](CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
@@ -277,8 +305,8 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     draw the team's AI quota — scope the role to control it).
 21. **[PLATFORMS.md](PLATFORMS.md)**, where the base can run. **Cloudflare is
     recommended** (and `new-app` stands it up turnkey); this maps the base's five seams
-    (per-team data · live layer · compute · storage · static web) onto the top-10 cloud
-    providers (AWS, GCP, Azure, Vercel, Supabase, Fly.io, Render, DigitalOcean, Netlify)
+    (per-team data · live layer · compute · storage · static web) onto eight other cloud
+    providers (AWS, GCP, Azure, Supabase, Fly.io, Render, DigitalOcean, Netlify)
     with an honest effort rating and the porting method (swap ~4 seam files, not the app).
 22. **[mcp-quickstart.md](mcp-quickstart.md)**, the one-page version of MCP.md, meant
     to be handed straight to an outside developer. Deliberately a short overlap with
@@ -373,7 +401,7 @@ again, or to work out what is wrong while it is live, read
 
 ## Licence
 
-Proprietary and confidential, copyright © 2026 Swift Struck, all rights
+Proprietary and confidential, copyright © 2026 Kwapso SLU, all rights
 reserved. See [LICENSE](LICENSE). Access to this repository does not grant a
 licence to use, copy or redistribute it. Third-party dependencies keep their own
 licences, which are acknowledged in the same file.
