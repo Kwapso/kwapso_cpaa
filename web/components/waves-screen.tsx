@@ -331,12 +331,18 @@ export function WaveCollection({
         }
       />
     )
-  if (wavesQ.data === undefined) return <Skeleton variant="list" lines={4} />
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): this unmounted the card, the
+  // `WaveFinder` toolbar and "Sell a wave" along with the rows. Fixed the same
+  // way every sibling screen was: keep the chrome drawn and swap only the
+  // rows region below.
+  const wavesLoading = wavesQ.data === undefined
 
   // ON A CLIENT'S RECORD the list is narrowed before anything else is asked, so
   // the count under the search box and the empty state both speak about that
   // client rather than about the team.
-  const all = accountId ? wavesQ.data.filter((w) => w.accountId === accountId) : wavesQ.data
+  const loadedWaves = wavesQ.data ?? []
+  const all = accountId ? loadedWaves.filter((w) => w.accountId === accountId) : loadedWaves
   const rows = selectWaves(all, query)
   const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
@@ -392,33 +398,39 @@ export function WaveCollection({
             instead") that read as an intentional design rather than the bug
             it was. A genuinely empty Waves screen now draws no toolbar at
             all, below — `CollectionEmptyState` carries "Add the first"
-            alone. */}
-        {all.length > 0 && (
-          <div className="mb-4">
-            <WaveFinder
-              query={query}
-              onChange={setQuery}
-              clients={clients}
-              showClientFilter={!accountId}
-              resultCount={rows.length}
-              view={view}
-              onViewChange={(v) => {
-                setView(v)
-                // A fresh view starts at the most recent window — carrying
-                // the old offset forward would land on a period the reader
-                // never chose from this collection.
-                setTimelineOffset(0)
-              }}
-              period={timelineStepper}
-              actions={
-                canCreate && clients.length > 0 && (
-                  <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
-                )
-              }
-            />
-          </div>
+            alone.
+            `wavesLoading ||` — the same fold every sibling screen's own
+            `empty` gate carries now (2026-09-03 audit): `all` defaults to
+            `[]` before the read resolves, which reads exactly like a
+            genuinely empty collection unless the loading state says
+            otherwise, so this keeps the toolbar drawn through the load. */}
+        {(wavesLoading || all.length > 0) && (
+          <WaveFinder
+            query={query}
+            onChange={setQuery}
+            clients={clients}
+            showClientFilter={!accountId}
+            resultCount={rows.length}
+            view={view}
+            onViewChange={(v) => {
+              setView(v)
+              // A fresh view starts at the most recent window — carrying
+              // the old offset forward would land on a period the reader
+              // never chose from this collection.
+              setTimelineOffset(0)
+            }}
+            period={timelineStepper}
+            actions={
+              canCreate && clients.length > 0 && (
+                <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
+              )
+            }
+          />
         )}
-        {view === "timeline" && timeline ? (
+        {wavesLoading ? (
+          // ROWS ONLY — the toolbar above is already real.
+          <Skeleton variant="list" lines={4} />
+        ) : view === "timeline" && timeline ? (
           // ONE LANE PER ACCOUNT, one bar per wave, months across the top —
           // waveTimelineWindow's own header says why lanes are accounts and
           // periods are months rather than weeks. `Gantt` draws its own

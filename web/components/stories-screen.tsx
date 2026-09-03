@@ -237,9 +237,12 @@ export function StoriesScreen({
         }
       />
     )
-  if (storiesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const loaded = storiesQ.data
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the heading and the
+  // whole PagedFind toolbar along with the rows. Fixed the shared way —
+  // see processes-screen.tsx's identical note.
+  const storiesLoading = storiesQ.data === undefined
+  const loaded = storiesQ.data ?? []
 
   return (
     <div className="flex flex-col gap-6">
@@ -266,6 +269,8 @@ export function StoriesScreen({
         // same `loaded` array the recipe engine's own `SectionWithCreate`
         // below already reads to shape its rows.
         restingEmpty={loaded.length === 0}
+        // 2026-09-03 audit — see processes-screen.tsx's identical note.
+        restingLoading={storiesLoading}
         // FOUR FILTERS, all of them the DOOR's. They were the frame's until
         // 18 Aug 2026, which is the objection this file already makes two
         // comments up about narrowing the backlog by app in the browser — made
@@ -297,7 +302,7 @@ export function StoriesScreen({
         }
       >
         {(found) => {
-          const rows = found.active ? found.rows : loaded
+          const rows = found.active ? found.rows : storiesLoading ? null : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
           const data = shapeStories(rows, lang, storyMarks)
           const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)

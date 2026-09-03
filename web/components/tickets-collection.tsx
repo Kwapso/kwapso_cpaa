@@ -239,6 +239,10 @@ export function TicketsCollection({
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
   const scopedQ = narrowed ? facetQ : allQ
+  // 2026-09-03 audit — named short so PagedFind's own tag below (a fixed
+  // window this file's `facets-ask-the-door` census reads) stays inside it.
+  const scopedLoading = scopedQ.data === undefined
+  const scopedRows = scopedQ.data ?? []
   // The list key is written out at BOTH call sites below rather than held in a
   // variable: the paging and search checks read the JSX and look for the key the
   // door's own page lands in (`helpKey(`), which is the honest thing to look for
@@ -391,11 +395,17 @@ export function TicketsCollection({
                 }
               />
             </CollectionCard>
-          ) : scopedQ.data === undefined ? (
-            <CollectionCard>
-              <Skeleton variant="list" lines={4} />
-            </CollectionCard>
           ) : (
+            // WAS A THIRD BRANCH HERE, "scopedQ.data === undefined ?
+            // CollectionCard+Skeleton" (2026-09-03 audit — "nine screens
+            // blank their entire toolbar while loading"): that unmounted the
+            // whole PagedFind toolbar (search/sort/filters/"Raise ticket")
+            // while the tab strip above it stayed — so the search box and
+            // the create button still popped into existence only once the
+            // read resolved. Fixed the shared way: `restingLoading` below
+            // keeps PagedFind's own chrome mounted, and `children`'s
+            // `rows === null` check (already there for the search's own
+            // loading state) is what draws the skeleton now.
             <PagedFind<HelpTicket>
               listKey={narrowed ? helpFacetKey(teamId, "all", facet) : helpKey(teamId, "all")}
               placeholder={t("Search tickets…")}
@@ -409,7 +419,8 @@ export function TicketsCollection({
               // R50 — whichever tab is open, `scopedQ` is its own resting read
               // (the "all" list, or the sub-tab's own facet read), so this is
               // the one honest "is THIS tab's collection empty" answer.
-              restingEmpty={scopedQ.data.length === 0}
+              restingEmpty={scopedRows.length === 0}
+              restingLoading={scopedLoading}
               // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
               // overnight (2026-09-01) names Client and Module as the ticket
               // screen's own worked example of "real filter facet chips"; the
@@ -657,6 +668,24 @@ function TriageQueue({
     toast.success(t("Reply sent."))
   }
 
+  // NO ERROR BRANCH USED TO EXIST HERE (2026-09-03 audit) — every sibling tab
+  // in this file (`scopedQ.error`, above) has its own `ShapeStateBody
+  // state="error"` + Retry, and this queue had none: a failed read fell
+  // straight through to the `triageQ.data === undefined` check below and
+  // spun on a skeleton for ever, with no way out for whoever hit it.
+  if (triageQ.error)
+    return (
+      <ShapeStateBody
+        shape="collectionScreen"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the triage queue.") }}
+        action={
+          <Button variant="secondary" onClick={() => triageQ.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (triageQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const view = triageQ.data
   // GENUINELY EMPTY, TWO WAYS — NEITHER DRAWS THE TOOLBAR (R50: never toolbar
@@ -669,8 +698,15 @@ function TriageQueue({
   if (!view.yours)
     return (
       <p className="text-muted-foreground text-sm">
+        {/* A NAMED HOLE (R28/R33), not a raw interpolated fragment glued to a
+            value — the same sentence beside it, `t("Nobody is on triage this
+            week.")`, was correctly wrapped all along, so a name arriving on
+            duty was the one branch of this sentence shipping in English to
+            every non-English reader. */}
         {view.onDuty?.userName
-          ? `${view.onDuty.userName} is on triage this week, so the queue is theirs.`
+          ? t("{name} is on triage this week, so the queue is theirs.", {
+              name: view.onDuty.userName,
+            })
           : t("Nobody is on triage this week.")}
       </p>
     )

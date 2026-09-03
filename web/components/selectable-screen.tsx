@@ -483,7 +483,12 @@ export function SelectableScreen({
         }
       />
     )
-  if (valuesQ.data === undefined) return <Skeleton variant="list" lines={5} />
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the card, the toolbar
+  // (search/status/sort/New value) along with the rows. `values` above
+  // already defaults to `[]` for the same reason every sibling screen's does
+  // — the fix is to keep the chrome drawn and swap only the ROWS region.
+  const valuesLoading = valuesQ.data === undefined
 
   // Bundled once so `GroupValues`/`ValueRow` take one prop instead of
   // fourteen — every group reads the SAME state and handlers, never its own.
@@ -539,13 +544,18 @@ export function SelectableScreen({
             // above" pointing at a button that had just been removed from
             // above it. `CollectionEmptyState` below now carries "Add the
             // first" alone.
-            empty={values.length === 0}
+            // `!valuesLoading &&` — `values` defaults to `[]` before the read
+            // resolves (2026-09-03 audit), which reads exactly like a
+            // genuinely empty collection unless the loading state is folded
+            // into the same expression.
+            empty={!valuesLoading && values.length === 0}
             search={
-              values.length > 0 && (
+              (valuesLoading || values.length > 0) && (
                 <>
                   <SearchInput
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onClear={() => setQuery("")}
                     placeholder={t("Search values…")}
                     className="flex-1"
                     aria-label={t("Search dropdown values")}
@@ -592,7 +602,10 @@ export function SelectableScreen({
             }
           />
 
-        {grouped.length === 0 ? (
+        {valuesLoading ? (
+          // ROWS ONLY — the toolbar above is already real.
+          <Skeleton variant="list" lines={5} />
+        ) : grouped.length === 0 ? (
           values.length === 0 ? (
             // GENUINELY EMPTY — the toolbar above is gone, so this is the
             // only "New value" (and "Import CSV") left on screen.

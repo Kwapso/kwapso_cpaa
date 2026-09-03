@@ -482,7 +482,22 @@ export function MeetingsScreen({
             data.rows ?? [],
             found.emptyText
           )
-          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          // `listRecipe` IS ONLY EVER DRAWN FOR THE WEEK VIEW (the "calendar"
+          // and "all" branches below each draw their own renderer), so
+          // leaving its `emptyText` to `withDataDrivenCollection`'s own
+          // fallback meant a genuinely quiet week fell through to the
+          // COLLECTION's empty sentence — "Nothing in Meetings yet."
+          // (screens.ts's `meetingsListRecipe`), the whole-history claim,
+          // under a tab that only ever asks about seven days of it (2026-09-03
+          // audit). `found.emptyText` ("Nothing matched.") still wins
+          // mid-search; only the genuinely-empty week gets its own honest
+          // word, the same shape the Calendar tab's own
+          // "Nothing in Meetings this month." already has.
+          const listRecipe = withDataDrivenCollection(
+            recipe,
+            data.rows ?? [],
+            found.emptyText ?? t("Nothing in Meetings this week.")
+          )
           return (
             // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
             // `SectionWithCreate` does this identically) — the create button now

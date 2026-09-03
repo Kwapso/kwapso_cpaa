@@ -411,9 +411,15 @@ export function SprintsScreen({
         }
       />
     )
-  if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const sprints = sprintsQ.data
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): this unmounted the heading, the
+  // Overview/Calendar/All tab strip, `sprintToolbar` and "Start a sprint"
+  // along with the rows, so all four popped into existence together the
+  // moment the read resolved. `loadedSprints` above already defaults to `[]`
+  // before that happens, for the hooks beneath it — the fix is to keep that
+  // discipline all the way down and swap only the ROWS region.
+  const sprintsLoading = sprintsQ.data === undefined
+  const sprints = sprintsQ.data ?? []
   // The same map the Overview groups read, in the shape `RecordMark` wants.
   const kindMarks = new Map(kinds.filter((k) => k.mark).map((k) => [k.value, k.mark as string]))
   // The glyph for the STATE a sprint is in, keyed by the heading word itself —
@@ -441,7 +447,11 @@ export function SprintsScreen({
   // `useFilterBar` split) — never a second row this call site draws itself.
   const sprintToolbar = (
     <ToolbarRow
-      empty={sprints.length === 0}
+      // `!sprintsLoading &&` — `sprints` defaults to `[]` before the read
+      // resolves (2026-09-03 audit), which reads exactly like a genuinely
+      // empty collection unless the loading state is folded into the same
+      // expression.
+      empty={!sprintsLoading && sprints.length === 0}
       search={
         <SearchInput
           value={sprintQuery.q}
@@ -639,21 +649,38 @@ export function SprintsScreen({
                   `sprintToolbar`'s own note). The button still lives below the
                   tabs rather than beside them (client ruling, 2026-08-31). */}
               {sprintToolbar}
-              {overview}
+              {/* ROWS ONLY — the toolbar above is already real. */}
+              {sprintsLoading ? <Skeleton variant="list" lines={4} /> : overview}
             </div>
           ) : view === "calendar" ? (
             <div className="flex flex-col">
               {sprintToolbar}
-              <RecordCalendar
-                entries={calendarEntries}
-                onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
-                emptyText={
-                  askingSprints && narrowedSprints.length === 0
-                    ? t("Nothing matched.")
-                    : t("No sprints start this month.")
-                }
-              />
+              {sprintsLoading ? (
+                <Skeleton variant="list" lines={4} />
+              ) : (
+                <RecordCalendar
+                  entries={calendarEntries}
+                  onOpen={(id) => onIntent({ kind: "open", module: "sprints", id })}
+                  emptyText={
+                    askingSprints && narrowedSprints.length === 0
+                      ? t("Nothing matched.")
+                      : t("No sprints start this month.")
+                  }
+                />
+              )}
             </div>
+          ) : sprintsLoading ? (
+            // ALL SPRINTS, STILL LOADING — this tab's own search/sort/filter
+            // chrome is drawn by the kit's `CollectionFrame` INSIDE
+            // `ScreenRenderer` below (`useKitPanel`), not by a component this
+            // file owns, so it cannot yet be told apart from "genuinely
+            // empty" the way `sprintToolbar` above can — fixing that needs a
+            // loading-state passthrough on the kit panel itself, outside this
+            // file's territory. A rows-region skeleton is the honest partial
+            // fix available here: the tab strip and "Start a sprint" (this
+            // tab's own copy lives in the kit panel's toolbar) still wait on
+            // this one tab, everywhere else on this screen they do not.
+            <Skeleton variant="list" lines={4} />
           ) : (
             // ALL SPRINTS — the engine's own flat list, with the search and the
             // Client / App / Status filters the recipe declares. Its rows carry

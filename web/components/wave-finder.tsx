@@ -242,7 +242,20 @@ export function WaveFinder({
         // right for a row sitting directly on `ScreenShell`'s pane, which
         // this row never does).
         "flex w-full min-w-0 flex-col bg-surface-panel",
-        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
+        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill",
+        // THE GAP TO WHATEVER COMES NEXT — R49's `--toolbar-content-gap`
+        // (web/app/globals.css), the same token `<ToolbarRow>`
+        // (screen-bits.tsx) pays as its own trailing margin. This component
+        // is the one other toolbar row in the app (a bounded, single-view
+        // collection's own search/filter/sort, never the frame's), and it
+        // used to leave the gap to its ONE call site instead: waves-screen.tsx
+        // wrapped it in a bare `<div className="mb-4">` — 16px, not the
+        // token's 20px, and invisible to R49's own census, which only walks
+        // literal `<ToolbarRow>` call sites and cannot see a wrapper around a
+        // component it does not know by name. Paid here instead, the same way
+        // `ToolbarRow` owns its own margin, so the wrapper div is gone from
+        // the one place that grew it.
+        "mb-[var(--toolbar-content-gap)]"
       )}
     >
       <div

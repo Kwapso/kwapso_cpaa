@@ -335,7 +335,18 @@ export function AppsScreen({
         }
       />
     )
-  if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): `if (appsQ.data === undefined)
+  // return <Skeleton .../>` unmounted the heading, the tab strip, the
+  // search/sort/view row and the create button along with the rows, so all
+  // four popped into existence at once the moment the read resolved, over a
+  // generic 3-line skeleton even on this, the one tile-wall screen in the
+  // app. `loadedApps` above already defaults to `[]` before that happens (it
+  // has to, for the hooks beneath it to run unconditionally), so the fix is
+  // to keep drawing the real chrome throughout and swap only the ROWS region
+  // below — the same "body swap, frame stays" law the kit's own
+  // `CollectionFrame` already follows internally.
+  const appsLoading = appsQ.data === undefined
 
   // THE LIST VIEW'S ROWS — the SAME `shown` array Tiles renders below, shaped
   // once for `appsListRecipe` ("apps.list", web/lib/screens.ts). No second
@@ -431,21 +442,26 @@ export function AppsScreen({
             Options come from the WHOLE collection (see above), so narrowing
             by one facet never hides the other's choices. */}
         <ToolbarRow
-          empty={appsQ.data.length === 0}
+          // `!appsLoading &&` — never the RAW `loadedApps.length === 0` alone:
+          // that array defaults to `[]` before the read resolves, which reads
+          // exactly like a genuinely empty collection unless the loading state
+          // is folded into the same expression (2026-09-03 audit).
+          empty={!appsLoading && loadedApps.length === 0}
           search={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <SearchInput
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onClear={() => setQuery("")}
                 placeholder={t("Search apps…")}
                 className="w-full"
               />
             )
           }
-          filters={appsQ.data.length > 0 && filterPill}
-          toolbarPanel={appsQ.data.length > 0 && filterPanel}
+          filters={(appsLoading || loadedApps.length > 0) && filterPill}
+          toolbarPanel={(appsLoading || loadedApps.length > 0) && filterPanel}
           sort={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <SortControl
                 options={sortOptions}
                 value={sort.by}
@@ -461,7 +477,7 @@ export function AppsScreen({
             )
           }
           view={
-            appsQ.data.length > 0 && (
+            (appsLoading || loadedApps.length > 0) && (
               <ViewSwitch
                 // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
                 // generic table-first default (see the state declaration
@@ -478,7 +494,12 @@ export function AppsScreen({
           }
           actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
         />
-        {shown.length === 0 ? (
+        {appsLoading ? (
+          // THE ROWS REGION ONLY — the chrome above (tabs, search, sort, view,
+          // the create button) is already drawn; this is the one thing that
+          // was worth a skeleton in the first place.
+          <Skeleton variant="list" lines={4} />
+        ) : shown.length === 0 ? (
           narrowed ? (
             <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
           ) : tab === "inactive" ? (

@@ -292,9 +292,19 @@ export function TasksScreen({
         }
       />
     )
-  if (tasksQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const data = shapeTasks(tasksQ.data, lang)
+  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
+  // their entire toolbar while loading"): unmounted the heading, the six-tab
+  // strip and "New task" along with the rows. Kept from here down: the tab
+  // strip and the Calendar tab's own `ToolbarRow` (both this file's), which
+  // now stay mounted through the load. The other five tabs draw through
+  // `RecordTable` → the kit's `CollectionFrame` (`useKitPanel`), which has no
+  // loading-state passthrough of its own to lean on — outside this file's
+  // territory (`record-table.tsx` is not one of this pass's files) — so
+  // those five get a rows-region skeleton in place of the table, same as
+  // before this fix, rather than a false "genuinely empty" flash from an
+  // empty `[]` default.
+  const tasksLoading = tasksQ.data === undefined
+  const data = shapeTasks(tasksQ.data ?? [], lang)
   const columns = view === "completed" ? COMPLETED_COLUMNS : EVERYDAY_COLUMNS
   // A TABLE, not a two-line list, and that is what makes the four priority levels
   // distinct: each is its own sortable, filterable column rather than the fourth
@@ -344,8 +354,8 @@ export function TasksScreen({
   // with nothing due is the ordinary, expected shape of a perfectly healthy
   // calendar) and never "zero after `calendarQuery` narrowed it" (that stays
   // the toolbar's own search-box-only concern, below).
-  const hasDueDated = tasksQ.data.some((r) => r.dueOn)
-  const calendarEntries: CalendarEntry[] = tasksQ.data
+  const hasDueDated = (tasksQ.data ?? []).some((r) => r.dueOn)
+  const calendarEntries: CalendarEntry[] = (tasksQ.data ?? [])
     .filter((r) => r.dueOn)
     // THE CALENDAR'S OWN SEARCH (see `calendarQuery` above) — the title is the
     // one word every square already shows, so it is what a query narrows by,
@@ -420,9 +430,12 @@ export function TasksScreen({
                 needs its OWN search box, not a reason to have none. See
                 `calendarQuery` above for the filter this narrows. */}
             <ToolbarRow
-              empty={!hasDueDated}
+              // `!tasksLoading &&` — `hasDueDated` reads off `tasksQ.data ??
+              // []`, which is `[]` before the read resolves and would
+              // otherwise say "genuinely empty" too early (2026-09-03 audit).
+              empty={!tasksLoading && !hasDueDated}
               search={
-                calendarEntries.length > 0 || calendarQuery !== "" ? (
+                tasksLoading || calendarEntries.length > 0 || calendarQuery !== "" ? (
                   <SearchInput
                     value={calendarQuery}
                     onChange={(e) => setCalendarQuery(e.target.value)}
@@ -434,12 +447,25 @@ export function TasksScreen({
               }
               actions={canCreate && <AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />}
             />
-            <RecordCalendar
-              entries={calendarEntries}
-              onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
-              emptyText={calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")}
-            />
+            {tasksLoading ? (
+              // ROWS ONLY — the toolbar above is already real.
+              <Skeleton variant="list" lines={4} />
+            ) : (
+              <RecordCalendar
+                entries={calendarEntries}
+                onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+                emptyText={calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")}
+              />
+            )}
           </div>
+        ) : tasksLoading ? (
+          // THE OTHER FIVE TABS, STILL LOADING — see the note above
+          // `tasksLoading`'s own declaration: their search/sort chrome is the
+          // kit panel's (`RecordTable` → `CollectionFrame`), which has no
+          // loading state of its own to ask for here, so this is a
+          // rows-region skeleton in place of the table rather than a false
+          // "nothing here" read of an empty `[]` default.
+          <Skeleton variant="list" lines={4} />
         ) : (
           <RecordTable
             columns={tableColumns}

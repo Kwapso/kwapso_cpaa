@@ -81,6 +81,7 @@ import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRemembered } from "@shared/web/remembered"
+import { useT } from "@shared/web/language"
 
 /** One page of an answer from a list door: the rows, and where the next page
  * starts (null = that was the last one). `total` is the door's exact COUNT(*)
@@ -157,6 +158,7 @@ export function PagedFind<T>({
   wrap,
   actions,
   restingEmpty,
+  restingLoading = false,
   children,
 }: {
   /** the collection's OWN cache key (accountsKey(teamId), …) */
@@ -274,8 +276,20 @@ export function PagedFind<T>({
    * this toolbar went undocked from "is the collection empty" for as long as
    * it has existed. */
   restingEmpty: boolean
+  /** THE RESTING READ IS STILL ON ITS WAY — never a search's own `found.loading`
+   * (that already keeps the chrome up on its own, see `genuinelyEmpty` below),
+   * this is the call site's OWN top-level query, the one every screen used to
+   * gate its WHOLE return on (2026-09-03 audit: "nine screens blank their
+   * entire toolbar while loading"). `restingEmpty` cannot answer "is this
+   * empty" honestly before the read resolves — a call site defaulting to `[]`
+   * while its own query is still in flight would otherwise read as a
+   * genuinely empty collection and suppress the whole toolbar for exactly as
+   * long as the flicker this prop exists to remove. `undefined`/`false` is
+   * every existing call site's behaviour, unchanged. */
+  restingLoading?: boolean
   children: (found: Found<T>) => React.ReactNode
 }) {
+  const t = useT()
   // ── WHAT SHE WAS ASKING THIS DOOR, WHEN SHE LEFT ───────────────────────────
   //
   // The same sentence CollectionFrame's header carries, one layer down: the
@@ -391,12 +405,31 @@ export function PagedFind<T>({
   // currently being asked. `active` (not `asked`) is deliberate — a sort with
   // nothing typed still asks the door a different question, and the toolbar
   // that changed it has to stay on screen for the same reason a search does.
-  const genuinelyEmpty = restingEmpty && !active
+  //
+  // …AND NEVER WHILE THE RESTING READ ITSELF IS STILL LOADING (`restingLoading`,
+  // 2026-09-03 audit). A call site removing its own top-level early return
+  // defaults its resting array to `[]` before the fetch resolves, which reads
+  // exactly like a genuinely empty collection unless it is told otherwise —
+  // this is that telling, so the chrome (search, tabs, sort, actions) stays
+  // mounted through the load and only the ROWS region swaps to a skeleton
+  // (the call site's own `children`, checking `rows === null`).
+  const genuinelyEmpty = restingEmpty && !active && !restingLoading
 
   // NOTHING FOUND is a sentence, not a blank. "No accounts yet." is the
   // collection's empty state and it is simply untrue mid-search — but an empty
   // TAB is not a failed search either, so the sentence follows what was asked.
-  const emptyText = asked ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
+  //
+  // WRAPPED HERE, NOT LEFT AS A RAW TEMPLATE LITERAL (2026-09-03 audit,
+  // robustness fix — not user-visible). This sentence does not currently ship
+  // in English: the catalogue looks strings up by CONTENT, and the identical
+  // sentence happens to be correctly `t(...)`-wrapped elsewhere in the app, so
+  // every language's translation already exists and resolves here too. But
+  // that is a coincidence between two unrelated files, not a contract R28's
+  // extractor can see — it only finds text inside a real `t(...)` call, so if
+  // the other file's wording ever changes by one word this reverts to English
+  // everywhere with no test to catch it. Declaring it at its own call site
+  // makes the catalogue entry this file's own rather than borrowed.
+  const emptyText = asked ? t("Nothing matched. Try fewer words, or clear the filters.") : undefined
 
   // Computed once, ahead of the toolbar and the `children` call below, so
   // `actions` and the CSV export href (inside `children`) narrow by the exact

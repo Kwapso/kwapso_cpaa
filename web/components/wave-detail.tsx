@@ -395,6 +395,7 @@ export function WaveDetailScreen({
                           <SearchInput
                             value={sprintQuery}
                             onChange={(e) => setSprintQuery(e.target.value)}
+                            onClear={() => setSprintQuery("")}
                             placeholder={t("Search sprints in this wave…")}
                             className="flex-1"
                             aria-label={t("Search sprints in this wave")}

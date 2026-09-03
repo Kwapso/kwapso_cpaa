@@ -515,7 +515,15 @@ const knowledgeListRecipe: ScreenRecipe = {
     "Nothing in the knowledge base yet.",
     "Search knowledge base…",
     [],
-    { paged: true }
+    // `icon` WAS MISSING (2026-09-03 audit) — the only one of fifteen
+    // `listCollection` calls with none, so this was the one empty state in
+    // the app drawing a bare dashed box with no glyph above the sentence
+    // (this file's own `listCollection` doc: "a lone line of grey text …
+    // reads as a screen that FAILED"). `CONCEPT_ICON.knowledge` already
+    // exists (it draws the rail entry and every mark on this collection's own
+    // rows), so this was a call site that forgot to pass it, not a gap in
+    // the vocabulary.
+    { paged: true, icon: "knowledge" }
   ),
 }
 
