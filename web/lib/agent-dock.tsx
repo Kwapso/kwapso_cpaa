@@ -41,6 +41,25 @@ function publish(node: HTMLElement | null): void {
  * the padding and the scroller, and this only has to fill it so the portalled
  * panel has a full-height box to be `h-full` against.
  *
+ * `h-full` IS THE FIX, NOT DECORATION — the comment above stated the intent
+ * for a while before the class actually carried it. Its own parent
+ * (`screen-shell-aside-body`, kit) is a `min-h-0 flex-1` flex child, so it
+ * DOES have a determinate height; without `h-full` here this box's own
+ * height was `auto` (a percentage against a determinate parent still needs
+ * an explicit `height`/`h-full` on the CHILD, or the child just shrinks to
+ * its content). That auto height then defeated every `h-full` the portalled
+ * panel and `AgentChat` declare further down (a percentage against an
+ * `auto`-height ancestor resolves to `auto` too), so the whole conversation
+ * rendered at its full, unclipped content height — the kit's own
+ * `screen-shell-aside` still capped and scrolled THAT as one long blob (it
+ * never grew past the window), but `AgentChat`'s own turns-only scroller
+ * (header and composer pinned, only the messages move) never activated,
+ * because it never received a bounded box to scroll within. Reproduced and
+ * confirmed in the kit's `verify/shell-chat/` harness by nesting the exact
+ * `AgentDockSlot -> PanelFrame -> AgentChat` shape: without `h-full` the
+ * panel's own box measured ~7400px tall; with it, ~726px, matching the
+ * card's own height to the pixel, with the turns region alone scrolling.
+ *
  * A CALLBACK REF RATHER THAN AN EFFECT, so the node is published in the same
  * commit that creates it — an effect would publish one paint later and the
  * panel would flash in at the wrong moment. React 19 calls the returned cleanup
@@ -51,7 +70,7 @@ export function AgentDockSlot() {
   return (
     <div
       data-slot="agent-dock"
-      className="flex min-h-0 w-full flex-1 flex-col"
+      className="flex h-full min-h-0 w-full flex-1 flex-col"
       ref={(node) => {
         publish(node)
         return () => {
