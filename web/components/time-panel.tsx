@@ -27,6 +27,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Alarm, StopCircle, Clock, PencilSimple, Play, Trash } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
@@ -263,6 +264,28 @@ export function TimePanel({
     }
   }
 
+  // A FAILED READ SAYS SO. Neither read was ever checked here, so a failed
+  // fetch used to spin the skeleton below for ever — no retry, no explanation,
+  // no way out (work-logs-panel.tsx carries the same guard on its own list).
+  if (logsQ.error || timersQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("That didn't load. Refresh the page, and tell us if it keeps happening.") }}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              logsQ.refresh()
+              timersQ.refresh()
+            }}
+          >
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (logsQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const logs = logsQ.data
   const runaways = (timersQ.data ?? []).filter((t) => t.runaway)

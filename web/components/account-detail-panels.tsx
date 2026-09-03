@@ -249,19 +249,24 @@ export function ContactsPanel({
                     disabled={busy}
                     onClick={() =>
                       ask({
-                        title: `Remove ${l.personName} from ${accountName}?`,
-                        body: "They stay in your accounts, with everything they're attached to. You're only saying they're no longer a contact here.",
-                        action: "Remove contact",
+                        title: t("Remove {person} from {account}?", {
+                          person: l.personName,
+                          account: accountName,
+                        }),
+                        body: t(
+                          "They stay in your accounts, with everything they're attached to. You're only saying they're no longer a contact here."
+                        ),
+                        action: t("Remove contact"),
                         run: () =>
                           act(
                             () => tenancy.setLinkActive(l.id, false),
-                            "Contact removed.",
-                            "Couldn't remove that contact."
+                            t("Contact removed."),
+                            t("Couldn't remove that contact.")
                           ),
                       })
                     }
                     className="text-destructive hover:text-destructive gap-1"
-                    aria-label={`Remove ${l.personName}`}
+                    aria-label={t("Remove {person}", { person: l.personName })}
                   >
                     <UserMinus className="size-3.5" />
                   </Button>
@@ -273,12 +278,12 @@ export function ContactsPanel({
                     onClick={() =>
                       void act(
                         () => tenancy.setLinkActive(l.id, true),
-                        "Contact added back.",
-                        "Couldn't add that contact back."
+                        t("Contact added back."),
+                        t("Couldn't add that contact back.")
                       )
                     }
                     className="gap-1"
-                    aria-label={`Add ${l.personName} back`}
+                    aria-label={t("Add {person} back", { person: l.personName })}
                   >
                     <Power className="size-3.5" /> {t("Add back")}
                   </Button>
@@ -402,13 +407,15 @@ export function PortalAccessPanel({
                     onClick={() =>
                       ask({
                         title: t("Take this login away?"),
-                        body: "They won't be able to sign in any more. Everything they're attached to, their records, their history, stays exactly where it is, and you can switch it back on later.",
-                        action: "Take access away",
+                        body: t(
+                          "They won't be able to sign in any more. Everything they're attached to, their records, their history, stays exactly where it is, and you can switch it back on later."
+                        ),
+                        action: t("Take access away"),
                         run: () =>
                           act(
                             () => tenancy.setPortalAccessActive(p.id, false),
-                            "Access taken away.",
-                            "Couldn't change that login."
+                            t("Access taken away."),
+                            t("Couldn't change that login.")
                           ),
                       })
                     }
@@ -425,8 +432,8 @@ export function PortalAccessPanel({
                     onClick={() =>
                       void act(
                         () => tenancy.setPortalAccessActive(p.id, true),
-                        "Access switched back on.",
-                        "Couldn't change that login."
+                        t("Access switched back on."),
+                        t("Couldn't change that login.")
                       )
                     }
                     className="gap-1"

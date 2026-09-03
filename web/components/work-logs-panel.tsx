@@ -416,12 +416,24 @@ export function WorkLogsPanel({
       <div className="flex flex-col gap-6">
         {/* The numbers wait for the second read rather than flashing a zero: an
             "0 hours" that becomes "14 hours" a moment later is a number somebody
-            might act on. */}
-        {summaryQ.data && summaryQ.data.total > 0 && (
-          <>
-            <Numbers summary={summaryQ.data} />
-            <Pictures summary={summaryQ.data} />
-          </>
+            might act on. A FAILED summary read used to fall through this same
+            gate as silently as "nothing logged yet" — the list below still
+            proved time existed, so the band said so instead of vanishing. */}
+        {summaryQ.error ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+            {t("Couldn't load the hours for this record.")}
+            <Button variant="secondary" size="sm" onClick={() => summaryQ.refresh()}>
+              {t("Try again")}
+            </Button>
+          </p>
+        ) : (
+          summaryQ.data &&
+          summaryQ.data.total > 0 && (
+            <>
+              <Numbers summary={summaryQ.data} />
+              <Pictures summary={summaryQ.data} />
+            </>
+          )
         )}
 
         {rows === null ? (

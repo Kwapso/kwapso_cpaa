@@ -31,7 +31,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
-import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
 import { useT } from "@shared/web/language"
@@ -74,12 +74,28 @@ function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
   )
 }
 
-function Group({ title, people, empty, mainLabel }: { title: string; people: Side[]; empty: string; mainLabel: string }) {
+function Group({
+  title,
+  people,
+  empty,
+  concept,
+  mainLabel,
+}: {
+  title: string
+  people: Side[]
+  empty: string
+  /** the CONCEPT_ICON key this side's people are — see `EmptyLine`'s own doc:
+   * a bare grey line here reads as a screen that FAILED rather than one with
+   * nothing on it yet, which is exactly the state a brand-new system's own
+   * record meets on both sides. */
+  concept: "members" | "contacts"
+  mainLabel: string
+}) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
       {people.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{empty}</p>
+        <EmptyLine concept={concept}>{empty}</EmptyLine>
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (
@@ -167,6 +183,7 @@ export function StakeholdersPanel({
               ? t("Nobody on our side matches that.")
               : t("Nobody from our side is on this yet.")
           }
+          concept="members"
           // "Team lead" is the word the app already uses for this person on the
           // form that sets them — not "main", which is the client side's word.
           mainLabel={t("Team lead")}
@@ -179,6 +196,7 @@ export function StakeholdersPanel({
               ? t("Nobody on the client's side matches that.")
               : t("Nobody from the client's side is on this yet.")
           }
+          concept="contacts"
           mainLabel={t("Main")}
         />
       </div>

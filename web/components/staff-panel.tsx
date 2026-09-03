@@ -23,6 +23,7 @@ import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { RecordActionsMenu } from "@/components/record-chrome"
@@ -85,6 +86,29 @@ export function StaffPanel({
   const { busy: archiveBusy, ask, run, dialog: archiveDialog } = useConfirm()
 
   if (!mayRead) return null
+
+  // A FAILED READ SAYS SO. Neither read was ever checked here, so a failed
+  // fetch used to spin the skeleton below for ever — no retry, no explanation,
+  // no way out (work-logs-panel.tsx carries the same guard on its own list).
+  if (profilesQ.error || certsQ.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("That didn't load. Refresh the page, and tell us if it keeps happening.") }}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              profilesQ.refresh()
+              certsQ.refresh()
+            }}
+          >
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
   if (profilesQ.data === undefined || certsQ.data === undefined) return <Skeleton variant="list" lines={3} />
 
   // The LIVE profile if there is one; otherwise the last one that was taken
