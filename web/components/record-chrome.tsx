@@ -1323,21 +1323,29 @@ const PANEL_BELOW_TABS =
  *     the screenshot. So the restore is now `px-1`, matching the header at
  *     every breakpoint (the header's own inset never grows at `lg`, so
  *     neither does this) rather than the card's own responsive ladder.
- * 2 · THE ROW NO LONGER STRETCHES PAST ITS OWN TABS. `[role=tablist]` is a
- *     flex child of `<Tabs>` (`flex flex-col`, tabs.tsx — no `items-start`),
- *     so with nothing of its own saying otherwise it STRETCHES to the full
- *     cross-axis width of whatever it sits in — which, once escaped by
- *     `-mx-6`/`-mx-[space-7]` above, is the CARD's own full outer width, not
- *     the strip's own content. A record with fewer tabs than that width
- *     (any of them, and worse the more tabs fall short) got a large, blank,
- *     unstyled rectangle immediately after its last tab — reachable,
- *     hoverable, and drawing nothing, which is exactly the "mis-sized empty
- *     container" a screenshot of the App detail screen's own long strip
- *     (FluClinic: twelve tabs, still short of a wide desktop's width) showed
- *     sitting where a toolbar might otherwise go. `self-start` is the whole
- *     fix — it opts this one flex child out of the column's default stretch,
- *     back to sizing itself off its own tabs, the same as `max-w-full` +
- *     `overflow-x-auto` already assumed it did. */
+ * 2 · THE ROW NO LONGER STRETCHES PAST ITS OWN TABS — `self-start`, AND
+ *     SUPERSEDED BY AN EXPLICIT WIDTH, 2026-09-03 (STICKY_TABS's own comment,
+ *     below, has the full story — this paragraph is kept for why `self-start`
+ *     was reached for in the first place). `[role=tablist]` is a flex child
+ *     of `<Tabs>` (`flex flex-col`, tabs.tsx — no `items-start`), so with
+ *     nothing of its own saying otherwise it STRETCHES to the full cross-axis
+ *     width of whatever it sits in — which, once escaped by `-mx-6`/
+ *     `-mx-[space-7]` above, is the CARD's own full outer width, not the
+ *     strip's own content. A record with fewer tabs than that width (any of
+ *     them, and worse the more tabs fall short) got a large, blank, unstyled
+ *     rectangle immediately after its last tab — reachable, hoverable, and
+ *     drawing nothing, which is exactly the "mis-sized empty container" a
+ *     screenshot of the App detail screen's own long strip (FluClinic: twelve
+ *     tabs, still short of a wide desktop's width) showed sitting where a
+ *     toolbar might otherwise go. `self-start` fixed THAT complaint — it
+ *     opted this one flex child out of the column's default stretch, back to
+ *     sizing itself off its own tabs — but it over-corrected: sizing to
+ *     CONTENT is exactly as short of the card's true edge as sizing to
+ *     un-escaped `max-w-full` was, just for a different reason, and it is
+ *     what the client's next round of screenshots caught (STICKY_TABS's own
+ *     comment). `self-start` is gone from the class list below; an explicit,
+ *     escape-compensated `width` replaces it and covers both complaints at
+ *     once — see that comment for the measurements. */
 /* THE STRIP PINS AT THE PAGE'S OWN TOP EDGE — `top-0`, 2026-09-03. It used to
  * read `--record-tabs-top`, a MEASURED clearance the condensed stand-in title
  * published for it (a `ResizeObserver` on that bar, because a translated word
@@ -1383,13 +1391,66 @@ const PANEL_BELOW_TABS =
  * rest: the tablist's margin box is now `--record-tab-gap` taller, and the
  * room `TabsContent` needs to still land at the card's ordinary inset is
  * `--space-6`/`--space-7` alone. Verified at rest before and after — the
- * panel's top and the triggers' bottom are unchanged to 0.2px. */
+ * panel's top and the triggers' bottom are unchanged to 0.2px.
+ *
+ * THE STRIP'S OWN BOX NOW SPANS THE FULL WIDTH — CLIENT BUG, 2026-09-03,
+ * TWO REPORTS, VERBATIM: "the shape of the folder tab shoudl be behind the
+ * body, if not when i scroll down look what happens in my screenshots - its
+ * overlapping nad cuts the content" and "also when scrolling the tabs shoudl
+ * take all the width." A SECOND screenshot, on a Sprint detail screen
+ * ("FluClinic-SPR0007", three tabs), showed the identical shape: the strip
+ * stopping well short of the card's own right edge, with what looked like a
+ * second panel's text bleeding through past it — same component, same class,
+ * proving this was never page-specific.
+ *
+ * ROOT CAUSE, MEASURED (kwapso-design `verify/record-tab-strip/`, a harness
+ * built from the kit's real `Card`/`Tabs`/`TabsList` against this exact class
+ * string, before and after, at rest and scrolled): `self-start` sizes
+ * `[role=tablist]` to its own TAB CONTENT, not to its container — correct for
+ * "don't stretch," wrong for "cover the row you sit above." An 8-tab strip on
+ * a 900px card measured 184px short of the card's own right edge; a 3-tab
+ * strip (the sprint shape) measured 621px short. That uncovered band is
+ * still inside the strip's own STICKY, z-10 vertical range, so a row
+ * scrolling up through it is only hidden where a tab happens to sit — a row's
+ * trailing content (a status pill, in the reported case) stays fully visible,
+ * uncovered, scrolling straight through the same band the active tab's own
+ * mango count badge occupies. Proven directly: with `self-start`, a "Done"
+ * pill scrolled into the strip's own vertical range was NOT horizontally
+ * covered by the strip's box (`horizontallyCovered: false` at every scroll
+ * position where the pill sat under the strip) — exactly the "mango shape
+ * cutting into scrolled content" the client saw. There was no separate
+ * z-index bug: `[role=tablist]` already carries `z-10` over `sticky`, and
+ * that was never the defect — the strip's own painted box simply didn't
+ * reach far enough to need it.
+ *
+ * THE FIX IS AN EXPLICIT WIDTH, NOT A SWAP TO `w-full`. `[role=tablist]` is
+ * escaped sideways by `-mx-6`/`-mx-[space-7]` (this rule, above) to align its
+ * left edge with the header rather than the card's padded content — so a
+ * bare `w-full` (100% of the SAME un-escaped containing block `self-start`
+ * measured against) would land the box's right edge exactly `space-6`/
+ * `space-7` short of the card's true edge, the same shortfall by a smaller
+ * name. The width has to GROW by the escape amount on both sides, the
+ * ordinary "full bleed" calc. `max-w-none` is required alongside it: the
+ * kit's own `TabsList` (tabs.tsx) already carries `max-w-full` unconditionally,
+ * which would otherwise clamp any wider explicit width straight back down to
+ * 100% of the un-escaped container, silently undoing this. Individual
+ * `TabsTrigger`s are UNTOUCHED — no `flex-1`, no stretch, each tab keeps its
+ * own content width and the row still scrolls horizontally exactly as before
+ * when there are more tabs than room (measured: a narrow host with 8 tabs
+ * still requires the same horizontal scroll after this fix, `Tickets` simply
+ * starts further right because there is more true width to show it in first).
+ * This is the record strip's OWN track reaching full width, never a
+ * per-tab stretch — the mechanism `BreadcrumbFolders` was reverted away from
+ * the same day; that reversal is untouched and does not apply here, this is
+ * a different component with a different problem. */
 export const STICKY_TABS =
   "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
-  "[&>[role=tablist]]:self-start [&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
+  "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
+  "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--background)] " +
   "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   "gap-[var(--space-6)] " +
   "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +
+  "lg:[&>[role=tablist]]:w-[calc(100%_+_var(--space-7)_+_var(--space-7))] " +
   "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   "lg:gap-[var(--space-7)]"
