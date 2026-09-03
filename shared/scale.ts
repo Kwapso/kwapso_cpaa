@@ -42,6 +42,30 @@
 // rem against a 16px authoring base, and a px value in consuming code silently
 // opts that property out of this control. That is why the reskin deleted 54
 // hand-set `text-[10px]`-family sizes rather than re-tuning them.
+//
+// ── AND IT IS WHY THE HEADING-SIZE PROPOSAL WAS DECLINED (3 Sep 2026) ──────
+//
+// An open design decision asked whether a page title and a record heading
+// should grow from 32px to 44, and the portal's title from 24 to 32 — the
+// reference PDF names three roles ("Page title" 56, "Record heading" 44,
+// "Section title" 32) and both doors currently spend the smallest of them on
+// their largest thing. The owner declined all three, and the reason IS this
+// file: a person who wants bigger headings already has a control that gives
+// them bigger headings, across the whole app, without anybody choosing a number
+// on their behalf. `large` moves the agency app to 18px and the portal to 19,
+// and because every size in the theme is rem, a title moves with it.
+//
+// THAT REASONING ONLY HOLDS WHILE THE HEADINGS ARE REM, which is the sentence
+// worth keeping. A heading hand-set in px would sit still while every step of
+// this control moved around it — the setting would look broken on exactly the
+// text a person raised the setting to fix. So the paragraph above is not
+// housekeeping: it is the precondition of the answer given here.
+//
+// WHAT WAS NOT SETTLED, so nobody reads more into this than was decided: the
+// kit's own `Title` primitive stops at 32 and has no 44 rung, while `Headline`
+// draws 44 and 56 and is wired to nothing. That mismatch is still on file
+// upstream. The ruling is that we are not spending the app's headings to fix
+// it, not that it is fixed.
 
 /** One step: the root font size it sets on each front door. `agencyPx` is
  * `web/`; `portalPx` is `web-portal/`. Carries no `label` — `scale-section.tsx`
