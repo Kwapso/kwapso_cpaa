@@ -277,7 +277,15 @@ export function RelationshipMap({
                   cy={n.y}
                   r={isFocus ? 22 : 14}
                   fill={colourFor(n.table)}
-                  stroke="var(--background)"
+                  // The kit's own avatar-ring "cut-out": the ring must match
+                  // the surface it sits on, not the page. This SVG's own
+                  // container (above) is `bg-muted`, not `bg-background` — the
+                  // two are near-identical in light (1.04:1, which is why this
+                  // read fine for a year) but diverge in dark (`--muted`
+                  // #2F2D28 vs `--background` #141310, 1.35:1), drawing a
+                  // visible halo around every node. `--muted` is the right
+                  // token because it is the ground actually behind the ring.
+                  stroke="var(--muted)"
                   strokeWidth={isFocus ? 4 : 2}
                 />
                 <text
