@@ -21,9 +21,8 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { Check, ClockCounterClockwise, Paperclip, Plus, Sparkle, X } from "@shared/ui/foundations/icons"
+import { Check, ClockCounterClockwise, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
@@ -45,10 +44,8 @@ import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentDock } from "@/lib/agent-dock"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
-import { personInitials } from "@/lib/identity"
 import { useLanguage, useT } from "@shared/web/language"
 import { formatRelative } from "@shared/web/format"
-import type { SessionUser } from "@shared/types"
 
 /** THE CHIP LABELS. Here rather than in `shared/knowledge-chips.ts` because a
  * sentence a person reads is the front door's to say and to translate (R28/R33):
@@ -109,6 +106,27 @@ function SourceChips({
               disabled={disabled}
               onPressedChange={() => onToggle(chip.key)}
               aria-label={LABEL[chip.key] ?? chip.key}
+              // SAME SIZE AS THE DETAIL TITLE'S OWN PILLS (owner, 3 Sep 2026:
+              // "make them the same size as the pills on top of details
+              // title"). That row is `record-chrome.tsx`'s `IDENTITY_ROW`,
+              // which gives every `Badge` inside it the kit's `size="pill"`
+              // geometry — `--control-height-pill` (26 at the kit's own
+              // 16px-root arithmetic), `--space-3h` inline padding and the
+              // `text-badge` step — by the SAME three custom properties
+              // `badge.tsx` defines that size from, not by numbers re-derived
+              // here. `Toggle` has no `size="pill"` of its own (its ladder
+              // stops at `sm`'s 32-tall `--control-height-dense`, chapter
+              // 10's segmented-control height, which is a different control's
+              // geometry to begin with — the kit change that would be a real
+              // `size="pill"` on this component is logged for Aurora, not
+              // guessed at here), so this reaches the SAME tokens Badge's
+              // pill size already reaches, on the one call site that draws
+              // this row, exactly as `IDENTITY_ROW` reaches them on its own
+              // side rather than a hand-tuned pixel count. `gap-2` is
+              // untouched: `toggleVariants`' own base class already sets it,
+              // matching `IDENTITY_ROW`'s `gap-2` without needing to be
+              // repeated here.
+              className="h-[var(--control-height-pill)] px-[var(--space-3h)] text-badge"
             >
               {LABEL[chip.key] ?? chip.key}
             </Toggle>
@@ -269,17 +287,10 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
 
 export function AgentPanel({
   teamId,
-  user,
   open,
   docked,
 }: {
   teamId: string | null
-  /** The signed-in member — item 6 (owner, 31 Aug 2026): "for my messages I
-   * need to see my user avatar". Passed down rather than re-read here because
-   * agent-host.tsx already holds it (`useActiveTeam()`), and a second
-   * subscription to the same session cache would answer the identical
-   * question a second time. */
-  user: SessionUser | null
   open: boolean
   // NO `onOpenChange` any more (ITEM 1, 31 Aug 2026) — this component had
   // exactly one use for it, the header's own ✕, which is gone outright: the
@@ -315,45 +326,29 @@ export function AgentPanel({
     return () => clearTimeout(id)
   }, [open, canUse])
 
-  // A "PUNCHED THROUGH" RING (owner, 1 Sep 2026, on last round's avatars:
-  // stronger contrast in light mode). The kit already draws exactly this
-  // ring for the same reason on `AvatarPresence` and `AvatarStack` —
-  // `shadow-[0_0_0_var(--avatar-ring)_var(--background)]`, a 2.5px ring in
-  // the GROUND tone, "so it reads as punched through the mark rather than
-  // laid on it" (avatar.tsx's own words) — reached here directly rather than
-  // re-invented, because a round mark sitting flush against a bubble that is
-  // now genuinely close to it in tone (item 1's beige, `--surface-quiet`) is
-  // exactly the case that ring exists for: light mode's beige-on-white is a
-  // visibly weaker edge than dark mode's near-black-on-charcoal, so the ring
-  // is what restores a crisp boundary in the palette that needed it, without
-  // a second, mode-specific override.
-  const AVATAR_RING = "shadow-[0_0_0_var(--avatar-ring)_var(--background)]"
-
-  // ITEM 6, THE ASSISTANT'S OWN SIDE — round (item 6: "avatars are always
-  // round"), the kit's brand fill, its own Sparkle mark: the same glyph the
-  // launcher and `AssistantMark` already draw, just carried on `Avatar`
-  // instead of a square record-mark, because the kit's own ruling 30 ("square
-  // for a THING, pill for a person") is a KIT design law, not a Law of the
-  // Base — and the owner, today, is asking for this one call site to read as
-  // a face rather than a record mark. `Avatar`'s own default shape is
-  // already `pill` (round); nothing here overrides it.
-  const assistantAvatar = (
-    <Avatar size="sm" variant="brand" className={AVATAR_RING}>
-      <AvatarFallback>
-        <Sparkle className="size-3" aria-hidden />
-      </AvatarFallback>
-    </Avatar>
-  )
-  // ITEM 6, YOUR OWN SIDE — the same `Avatar` the profile menu already draws
-  // (app-shell.tsx's `ProfileMenu`): a photograph if there is one, else your
-  // initials. Left `undefined` with no signed-in user, which is the kit's own
-  // "nothing invented" behaviour for a missing avatar.
-  const userAvatar = user ? (
-    <Avatar size="sm" className={AVATAR_RING}>
-      {user.imageUrl && <AvatarImage src={user.imageUrl} alt="" />}
-      <AvatarFallback>{personInitials(user.firstName, user.lastName)}</AvatarFallback>
-    </Avatar>
-  ) : undefined
+  // AVATARS ARE GONE (owner, 3 Sep 2026, verbatim: "remove the avatars from
+  // the assistant chat - they take too much space"). ITEM 6 above (the round,
+  // punched-through-ring marks this section used to build for both sides) is
+  // reversed outright, not hidden: `avatars={false}` below, on the AgentChat
+  // call itself, so the kit renders neither `userAvatar` nor
+  // `assistantAvatar` at all and the row's own `gap-2` toward them collapses
+  // with them — the bubble's own flex item is the row's only remaining
+  // child, so it gets the full 62%/85% cap to itself instead of sharing it
+  // with a 20px mark, which is the "reclaim the space" half of the ask.
+  //
+  // SPEAKER IDENTITY DOES NOT NEED A REPLACEMENT, because it was never
+  // resting on the avatar alone. `agent-chat.tsx`'s own ruling 36 already
+  // draws the two sides on two different signals that have nothing to do
+  // with the mark: SIDE (`self-end`/`self-start` — yours right, its left) and
+  // FILL (`bg-surface-inverse` charcoal for you, `bg-card` paper for it) —
+  // "Threads are yours-right on the charcoal fill, theirs-left on paper,
+  // avatars outside" is one ruling naming three signals, and only the third
+  // is what this item removes. A screen reader was never told by the avatar
+  // either: the role is `sr-only` above each bubble regardless (`userLabel`/
+  // `assistantLabel` in the kit component), untouched by this change. So the
+  // two speakers stay unambiguous through alignment + fill exactly as they
+  // did before the avatar existed on top of them; nothing new is invented
+  // here to replace it.
 
   // ITEM 7, TAKEN FURTHER THREE TIMES NOW (owner: 31 Aug "on top of the
   // bubble", then 1 Sep "make it eyebrow and aligned to right on my messages
@@ -787,10 +782,10 @@ export function AgentPanel({
                 // consistent with every other spacing decision in this file.
                 "[&_[data-slot=agent-chat-turns]]:gap-[var(--space-5)]"
               )}
-              // ITEM 6 — round marks on both sides (see above); `avatars`
-              // stays at the kit's own default (`true`).
-              userAvatar={userAvatar}
-              assistantAvatar={assistantAvatar}
+              // ITEM (3 Sep 2026) — no marks on either side any more (see the
+              // comment above this function for why speaker identity does
+              // not need a replacement).
+              avatars={false}
               // NO `header` any more (ITEM 5, 31 Aug 2026) — ClockCounterClockwise and New
               // chat moved UP to share the panel's own `Title` row, aligned
               // with "Assistant" per the just-established title/actions

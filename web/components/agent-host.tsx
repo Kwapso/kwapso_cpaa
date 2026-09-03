@@ -74,7 +74,7 @@ export function AgentHost() {
   // through a portal; when the column is shut there is no column, so it draws
   // nothing and keeps its thread. "Closed assistant show nothing. It's literally
   // only the bar" (client, verbatim) is the shell's own behaviour, unassisted.
-  if (docked) return <AgentPanel teamId={teamId} user={active.user} open={open} docked />
+  if (docked) return <AgentPanel teamId={teamId} open={open} docked />
 
   return (
     // ITEM 2/3 (owner, 31 Aug 2026): "more like a bubble coming out of its
@@ -120,7 +120,7 @@ export function AgentHost() {
           <Sparkle />
         </Button>
       </PopoverTrigger>
-      <AgentPanel teamId={teamId} user={active.user} open={open} docked={false} />
+      <AgentPanel teamId={teamId} open={open} docked={false} />
     </Popover>
   )
 }
