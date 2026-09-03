@@ -116,6 +116,27 @@ describe("the tab-to-content gap", () => {
       read("web/components/record-chrome.tsx"),
       "a detail screen's --record-tab-gap must resolve to the same --tab-content-gap, or the two halves of the app can drift apart again"
     ).toContain("[--record-tab-gap:var(--tab-content-gap)]")
+
+    // AND THE DETAIL SCREEN'S GAP MUST BE PART OF THE PINNED STRIP'S OWN
+    // PAINTED BOX, exactly as the collection strip's is. It was a flex `gap`
+    // on the `<Tabs>` root — the same class of mistake as the margin above,
+    // and just as silent: a flex gap is flow, the pinned tablist is not, so
+    // the band below the strip was covered by nothing the moment it stuck and
+    // the panel's rows scrolled through it (measured at 1440x900, scrolled
+    // 500px: a row showing 2.3px under the tabs). It is a BOTTOM BORDER here
+    // rather than `pb-`, because this strip pins `[role=tablist]` itself and
+    // the kit draws that element's baseline rule as an INSET shadow — inset
+    // paints at the padding box, so padding would drag the rule off the tabs;
+    // a border extends the border box instead. See STICKY_TABS's own comment.
+    expect(
+      read("web/components/record-chrome.tsx"),
+      "STICKY_TABS must spend --record-tab-gap on the pinned tablist's OWN border box, not as a flex gap between it and its TabsContent sibling — a gap between two siblings is never painted and stops meaning anything once the strip pins on scroll"
+    ).toContain("[border-bottom:var(--record-tab-gap)_solid_var(--background)]")
+
+    expect(
+      read("web/components/record-chrome.tsx"),
+      "STICKY_TABS's flex gap must not spend --record-tab-gap a second time — the border above already reserves it, and paying twice pushes the panel down by a gap nobody asked for"
+    ).not.toContain("gap-[calc(var(--space-6)_+_var(--record-tab-gap))]")
   })
 
   it("design-scale: no collection strip is drawn outside the one seam", () => {

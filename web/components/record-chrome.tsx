@@ -1346,11 +1346,50 @@ const PANEL_BELOW_TABS =
  * top should be only the tabs, if there are tabs" — so there is nothing left
  * above the strip to clear, and the variable that carried the clearance went
  * with the file that published it. */
+/* THE GAP IS PART OF THE PINNED STRIP'S OWN PAINTED BOX — 2026-09-03,
+ * measured in a browser, not reasoned. It used to be the flex `gap` between
+ * `[role=tablist]` and its `TabsContent` sibling on the `<Tabs>` root
+ * (`gap-[calc(var(--space-6)_+_var(--record-tab-gap))]`), which is the same
+ * mistake `STICKY_FOLDER_TABS` made with a margin and for the same reason: a
+ * flex gap is FLOW, and the strip pinned inside it is not. `bg-background`
+ * paints the tablist's own border box and nothing else, so the moment the
+ * strip pinned, the `--record-tab-gap` band below it stopped being covered by
+ * anything and the panel's own rows scrolled straight through it. Measured on
+ * this file's own harness at 1440x900, scrolled 500px: the strip's painted
+ * bottom sat at y=42.4 and a probe row spanned y=3.2-44.7 — 2.3px of a row
+ * showing directly under the tabs, with the next row's top 9.8px below them
+ * instead of the 18.75px the gap is worth. The client's own words are what
+ * this fails: "make sure to maintain the space between tabs and content on all
+ * screens, even when I scroll down."
+ *
+ * WHY A BORDER AND NOT `pb-`, WHICH IS WHAT THE COLLECTION STRIP USES. The two
+ * strips pin DIFFERENT ELEMENTS. `STICKY_FOLDER_TABS` pins the `<Tabs>` ROOT
+ * (a collection strip hands `TabsView` no `renderPanel`, so the root holds the
+ * tablist and nothing else), and a root carries no mark of its own — padding
+ * there is free. This one pins `[role=tablist]` ITSELF, because only the
+ * tablist may escape the card (`-mx`/`-mt` below) while `TabsContent` stays
+ * inside it. And the kit draws the line strip's baseline rule as an INSET
+ * shadow on the tablist (`shadow-[inset_0_-0.0625rem_0_var(--border)]`,
+ * tabs.tsx) — an inset shadow paints at the PADDING box's edge, so
+ * `pb-[var(--record-tab-gap)]` drags the rule 18.75px down, away from the tabs
+ * it underlines. Measured, both: with `pb-` the tablist's box bottom moved
+ * 42.4 -> 61.2 while the triggers stayed at 43.4. A BOTTOM BORDER extends the
+ * BORDER box instead — painted, part of the pinned element, and outside the
+ * padding box the inset rule is clipped to — so the band is covered at every
+ * scroll position and the baseline stays welded to the tabs. Same value, same
+ * property owner (`--record-tab-gap`, itself `--tab-content-gap`), one seam.
+ *
+ * The flex gap drops by exactly what the border added, so nothing moves at
+ * rest: the tablist's margin box is now `--record-tab-gap` taller, and the
+ * room `TabsContent` needs to still land at the card's ordinary inset is
+ * `--space-6`/`--space-7` alone. Verified at rest before and after — the
+ * panel's top and the triggers' bottom are unchanged to 0.2px. */
 export const STICKY_TABS =
   "[&>[role=tablist]]:bg-background [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   "[&>[role=tablist]]:self-start [&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
+  "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--background)] " +
   "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "gap-[calc(var(--space-6)_+_var(--record-tab-gap))] " +
+  "gap-[var(--space-6)] " +
   "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +
   "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "lg:gap-[calc(var(--space-7)_+_var(--record-tab-gap))]"
+  "lg:gap-[var(--space-7)]"
