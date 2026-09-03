@@ -161,22 +161,22 @@ function SourceChips({
  *
  * ITEM 1 (owner, 31 Aug 2026 — the precise repeat of the 28 Aug report,
  * GAPS-A.md OVL-1): "the background of the assistant should be white, and his
- * messages in beige." `--card` and `--popover` are #FFFEF9 in light and #26241F
- * in dark — IDENTICAL to `--background`, which is why the earlier
- * `bg-surface-panel` patch (still visible in git blame) never really fixed it:
- * `--surface-panel` (#F7F2EB light / #1C1B18 dark) sits only ONE faint step
- * from `--card`, not a genuinely different tone. So: the ground is
- * `bg-background` — the token tokens.css itself calls "the kwapso white" — and
- * every `bg-card` inside this one subtree (the assistant's bubble, its composer
- * pill, a pending confirm step's marker) is repointed, by a LOCALLY SCOPED
- * custom property, at `--surface-quiet` instead: #E2DDD4 light (a real beige,
- * not an off-white) and #3A3833 dark (distinctly lighter than the near-black
- * ground — the dark-mode variation the owner asked for). Still one token each
- * side, per R32 — reassigned for this one surface, not a new colour, and not a
- * change to `--card` anywhere else in the app. Your OWN messages
- * (`bg-surface-inverse`, ruling 36's charcoal-on-light / off-beige-on-dark
- * fill) were never part of this bug — checked: they sit nowhere near the ground
- * tone in either palette.
+ * messages in beige." AT THE TIME, `--card` and `--popover` were #FFFEF9 in
+ * light and #26241F in dark — IDENTICAL to `--background`, which is why the
+ * earlier `bg-surface-panel` patch (still visible in git blame) never really
+ * fixed it: `--surface-panel` (#F7F2EB light / #1C1B18 dark) sits only ONE
+ * faint step from `--card`, not a genuinely different tone. So: the ground
+ * was `bg-background` — the token tokens.css itself calls "the kwapso white"
+ * — and every `bg-card` inside this one subtree (the assistant's bubble, its
+ * composer pill, a pending confirm step's marker) is repointed, by a LOCALLY
+ * SCOPED custom property, at `--surface-quiet` instead: #E2DDD4 light (a real
+ * beige, not an off-white) and #3A3833 dark (distinctly lighter than the
+ * near-black ground — the dark-mode variation the owner asked for). Still one
+ * token each side, per R32 — reassigned for this one surface, not a new
+ * colour, and not a change to `--card` anywhere else in the app. Your OWN
+ * messages (`bg-surface-inverse`, ruling 36's charcoal-on-light /
+ * off-beige-on-dark fill) were never part of this bug — checked: they sit
+ * nowhere near the ground tone in either palette.
  *
  * ITEM 3 (owner, 31 Aug 2026): "fix the color of the texts... you invented that
  * color. refer to guide and rules for colors!" `--card-foreground` is set
@@ -194,9 +194,48 @@ function SourceChips({
  * The one GENUINE gap found while tracing this: `shared/web/markdown-html.ts`
  * emits bare `<a>`/`<code>`/`<strong>` with no class at all, so a link inside
  * an assistant reply was rendering in the BROWSER'S default blue rather than
- * any app token — fixed in `agent-markdown.tsx`. */
-const PANEL_SURFACE =
-  "flex flex-col gap-0 overflow-hidden bg-background " +
+ * any app token — fixed in `agent-markdown.tsx`.
+ *
+ * CORRECTION (client screenshot, 3 Sep 2026, dark mode, Settings screen):
+ * "the background of assistant should be the same as the background of
+ * content." ITEM 1's own premise had gone stale under it without anybody
+ * touching this file: a later dark-mode token pass (the three-spine work)
+ * split `--card` (#26241F, `--kw-unlit-raised`) away from `--background`
+ * (#141310, `--kw-unlit-page`) — they are NO LONGER identical in dark, only
+ * in light (both still `--kw-off-beige`), which is exactly why this read as
+ * "barely different near-blacks" instead of a loud break: it is dark-mode
+ * only, and the two shades are close enough to miss without measuring them.
+ * The content card was never painted from `--background` — it uses
+ * `--surface-raised` (`screen-shell.tsx`'s `CARD`, `bg-[var(--surface-raised)]`),
+ * which resolves through `--card` — so once the token split, this panel's own
+ * `bg-background` quietly stopped matching the card it was built to sit
+ * beside. Simply swapping to `bg-card`/`bg-[var(--surface-raised)]` ON THIS
+ * SAME element is not the fix: this element ALSO repoints `--card` to
+ * `--surface-quiet` for ITEM 1's own beige retint below, and a custom
+ * property resolves from the FINAL cascaded value on an element, not
+ * declaration order within one class list — reading `--card` here would read
+ * the beige it just reassigned, not the true raised tone. So the two
+ * concerns now live on two different elements: this outer surface reads the
+ * genuine, un-repointed `--surface-raised` (`PANEL_SURFACE`, below), and the
+ * `--card`/`--card-foreground` retint moves one level down, onto
+ * `PANEL_QUIET_SCOPE`, wrapped around `{children}` at both render sites —
+ * still scoped to exactly the same subtree (header included, same as
+ * before), so every `bg-card` this comment already named (the bubble, the
+ * composer pill, the confirm marker) keeps reading `--surface-quiet`
+ * unchanged; only the PANEL's OWN ground now resolves independently of that
+ * repoint. */
+const PANEL_SURFACE = "flex flex-col overflow-hidden bg-[var(--surface-raised)]"
+
+/** THE QUIET RETINT SCOPE — ITEM 1's `--card` → `--surface-quiet` reassignment,
+ * moved off the outer surface (see the CORRECTION above `PANEL_SURFACE`) onto
+ * a wrapper around `{children}`, so it retints the assistant's own bubble /
+ * composer / confirm marker without also being read back by the ground
+ * that surrounds them. `flex-1 min-h-0 flex-col` reproduces the layout the
+ * outer element used to do directly (this wrapper is now its one child, and
+ * needs to fill it the same way) so the header (`shrink-0`) and the content
+ * column (`flex-1 min-h-0`) inside still stack and size exactly as before. */
+const PANEL_QUIET_SCOPE =
+  "flex flex-1 min-h-0 flex-col " +
   "[--card:var(--surface-quiet)] [--card-foreground:var(--foreground)]"
 
 /** THE COLUMN. The kit's aside already owns the width (`ASIDE_WIDTH`, 23.75rem),
@@ -209,9 +248,11 @@ const PANEL_SURFACE =
  * surface is this app's node: the same `rounded-[var(--radius)]` (R31, no third
  * radius) and the same `--shadow-lifted` the shell gives the screen card, so
  * the two things floating on the spine read as siblings rather than as a card
- * beside a bare stack. `bg-background` rather than `var(--surface-raised)`
- * because `--surface-raised` resolves through `--card`, which this surface has
- * just repointed at beige — the same value by a name that is still true here. */
+ * beside a bare stack. The background itself now lives on `PANEL_SURFACE`
+ * (`bg-[var(--surface-raised)]`, the same expression `screen-shell.tsx`'s own
+ * `CARD` uses for the content card) rather than here — see the CORRECTION
+ * comment above it for why this used to say `bg-background` and no longer
+ * does. */
 const PANEL_COLUMN = "h-full w-full rounded-[var(--radius)] shadow-[var(--shadow-lifted)]"
 
 /** THE DOCKED PANEL'S OWN LEADING CORNER, SQUARED. Client, 2026-09-03:
@@ -240,7 +281,12 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
     // thing: there is nowhere to draw, so nothing is drawn. The panel itself
     // stays mounted above, so the thread and the live run are not lost.
     if (!dock) return null
-    return createPortal(<div className={cn(PANEL_SURFACE, PANEL_COLUMN_DOCKED)}>{children}</div>, dock)
+    return createPortal(
+      <div className={cn(PANEL_SURFACE, PANEL_COLUMN_DOCKED)}>
+        <div className={PANEL_QUIET_SCOPE}>{children}</div>
+      </div>,
+      dock
+    )
   }
 
   return (
@@ -295,7 +341,7 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
         "shadow-[var(--shadow-overlay),0_0_3rem_0.5rem_color-mix(in_srgb,var(--primary)_32%,transparent)]",
       )}
     >
-      {children}
+      <div className={PANEL_QUIET_SCOPE}>{children}</div>
     </PopoverContent>
   )
 }
@@ -734,30 +780,36 @@ export function AgentPanel({
                 // message bubble beige too, same as the text field — #F7F2EB").
                 // The assistant's bubble is `bg-card` (`turnVariants`, above),
                 // and this whole panel already reassigns `--card` to
-                // `--surface-quiet` at the OUTER scope (the PopoverContent
-                // className above, item 1's fix) — which is exactly why the
-                // composer needed its OWN, deeper override to reach
-                // `--surface-panel` instead (see that comment for the
-                // mechanism: a custom property set directly on an element wins
-                // over inheritance regardless of the ancestor rule's
-                // specificity). Same technique, applied one scope up: this
-                // repoints `--card` to `--surface-panel` for every
-                // `[data-slot=agent-chat-turn]` (both roles' turn wrapper),
-                // which reaches the assistant's `bg-card` bubble two levels
-                // down through ordinary inheritance and touches nothing else
-                // that still reads `--surface-quiet` from the outer scope —
-                // your OWN bubble (`bg-surface-inverse`, never part of `--card`
-                // at all) and the pending-confirm marker (`RunSteps`, a
-                // sibling of `AgentChat` outside this subtree) are both
-                // untouched, so the turn-to-turn (you vs. the assistant) and
+                // `--surface-quiet` at the QUIET scope (`PANEL_QUIET_SCOPE`,
+                // wrapped around this whole subtree — item 1's fix; see the
+                // CORRECTION comment on `PANEL_SURFACE` for why that
+                // reassignment lives on its own wrapper now, not on the
+                // panel's outer element) — which is exactly why the composer
+                // needed its OWN, deeper override to reach `--surface-panel`
+                // instead (see that comment for the mechanism: a custom
+                // property set directly on an element wins over inheritance
+                // regardless of the ancestor rule's own specificity). Same
+                // technique, applied one scope up: this repoints `--card` to
+                // `--surface-panel` for every `[data-slot=agent-chat-turn]`
+                // (both roles' turn wrapper), which reaches the assistant's
+                // `bg-card` bubble two levels down through ordinary
+                // inheritance and touches nothing else that still reads
+                // `--surface-quiet` from the quiet scope — your OWN bubble
+                // (`bg-surface-inverse`, never part of `--card` at all) and
+                // the pending-confirm marker (`RunSteps`, a sibling of
+                // `AgentChat` outside this subtree) are both untouched, so the
+                // turn-to-turn (you vs. the assistant) and
                 // bubble-to-confirm-marker distinctions this panel already
                 // relies on both survive. Separation from the PANEL's own
                 // ground is still a FILL difference, never a stroke (rejected
                 // outright by the client the same day, "pills no border!" —
                 // see `web/app/layout.tsx`'s hairline comment): the panel
-                // itself is `bg-background` (#FFFEF9 light / #141310 dark),
-                // one faint step from `--surface-panel` (#F7F2EB /
-                // #1C1B18) — the identical gap the composer already stands on,
+                // itself is `bg-[var(--surface-raised)]` (#FFFEF9 light /
+                // #26241F dark — the CORRECTION comment on `PANEL_SURFACE`
+                // above has the token-split history; this used to read
+                // `bg-background` and no longer does), close to
+                // `--surface-panel` (#F7F2EB / #1C1B18) in both palettes — the
+                // same kind of gap the composer already stands on,
                 // client-approved, so the bubble now reads exactly as
                 // legible against the same ground.
                 "[&_[data-slot=agent-chat-turn]]:[--card:var(--surface-panel)]",
