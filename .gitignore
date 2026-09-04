@@ -20,6 +20,11 @@ out/
 .wrangler/
 .dev-state/
 
+# The screen builder's built page — one regenerable HTML with React, the kit
+# and the fonts inlined (megabytes). `node scripts/build-screen-builder.mjs`
+# writes it; the catalogue beside it IS committed and locked by a test.
+/tools/screen-builder/index.html
+
 # Skill output — regenerable, never source. Each of these is written into the
 # repo ROOT by a skill that re-runs on demand, which is exactly where canon
 # lives, so an old run reads like a document someone wrote on purpose. The

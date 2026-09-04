@@ -137,8 +137,16 @@ made upstream and pulled. When Aurora ships a new tag:
 
     node scripts/sync-design.mjs v1.1.0     # replace shared/ui at the new tag
     node scripts/design-imports.mjs         # idempotent; converts any new old-path imports
-    npm run check                           # the laws + the hand-edit guard
+    node scripts/build-screen-builder.mjs   # re-derive the kit catalogue the screen builder offers
+    npm run check                           # the laws + the hand-edit guard + the catalogue lock
     # then ship as usual
+
+The third line is what "live" means for `tools/screen-builder/` (its README
+says why): every option that sandbox offers is derived from the kit's own
+`cva()` calls and `*Props` types into `tools/screen-builder/catalogue.json`,
+and `web/test/kit-catalogue.test.ts` turns the build red when that file is
+behind `shared/ui/`. The built page is git-ignored output; the catalogue is
+committed.
 
 Cloning needs the `alaap-kwapso` GitHub identity (the machine's default
 credential is a different account); the sync script's URL carries it.
