@@ -1,0 +1,14 @@
+/* The builder's stylesheet is the KIT'S stylesheet — the same four lines both
+ * front doors start from (web/app/globals.css), minus the app's own
+ * library-overrides.css, because this tool shows the kit and not the app's
+ * corrections to it. tokens.css carries its own `@source` lines for the kit's
+ * components, compositions and icons; the two below add this tool's own chrome
+ * and the samples. Fonts are inlined at build time by
+ * scripts/build-screen-builder.mjs so the page stands alone. */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../../shared/ui/foundations/tokens/tokens.css";
+@import "../../shared/ui/foundations/motion/motion.css";
+@source "./app.tsx";
+@source "./builder/**/*.tsx";
+@source "./samples/**/*.tsx";

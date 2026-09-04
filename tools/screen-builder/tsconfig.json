@@ -1,0 +1,13 @@
+{
+  // The screen builder is a developer tool OUTSIDE both front doors' import
+  // closure (so R28/R29/R33 do not reach it) but INSIDE `npm run check`, so a
+  // kit tag that renames a prop turns a sample red instead of drawing nothing.
+  "extends": "../../web/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}
