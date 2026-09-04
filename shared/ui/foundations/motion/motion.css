@@ -188,6 +188,297 @@
 
 
 /* ============================================================================
+   3a · BELOW THE MOBILE BREAKPOINT, NOTHING ARRIVES FROM THE SIDE
+
+   THE CLIENT, VERBATIM, 2026-09-04:
+       "everythung that's slisde in in desktop, should be slide up in mobile"
+
+   Read as a SYSTEM rule, not as a note about one drawer. On a phone a panel
+   anchored to the reading-start or reading-end edge is not a panel at all —
+   it is the whole screen wearing a side entrance — and it arrives across the
+   reader's thumb rather than under it. Every native handset convention, and
+   ch27.2's own narrow render ("On narrow it rises from the bottom as a sheet
+   with a grabber"), says the same thing: on a phone, panels rise.
+
+   WHY THE RULE LIVES HERE AND NOT AT THE 18 CALL SITES. `Sheet` already
+   centralises `side`, and `.motion-sheet` already reads `data-side`. Writing
+   the rule once against that attribute means no call site changes, no call
+   site can forget, and there is exactly one line to edit when the threshold
+   moves. The alternative — every composition sniffing the viewport and
+   passing `side="bottom"` itself — is the thing six compositions already do
+   by hand, and it is why this had to become a system rule.
+
+   WHY CSS AND NOT `matchMedia`. Tried and rejected, and it is not a style
+   preference. A JS breakpoint read at mount gives the server one answer and
+   the client another, which is a hydration mismatch; and even where it
+   hydrates cleanly the FIRST paint is the desktop side, so a phone shows a
+   frame of a drawer flying in from the right before it corrects itself. A
+   media query has no first paint to get wrong. The `data-side` ATTRIBUTE
+   still says "right" below the breakpoint — that is deliberate: the prop is
+   the call site's stated intent and the viewport is a separate fact, so the
+   attribute stays honest and the media query does the translating.
+
+   `top` AND `bottom` ARE UNTOUCHED AT EVERY WIDTH. A `top` sheet that rose
+   from the bottom would arrive at the edge it did not come from. The rule is
+   about panels that slide IN FROM THE SIDE, and those are exactly two.
+
+   THE SPECIFICITY, WHICH IS THE PART THAT BITES. The [dir="rtl"] mirror
+   above scores (0,4,0); the plain rules score (0,3,0). A media query adds
+   nothing to specificity, so a narrow block written only as
+   `.motion-sheet[data-side="right"][data-state="open"]` would be OUTSCORED
+   by the RTL mirror and an Arabic phone would keep sliding sideways. Both
+   forms are therefore listed below. Measured in verify/sheet-slide-up at
+   ?dir=rtl, because the first draft of this block had exactly that bug.
+
+   REDUCED MOTION needs nothing here and gets nothing. Only `animation-name`
+   is reassigned; the durations stay `--duration-overlay` and
+   `--duration-exit`, which tokens.css §9 already zeroes under
+   `prefers-reduced-motion: reduce`. The sheet then appears at its end state
+   instead of travelling, exactly as the side entrance already did.
+
+   THE THRESHOLD IS `45rem` — 720px at the 16px authoring base, and 720px in
+   a media query whatever the text-size control has done to the root, because
+   media-query lengths resolve against the INITIAL font-size and not the root
+   element's. 45rem is the figure ch27.2, ch27.4, ch27.14 and ch27.37 already
+   state and the figure six compositions already query. The RANGE syntax
+   (`width < 45rem`) is used rather than `max-width: 45rem` so that this file
+   and the geometry in components/sheet/sheet.tsx agree on the boundary pixel
+   itself: Tailwind's `max-[45rem]:` variant compiles to `width < 45rem`, and
+   at exactly 720px an inclusive query here would have flipped the MOTION one
+   pixel before the LAYOUT followed.
+   ========================================================================= */
+
+@media (width < 45rem) {
+  .motion-sheet[data-side="left"][data-state="open"],
+  .motion-sheet[data-side="right"][data-state="open"],
+  [dir="rtl"] .motion-sheet[data-side="left"][data-state="open"],
+  [dir="rtl"] .motion-sheet[data-side="right"][data-state="open"] {
+    animation-name: motion-sheet-in-bottom;
+  }
+
+  .motion-sheet[data-side="left"][data-state="closed"],
+  .motion-sheet[data-side="right"][data-state="closed"],
+  [dir="rtl"] .motion-sheet[data-side="left"][data-state="closed"],
+  [dir="rtl"] .motion-sheet[data-side="right"][data-state="closed"] {
+    animation-name: motion-sheet-out-bottom;
+  }
+}
+
+
+/* ============================================================================
+   3b · `.motion-edge-panel` — THE SAME RULE FOR A PANEL THAT IS NOT A SHEET
+
+   WHAT IT IS FOR. The client's rule is about panels, not about `Sheet`. The
+   shell's assistant is a COLUMN — it is laid out by the shell, it is not a
+   dialog, it is not portalled and it is not Radix — and it still slides in
+   from the inline end on desktop, so it is still covered. This class gives
+   that column, and anything else in the same position, the sheet's exact
+   travel and the sheet's exact narrow flip without pretending to be a sheet.
+
+   THE CONTRACT, IN FULL — four things, and only the first is required.
+
+     1 · Put `.motion-edge-panel` on the PANEL ELEMENT ITSELF, never on a
+         wrapper. The keyframes translate by 100% of the animated box, so the
+         box must be the panel or the distance is somebody else's height.
+
+     2 · `data-side="left" | "right" | "top" | "bottom"`. Same four words as
+         `Sheet`'s prop, same meaning, same LTR-physical spelling — `left` is
+         the reading-start edge and mirrors under [dir="rtl"] exactly as the
+         sheet does. OMITTED, it falls back to `bottom`, because a panel that
+         has not said where it lives is a panel on a phone.
+
+     3 · EITHER `data-state="open" | "closed"` on the same element — the
+         stateful form, and the one to prefer, because one class then covers
+         entrance and exit — OR the explicit `.motion-edge-panel-in` /
+         `.motion-edge-panel-out` twins for a panel with no state attribute
+         to give. That is the same two-form arrangement §2 and §4 use; it is
+         not a new idea, it is this file's existing one.
+
+     4 · GEOMETRY IS STILL THE CALLER'S. This class animates and does nothing
+         else — it sets no inset, no width, no height and no radius. Below
+         45rem it makes a left/right panel TRAVEL upward; it does not move
+         that panel to the bottom of the screen. The caller must place the
+         panel where it is going to land, or the travel will be right and the
+         destination wrong. `Sheet` does its half in
+         components/sheet/sheet.tsx; a shell column must do its half in the
+         shell.
+
+     5 · THE EXIT NEEDS THE PANEL TO STILL EXIST WHILE IT PLAYS, and this is
+         the one that will be got wrong first. Unmounting the panel — or
+         putting `hidden` on it — in the same commit that sets
+         `data-state="closed"` lands `display: none` on the exit's first
+         frame, so the panel disappears rather than leaves and the class
+         looks broken when the caller is what broke it. Keep it painted for
+         `--duration-exit` (140ms, and 0 under reduced motion), THEN remove
+         it. `inert`, on the other hand, goes on IMMEDIATELY: a panel that is
+         on its way out must be unreachable from the keyboard, from the
+         accessibility tree and from the pointer while it is still visible.
+         The two do not happen at the same moment and treating them as one
+         flag is the bug. Written out as working code in
+         verify/sheet-slide-up/page.tsx → `EdgePanelProbe`.
+
+   WHAT IT INHERITS AUTOMATICALLY. The durations and curves are the sheet's
+   (`--duration-overlay` in, `--duration-exit` out), so reduced motion is
+   already handled by tokens.css §9 zeroing them; and the keyframes are the
+   sheet's own, declared once in §3 above and merely referenced here. Nothing
+   about the feel of this class can drift away from the sheet's, because
+   there is nothing here to drift.
+
+   WHY IT IS A SECOND SET OF RULES RATHER THAN A SECOND SELECTOR BOLTED ONTO
+   §3. Tried, and backed out. Adding `.motion-edge-panel` to each of the
+   sheet's fourteen selector lists is tidier to read and puts the 18 sheet
+   call sites one typo away from a panel's problem; the rules above are
+   load-bearing for shipped screens and were left untouched on purpose. The
+   duplication here is four shorthand declarations and a list of
+   `animation-name` overrides, all of them pointing at the same keyframes.
+   ========================================================================= */
+
+/* The default is BOTTOM, for the reason in contract point 2. */
+.motion-edge-panel[data-state="open"],
+.motion-edge-panel-in {
+  animation: motion-sheet-in-bottom var(--duration-overlay) var(--ease-entrance) both;
+}
+.motion-edge-panel[data-state="closed"],
+.motion-edge-panel-out {
+  animation: motion-sheet-out-bottom var(--duration-exit) var(--ease-exit) both;
+}
+
+/* Per side, name only — the timing above is not restated, so it cannot
+   disagree with itself. Same shape as §4's `.motion-anchored`. */
+.motion-edge-panel[data-side="right"][data-state="open"],
+.motion-edge-panel-in[data-side="right"]   { animation-name: motion-sheet-in-right;  }
+.motion-edge-panel[data-side="right"][data-state="closed"],
+.motion-edge-panel-out[data-side="right"]  { animation-name: motion-sheet-out-right; }
+.motion-edge-panel[data-side="left"][data-state="open"],
+.motion-edge-panel-in[data-side="left"]    { animation-name: motion-sheet-in-left;   }
+.motion-edge-panel[data-side="left"][data-state="closed"],
+.motion-edge-panel-out[data-side="left"]   { animation-name: motion-sheet-out-left;  }
+.motion-edge-panel[data-side="top"][data-state="open"],
+.motion-edge-panel-in[data-side="top"]     { animation-name: motion-sheet-in-top;    }
+.motion-edge-panel[data-side="top"][data-state="closed"],
+.motion-edge-panel-out[data-side="top"]    { animation-name: motion-sheet-out-top;   }
+.motion-edge-panel[data-side="bottom"][data-state="open"],
+.motion-edge-panel-in[data-side="bottom"]  { animation-name: motion-sheet-in-bottom; }
+.motion-edge-panel[data-side="bottom"][data-state="closed"],
+.motion-edge-panel-out[data-side="bottom"] { animation-name: motion-sheet-out-bottom;}
+
+/* RTL, for §3's reason and no other: the caller anchors logically, so under
+   [dir="rtl"] a side="left" panel sits on the physical right and must enter
+   from the physical right. */
+[dir="rtl"] .motion-edge-panel[data-side="right"][data-state="open"],
+[dir="rtl"] .motion-edge-panel-in[data-side="right"]   { animation-name: motion-sheet-in-left;   }
+[dir="rtl"] .motion-edge-panel[data-side="right"][data-state="closed"],
+[dir="rtl"] .motion-edge-panel-out[data-side="right"]  { animation-name: motion-sheet-out-left;  }
+[dir="rtl"] .motion-edge-panel[data-side="left"][data-state="open"],
+[dir="rtl"] .motion-edge-panel-in[data-side="left"]    { animation-name: motion-sheet-in-right;  }
+[dir="rtl"] .motion-edge-panel[data-side="left"][data-state="closed"],
+[dir="rtl"] .motion-edge-panel-out[data-side="left"]   { animation-name: motion-sheet-out-right; }
+
+/* The client's rule, for panels that are not sheets. Both specificity forms
+   are listed for §3a's reason — the RTL mirror directly above scores higher
+   than the plain rules and would otherwise win inside this block. */
+@media (width < 45rem) {
+  .motion-edge-panel[data-side="left"][data-state="open"],
+  .motion-edge-panel[data-side="right"][data-state="open"],
+  .motion-edge-panel-in[data-side="left"],
+  .motion-edge-panel-in[data-side="right"],
+  [dir="rtl"] .motion-edge-panel[data-side="left"][data-state="open"],
+  [dir="rtl"] .motion-edge-panel[data-side="right"][data-state="open"],
+  [dir="rtl"] .motion-edge-panel-in[data-side="left"],
+  [dir="rtl"] .motion-edge-panel-in[data-side="right"] {
+    animation-name: motion-sheet-in-bottom;
+  }
+
+  .motion-edge-panel[data-side="left"][data-state="closed"],
+  .motion-edge-panel[data-side="right"][data-state="closed"],
+  .motion-edge-panel-out[data-side="left"],
+  .motion-edge-panel-out[data-side="right"],
+  [dir="rtl"] .motion-edge-panel[data-side="left"][data-state="closed"],
+  [dir="rtl"] .motion-edge-panel[data-side="right"][data-state="closed"],
+  [dir="rtl"] .motion-edge-panel-out[data-side="left"],
+  [dir="rtl"] .motion-edge-panel-out[data-side="right"] {
+    animation-name: motion-sheet-out-bottom;
+  }
+}
+
+
+/* ============================================================================
+   3c · `.motion-edge-panel-narrow` — THE BOTTOM HALF OF §3b, ON ITS OWN
+
+   WHAT IT IS AND WHY IT HAD TO EXIST, 2026-09-04. `.motion-edge-panel` above
+   is for a panel that slides on BOTH sides of 45rem: inline on a desktop,
+   block on a phone, one class covering both. The shell's assistant is not
+   that panel. On a desktop it does not slide at all — it MINIMISES, on the
+   inline axis, through `.motion-column-collapse` (§7), which the client asked
+   for by name in the same week ("that should minimize it with a nice
+   animation") and which is shipped and measured. What she asked for next was
+   only about the phone:
+
+       "assistan is a slide up"
+       "everythung that's slisde in in desktop, should be slide up in mobile"
+
+   So the assistant needs the SLIDE-UP below 45rem and it needs NOTHING above
+   it — adding `.motion-edge-panel` to that column would have given the
+   desktop a 360ms translate it does not have today, on top of the collapse it
+   does, which is a change to a width the instruction never mentions.
+
+   THE THREE WAYS OF NOT WRITING THIS RULE, AND WHY EACH ONE IS WORSE.
+
+     · APPLY `.motion-edge-panel` FROM THE COMPONENT ONLY BELOW 45rem. A
+       class list is not media-query-aware; deciding it in TypeScript means a
+       `matchMedia` read at render, which is the hydration mismatch and the
+       flash of the wrong layout that the shell's own house rule forbids.
+     · CANCEL THE ANIMATION ABOVE 45rem FROM THE COMPONENT. A component
+       writing `animation: none` is a component writing motion, which is law
+       6.1 with the sign flipped. It is the same violation.
+     · WIDEN §3b's SELECTOR LISTS. Fourteen selectors gain a second class
+       name each so that one caller can opt out of half of them. §3b was
+       itself written as a separate block rather than bolted onto §3 for
+       exactly this reason, and the reasoning has not changed in the two
+       hours since.
+
+   THE CONTRACT IS §3b'S, MINUS ONE CLAUSE. Points 1 (the class goes on the
+   PANEL, never a wrapper — the keyframes translate 100% of the animated box),
+   4 (geometry is still the caller's: this sets no inset, width, height or
+   radius, and a panel that has not been MOVED to the bottom will merely
+   travel toward it) and 5 (the exit needs the panel to still exist while it
+   plays; `inert` goes on immediately, removal waits `--duration-exit`) all
+   hold here word for word. Point 3 holds: `data-state="open" | "closed"` on
+   the same element.
+
+   POINT 2 IS THE ONE THAT DROPS. There is no `data-side` here and there is
+   nothing to read one for: below 45rem every side in §3b resolves to
+   `bottom` anyway — that IS the client's rule — so a side attribute on a
+   class that only exists below 45rem could only ever say `bottom` or be
+   wrong. The `-in` / `-out` twins are dropped for the same reason: the one
+   caller has a `data-state` to give, and two spellings of a rule are two
+   things to keep in agreement for no gain.
+
+   ABOVE 45rem THIS CLASS IS NOT A WEAKER RULE, IT IS NO RULE. The whole
+   block is inside the media query, so the cascade at 45rem and up resolves
+   exactly as it did before this class existed — nothing to override, nothing
+   to reset, and a desktop measurement taken before and after is the same
+   measurement. Same `max-` direction, and the same reason, as the shell's own
+   `max-lg:` and `max-md:` blocks.
+
+   TIMING AND CURVE ARE §3's, REFERENCED AND NOT RESTATED — the sheet's own
+   keyframes, `--duration-overlay` in and `--duration-exit` out. Reduced
+   motion is therefore already handled by tokens.css §9 zeroing both, and
+   nothing about the feel of this class can drift away from the sheet's,
+   because there is nothing here to drift.
+   ========================================================================= */
+
+@media (width < 45rem) {
+  .motion-edge-panel-narrow[data-state="open"] {
+    animation: motion-sheet-in-bottom var(--duration-overlay) var(--ease-entrance) both;
+  }
+  .motion-edge-panel-narrow[data-state="closed"] {
+    animation: motion-sheet-out-bottom var(--duration-exit) var(--ease-exit) both;
+  }
+}
+
+
+/* ============================================================================
    4 · DROPDOWN, POPOVER, TOOLTIP, HOVER-CARD, SELECT, COMMAND — OPEN/CLOSE
    Anchored surfaces. The rise is tight (4px) and takes its direction from
    the side the surface opened on, so the surface always appears to come OUT

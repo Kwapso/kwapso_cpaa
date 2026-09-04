@@ -26,6 +26,17 @@
    than re-derived, which is what "reuse without changing anything" means when
    the file it used to live in is being emptied.
 
+   THE PHONE DOES NOT GET TABS AT ALL, 2026-09-04, CLIENT-RULED, verbatim:
+   "in monile, lets use normal breadcrumbs (like they ware before, jhust teh
+   text)". Below `md` this component renders the ORDINARY trail — words and
+   separators, the way the product drew it before the folder shape arrived —
+   and at `md` and above it renders the strip below, unchanged to the pixel.
+   The whole mechanism is one display utility per drawing; it is argued at
+   length at `TEXT_TRAIL` and `STRIP_ONLY`, including what the swap costs, what
+   it deliberately does NOT do, and why the phone's trail is
+   `breadcrumbs.tsx`'s own component rather than a second text renderer living
+   here.
+
    WHY IT LIVES IN `breadcrumbs/` AND NOT IN `breadcrumb/`
    `breadcrumb/` is the COMPOSABLE form and its own header states its job in a
    sentence this component fails: "It elides nothing — it renders exactly the
@@ -135,7 +146,7 @@ import {
 } from "../dropdown-menu/dropdown-menu";
 import { FolderShape } from "../folder/folder";
 import { cn } from "../../lib/utils";
-import { collapse, type BreadcrumbsItem } from "./breadcrumbs";
+import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
 
 /* ----------------------------------------------------------------------------
    The strip.
@@ -187,6 +198,144 @@ const STRIP = cn(
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",
 );
+
+/* ----------------------------------------------------------------------------
+   THE TWO DRAWINGS AND THE ONE GATE BETWEEN THEM.
+
+   CLIENT, 2026-09-04, verbatim: "in monile, lets use normal breadcrumbs (like
+   they ware before, jhust teh text)". A phone gets the ordinary trail. Desktop
+   and tablet keep the strip above, to the pixel.
+
+   THE PHONE'S TRAIL IS `breadcrumbs.tsx`'s OWN COMPONENT, CALLED — NOT A
+   SECOND TEXT RENDERER IN THIS FILE. `Breadcrumbs` is already "an array in,
+   the finished trail out"; it takes the identical `BreadcrumbsItem[]` this
+   component takes, and it renders the identical `breadcrumb/` parts the tabs
+   render (`BreadcrumbLink`, `BreadcrumbPage`, `BreadcrumbSeparator`), so the
+   two drawings cannot drift in their semantics, their ink or their type step.
+   It is one file away, in this same folder, for the reason that folder's own
+   header gives: the two forms of one trail live together so neither can be
+   re-derived by accident. `collapse()` was already reached across that seam;
+   this is the second thing that is.
+
+   THE ALTERNATIVE WAS WORKED THROUGH AND REJECTED: restyling the TAB markup
+   down to plain text at `max-md` — one DOM tree, the silhouette hidden, the
+   tab skin unset. It reads cheaper than it is. `BreadcrumbSeparator` has no
+   place in the strip's markup at all, so the middle dot between crumbs would
+   have had to be CSS generated content — a user-visible mark this file
+   invents, that no translator can reach and that lands outside the
+   accessibility tree, against this repo's own law that "every user-facing
+   string is a prop with a default". It would also have to re-derive the wrap
+   behaviour `BreadcrumbList` already ships (`flex-wrap`, which `STRIP` above
+   deliberately overrides to `flex-nowrap`), keep the folder silhouette in the
+   DOM purely to hide it, and unset eight tab utilities one at a time at a
+   breakpoint. Two components, each drawing what it is for, is the smaller
+   thing.
+
+   THE GATE IS A DISPLAY UTILITY. NOT `matchMedia`, NOT `useSyncExternalStore`,
+   NOT A `useEffect` THAT MEASURES. A JS breakpoint has no answer on the
+   server, so the first paint is whichever trail the component guessed at and
+   the second is the swap — a hydration mismatch on every phone, and a visible
+   flash of tabs before the text on every load. CSS has the width before React
+   has anything, so neither happens and there is no state here at all.
+
+   AND IT IS `display: none`, WHICH IS THE POINT AND NOT AN IMPLEMENTATION
+   DETAIL. `sr-only`, `visibility`, `opacity: 0` and a zero-size box all leave
+   the hidden trail IN the accessibility tree and IN the tab order, and a
+   reader would then find two breadcrumb landmarks and two "you are here"
+   crumbs at every width — worse than the problem this fixes. `screen-shell.tsx`
+   already settled the same question at the same breakpoint for its own
+   `md:hidden` menu trigger, in its own words: "a `display: none` button is not
+   merely invisible — it is out of the tab order and out of the accessibility
+   tree, which is what 'genuinely unreachable' means." Measured the same way it
+   measured that — by focusing every focusable in the document and asking
+   `document.activeElement` who took it, never by reading `checkVisibility` —
+   in `verify/crumb-mobile/`: at 380 the strip hands out no focus, at 834 and
+   1440 the text trail hands out none, and exactly one landmark is painted at
+   each of the three.
+
+   `md` IS THE SHELL'S OWN BREAKPOINT AND IS NOT A NEW NUMBER. It is where
+   `screen-shell.tsx` puts the rail away and stands its menu trigger up, so the
+   width at which the product stops being a desktop is already written down
+   once; the trail changing shape at any other number would make the phone a
+   third layout. Note that the two gates cannot drift even in principle:
+   font-relative units inside a media query resolve against the INITIAL
+   font-size (16px), never this kit's 15px root, so both flip at 768 CSS px.
+
+   `pb-[var(--space-3)]` IS THE ONLY MEASURE THIS BLOCK SPENDS, and it is
+   borrowed rather than chosen. The strip pays a NEGATIVE block-end margin
+   (`--folder-tab-overlap`) because the card rides up over its tabs' cut feet;
+   a text trail attaches to nothing, so with the strip gone there would be no
+   space at all between the last crumb and the card's top edge. `--space-3` is
+   what the shell's own phone-only chrome row spends in exactly this position —
+   "this row pays its own `--space-3` beneath itself" — so the trail and the
+   menu above it sit on one rhythm. It is PADDING and not a margin on purpose:
+   a margin here collapses out of any parent that is not already a formatting
+   context of its own, and this component cannot see its parent.
+
+   `[overflow-wrap:anywhere]` IS THE HORIZONTAL-SCROLL GUARD, and `break-words`
+   is not enough for it. A flex item will not shrink below its min-content
+   width, and `overflow-wrap: break-word` does not change min-content — so one
+   long unbroken label (a client name with no spaces in it) would push the
+   `<ol>` past the viewport and scroll the whole DOCUMENT sideways at 380,
+   which is the one thing a phone layout may never do. `anywhere` is defined to
+   affect min-content, so the crumb shrinks and the word breaks. MEASURED BOTH
+   WAYS in `verify/crumb-mobile/`, on one unbroken label at 380: with this
+   line the crumb wraps to three lines and `document.scrollWidth` stays 380;
+   with it swapped for `overflow-wrap: normal` in the live cascade the same
+   label reports 1005 against a 380 client width — the document scrolling
+   sideways, which is the failure this one declaration is here to prevent.
+   -------------------------------------------------------------------------- */
+/* THE INK IS THE SPINE'S, NOT THE PAGE'S, AND THIS IS THE ONE THING THE SWAP
+   COULD NOT INHERIT. A tab brings its own paper with it: every label in the
+   strip is read against `--kw-crumb-rest` or `--kw-crumb-live`, both of which
+   step with the palette, so the trail never had to know what it was standing
+   ON. Take the tabs away and the words land straight on the shell's ground —
+   `--spine-fill` — and on the mango spine that ground is #FED069 in BOTH
+   palettes (tokens.css §7b says so in as many words: "mango is #FED069 in both
+   palettes, so anything drawn on it must be too"), while `--ink-tertiary` and
+   `--foreground` flip to near-white in dark. MEASURED, in `verify/crumb-mobile/`
+   at `?t=dark`, before these three lines existed: the trail drew #BDB9B1 and
+   #FFFEF9 on #FED069 — 1.34 and 1.45 against the ground. A trail nobody can
+   read is worse than a trail drawn as tabs.
+
+   `--spine-ink` / `--spine-ink-quiet` ARE THE KIT'S EXISTING ANSWER TO EXACTLY
+   THIS, and no new token is minted: they are what `rail.tsx` draws every row,
+   heading and hint with, for the same reason — it is the other thing that
+   stands on the spine rather than on paper. On the paper spine they resolve to
+   `--foreground` / `--muted-foreground`, which is the ordinary trail again; on
+   mango they are the palette-independent `--ink-on-accent`.
+
+   THE `var(…, …)` FALLBACK IS THE MECHANISM THIS FILE ALREADY USES ONE BLOCK
+   DOWN for `--spine-crumb-rest`, and it carries the same promise: this
+   component still names no spine and no palette. Outside a spine — a harness,
+   a story, any caller that is not `ScreenShell` — neither token is declared,
+   the fallback stands, and the trail draws precisely the inks
+   `breadcrumbs.tsx` would have drawn on its own. Nothing is overridden that
+   was not going to be wrong.
+
+   ONLY THREE SELECTORS, AND THEY ARE THE THREE THE PARTS ACTUALLY COLOUR. The
+   list carries the resting ink, which the links, the separators and the
+   ellipsis all INHERIT, so one rule covers four things; the current page
+   carries its own; and `BreadcrumbLink`'s hover carries the third. The
+   descendant form outranks each part's own class (0,2,0 and 0,3,0 against
+   0,1,0 and 0,2,0) without any part being edited, which matters: `breadcrumb/`
+   is the composable form and half a dozen other call sites draw from it. */
+const TEXT_TRAIL = cn(
+  "pb-[var(--space-3)]",
+  "[&_[data-slot=breadcrumb-list]]:text-[var(--spine-ink-quiet,var(--ink-tertiary))]",
+  "[&_[data-slot=breadcrumb-page]]:text-[var(--spine-ink,var(--foreground))]",
+  "[&_[data-slot=breadcrumb-link]:hover]:text-[var(--spine-ink,var(--foreground))]",
+  "md:hidden",
+);
+
+const TEXT_TRAIL_LIST = cn("min-w-0 [overflow-wrap:anywhere]");
+
+/* The strip's own half of the gate. Written as an ADDITIVE `max-md:` variant
+   rather than a `hidden md:block` pair so that at `md` and above the nav's
+   class list resolves to exactly what it resolved to before this change and
+   the element keeps its own UA `display: block` — the desktop strip is not
+   restyled into place, it is simply never gated. */
+const STRIP_ONLY = "max-md:hidden";
 
 /* ----------------------------------------------------------------------------
    One tab. `tabs.tsx`'s `TRIGGER_BASE` + `TRIGGER_SKIN.folder`, verbatim in
@@ -440,12 +589,21 @@ export interface BreadcrumbFoldersProps
  *                      tab before it stays read-only regardless.
  *
  * THREE BREAKPOINTS
- *  mobile / tablet / desktop — the geometry is UNCHANGED at every width; what
- *  changes is what the strip does when it runs out of it, and that changes
- *  continuously rather than at a breakpoint. The strip scrolls on the inline
- *  axis; a trail deeper than `foldAfter` has already folded its middle before
- *  width is consulted, because the fold is a CONTENT rule and the client set
- *  its number.
+ *  mobile — NOT TABS AT ALL since 2026-09-04. The client: "in monile, lets use
+ *  normal breadcrumbs (like they ware before, jhust teh text)". Below `md` the
+ *  strip is `display: none` and the trail is `breadcrumbs.tsx`'s plain text
+ *  form — same items, same parts, same landmark name — wrapping rather than
+ *  scrolling, with every crumb shown and every ancestor still a link. See
+ *  `TEXT_TRAIL` for the whole mechanism and for why the fold does not follow
+ *  it down there. THE ONE EXCEPTION IS `onCurrentActivate`: that call site is
+ *  a control wearing the tab shape, not a location in a trail, so it keeps its
+ *  tab at every width — see that prop.
+ *  tablet / desktop — the strip, and the geometry is UNCHANGED at every width
+ *  from `md` up; what changes is what it does when it runs out of room, and
+ *  that changes continuously rather than at a breakpoint. The strip scrolls on
+ *  the inline axis; a trail deeper than `foldAfter` has already folded its
+ *  middle before width is consulted, because the fold is a CONTENT rule and
+ *  the client set its number.
  *
  * RTL — LTR only, inherited from `FolderShape`. See the file header.
  */
@@ -538,6 +696,24 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
 
     if (items.length === 0) return null;
 
+    /* THE PHONE'S TRAIL, AND WHY IT IS NOT RENDERED FOR EVERY CALLER.
+       `onCurrentActivate` marks the one call site where the last crumb is a
+       CONTROL rather than a location — `screen-shell.tsx`'s assistant tab,
+       which the client asked for one day earlier in those exact terms: "i want
+       to close the assistant by clicking on its folder tab, that should
+       minimize it." Swapping that for a word would delete the affordance she
+       had just asked for, on the width where it is most needed: the assistant
+       is an OVERLAY on a phone, so its tab is the thing standing between an
+       open column and the screen underneath. The mobile ruling is about the
+       breadcrumb TRAIL — "normal breadcrumbs… just the text" — and a single
+       tab that is a button is not one. So that path keeps its tab at every
+       width, which also keeps the promise this prop's own doc makes: it adds
+       a second path through the tab shape and changes nothing about the
+       first.
+       `Breadcrumbs` returns `null` on an empty array too, so the guard above
+       covers both drawings and neither can render a bare landmark. */
+    const textTrail = onCurrentActivate === undefined;
+
     const rendered = fold(items, foldAfter);
     const lastIndex = items.length - 1;
     const hidden = items.filter(
@@ -546,212 +722,284 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
     );
 
     return (
-      <Breadcrumb
-        ref={ref}
-        label={label}
-        data-slot="breadcrumb-folders"
-        className={cn(
-          /* TAB-C1's mechanism, for this component's own two papers, and
-             declared HERE for the reason that block gives: a caller may rebind
-             `--surface-panel` or `--card` around a strip, and the live tab has
-             to keep agreeing with the CARD rather than with whatever the
-             rebinding made of the panel. Custom properties are substituted at
-             computed-value time on the element that declares them, so
-             resolving both one level above the tabs is correct in every
-             container at once.
+      <>
+        {/* ── THE PHONE'S TRAIL. Below `md` this is the only trail in the
+            document; at `md` and above it is `display: none`, which is to say
+            it is not in the accessibility tree and not in the tab order.
 
-             THE LIVE PAPER is the content card's own, by ruling: "the last
-             (current location) is same color as the big content card in the
-             middle, the main color". `screen-shell.tsx` paints that card
-             `--surface-raised`, so that is the token, not `--card` and not
-             `--spine-chip-fill` — the two agree in light and part company on
-             the mango spine in dark.
+            NO `maxItems`, SO NOTHING FOLDS HERE, AND THAT IS THE OPPOSITE OF
+            THE STRIP ON PURPOSE. The strip folds at five levels because it
+            CANNOT wrap — `STRIP` above says why: a wrapped folder strip puts
+            one row of tabs' feet through the next row's shoulders and only
+            the bottom row can attach to the card — so its only other answer
+            is to scroll, and scrolling is what pushes an ancestor out of
+            sight. A text trail has neither problem. `BreadcrumbList`'s own
+            header already ruled which answer belongs to a trail that can
+            wrap: "Wrapping keeps every crumb reachable; scrolling would hide
+            the ancestors, which is the half of the trail a reader is looking
+            for." Folding here would ALSO be strictly worse than folding
+            there, because the strip's elision opens a menu and this one has
+            none: the crumbs it hid would be reachable on a desktop and
+            unreachable on a phone. And it is what "like they ware before"
+            means literally — no call site in this kit ever passed
+            `Breadcrumbs` a `maxItems`, so the trail this product had before
+            the tabs showed every level.
 
-             THE REST PAPER is one step off it in the direction the palette
-             already steps: `--surface-raised` -> `--surface-panel`, which is
-             `--kw-soft-paper` in light and `--kw-unlit-panel` in dark. It is
-             the same step `screen-shell.tsx`'s CARD block makes when it
-             rebinds a filled control on the card to soft paper (ruling 01),
-             and it is derived rather than stated per spine — nothing here
-             knows what a spine is.
+            `label` IS SHARED, NOT DOUBLED. One trail, one announced name, in
+            one translation unit; a second string would be a second thing to
+            translate for a landmark a reader meets only one of.
 
-             MEASURED IN `verify/breadcrumb-folder/` and `verify/tab-joint/`,
-             on the two spines the client kept and in both palettes, against
-             the ground the strip stands on (`--spine-fill`):
+            `ellipsisLabel` IS NOT PASSED, and its absence is the point: with
+            no fold there is no elision to announce.
 
-               MANGO · LIGHT  ground #FED069 · rest #F7F2EB 1.306 · live
-                              #FFFEF9 1.440 · rest vs live 1.103
-               MANGO · DARK   ground #FED069 · rest #1C1B18 11.843 · live
-                              #26241F 10.661 · rest vs live 1.111
-               QUIET · LIGHT  ground #F7F2EB · rest #EDE8E1 1.094 · live
-                              #FFFEF9 1.103 · rest vs live 1.207
-               QUIET · DARK   ground #1C1B18 · rest #1C1B18 1.000 · live
-                              #26241F 1.111 · rest vs live 1.111
+            THE SEPARATOR IS LEFT AT ITS DEFAULT — `BreadcrumbSeparator`'s
+            middle dot, ruled in CH15 (NAV-B1), `aria-hidden` and
+            `role="presentation"`. No prop is added here to override it: it is
+            a MARK and not a string, it is hidden from assistive technology,
+            and the composable form already exposes `children` for the one
+            call site that ever needs another one.
 
-             THE FIGURE THIS FILE USED TO LOG AS OPEN, RULED, 2026-09-03. A
-             resting tab on the quiet spine used to measure 1.000 against the
-             ground IN BOTH PALETTES, because the quiet spine IS
-             `--surface-panel` (tokens.css §7b) and the rest fill was also
-             `--surface-panel` — the same value twice. The client was shown
-             drawn alternatives and picked #EDE8E1 for QUIET-LIGHT ONLY, the
-             quietest option that still reads as a real step off the ground
-             (1.094) rather than the loudest one available: `tokens.css`
-             names it `--spine-quiet-crumb-rest` and the reasoning for why it
-             is a new value and not a repoint of an existing paper is there.
-             QUIET-DARK IS LEFT AT 1.000, DELIBERATELY, NOT AN OVERSIGHT: its
-             own `--surface-panel` rest fill sits on a ground the live tab
-             already carries at 1.111 (the same step the card itself has), so
-             the trail's endpoint never disappears there the way it could on a
-             genuinely flat quiet-light strip; the client's ruling was scoped
-             to the palette she was shown.
+            `{...props}` DELIBERATELY DOES NOT COME HERE. The caller's rest
+            props are `<nav>` attributes and some of them are unique by
+            definition — an `id` on both drawings is invalid markup and would
+            break any `aria-labelledby` pointing at it, and a `data-testid`
+            on both would match twice. They stay on the strip, which is where
+            they already landed before today, so no existing caller's
+            attribute moves. THE FORWARDED `ref` STAYS ON THE STRIP FOR THE
+            SAME REASON — one node, and it is the one it has always been. A
+            caller holding it measures zeros below `md`, which is honest:
+            the element it asked for is genuinely not laid out there. No
+            caller in this kit passes a ref to this component today, and the
+            day one needs the phone's node it should ask for it by name
+            rather than have `ref` mean two elements. `className` DOES come here, because it is the
+            component's own styling hook and a caller styling "the breadcrumb"
+            means the trail rather than one drawing of it; the gate is
+            appended AFTER it so a caller cannot accidentally win the display
+            utility off it in tailwind-merge. */}
+        {textTrail ? (
+          <Breadcrumbs
+            items={items}
+            label={label}
+            className={cn(className, TEXT_TRAIL)}
+            listClassName={TEXT_TRAIL_LIST}
+          />
+        ) : null}
 
-             THE MECHANISM IS PER-SPINE, IN TOKENS.CSS, NOT PER-PALETTE HERE.
-             `--kw-crumb-rest` below reads `--spine-crumb-rest` with a
-             `var(…, var(--surface-panel))` fallback: `[data-spine="quiet"]`
-             binds it to the new paper in light and back to `--surface-panel`
-             in both dark blocks (tokens.css, right after that spine's own
-             block), and the mango spine never sets it at all, so the fallback
-             alone keeps mango's own two papers exactly as measured above.
-             This file names no palette and no spine — the whole branch is a
-             cascade a caller or a future spine can repoint without touching
-             this component, which is the same argument TAB-C1 already made
-             for declaring both papers as custom properties instead of
-             classes.
+        <Breadcrumb
+          ref={ref}
+          label={label}
+          data-slot="breadcrumb-folders"
+          className={cn(
+            /* TAB-C1's mechanism, for this component's own two papers, and
+               declared HERE for the reason that block gives: a caller may rebind
+               `--surface-panel` or `--card` around a strip, and the live tab has
+               to keep agreeing with the CARD rather than with whatever the
+               rebinding made of the panel. Custom properties are substituted at
+               computed-value time on the element that declares them, so
+               resolving both one level above the tabs is correct in every
+               container at once.
 
-             THE ALTERNATIVE CONSIDERED BEFORE THE NEW PAPER, AND WHY IT WAS
-             NOT TAKEN. `--muted` (#FAF9F7 / #2F2D28, whose own comment in
-             tokens.css reads "inactive tabs, idle wells") is the kit's third
-             paper and was the retired folder tab's idle fill; it clears the
-             ground on quiet, and it costs mango-light, where rest and live
-             would sit 1.021 apart instead of 1.103. `--surface-quiet`
-             (#E2DDD4, "cancel buttons, disabled wells") was tried next and
-             also withdrawn — a reuse the client did not choose once she saw
-             the alternatives drawn. */
-          "[--kw-crumb-live:var(--surface-raised)]",
-          "[--kw-crumb-rest:var(--spine-crumb-rest,var(--surface-panel))]",
-          className,
-        )}
-        {...props}
-      >
-        <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
-          {rendered.map((entry) => {
-            if (entry.kind === "gap") {
+               THE LIVE PAPER is the content card's own, by ruling: "the last
+               (current location) is same color as the big content card in the
+               middle, the main color". `screen-shell.tsx` paints that card
+               `--surface-raised`, so that is the token, not `--card` and not
+               `--spine-chip-fill` — the two agree in light and part company on
+               the mango spine in dark.
+
+               THE REST PAPER is one step off it in the direction the palette
+               already steps: `--surface-raised` -> `--surface-panel`, which is
+               `--kw-soft-paper` in light and `--kw-unlit-panel` in dark. It is
+               the same step `screen-shell.tsx`'s CARD block makes when it
+               rebinds a filled control on the card to soft paper (ruling 01),
+               and it is derived rather than stated per spine — nothing here
+               knows what a spine is.
+
+               MEASURED IN `verify/breadcrumb-folder/` and `verify/tab-joint/`,
+               on the two spines the client kept and in both palettes, against
+               the ground the strip stands on (`--spine-fill`):
+
+                 MANGO · LIGHT  ground #FED069 · rest #F7F2EB 1.306 · live
+                                #FFFEF9 1.440 · rest vs live 1.103
+                 MANGO · DARK   ground #FED069 · rest #1C1B18 11.843 · live
+                                #26241F 10.661 · rest vs live 1.111
+                 QUIET · LIGHT  ground #F7F2EB · rest #EDE8E1 1.094 · live
+                                #FFFEF9 1.103 · rest vs live 1.207
+                 QUIET · DARK   ground #1C1B18 · rest #1C1B18 1.000 · live
+                                #26241F 1.111 · rest vs live 1.111
+
+               THE FIGURE THIS FILE USED TO LOG AS OPEN, RULED, 2026-09-03. A
+               resting tab on the quiet spine used to measure 1.000 against the
+               ground IN BOTH PALETTES, because the quiet spine IS
+               `--surface-panel` (tokens.css §7b) and the rest fill was also
+               `--surface-panel` — the same value twice. The client was shown
+               drawn alternatives and picked #EDE8E1 for QUIET-LIGHT ONLY, the
+               quietest option that still reads as a real step off the ground
+               (1.094) rather than the loudest one available: `tokens.css`
+               names it `--spine-quiet-crumb-rest` and the reasoning for why it
+               is a new value and not a repoint of an existing paper is there.
+               QUIET-DARK IS LEFT AT 1.000, DELIBERATELY, NOT AN OVERSIGHT: its
+               own `--surface-panel` rest fill sits on a ground the live tab
+               already carries at 1.111 (the same step the card itself has), so
+               the trail's endpoint never disappears there the way it could on a
+               genuinely flat quiet-light strip; the client's ruling was scoped
+               to the palette she was shown.
+
+               THE MECHANISM IS PER-SPINE, IN TOKENS.CSS, NOT PER-PALETTE HERE.
+               `--kw-crumb-rest` below reads `--spine-crumb-rest` with a
+               `var(…, var(--surface-panel))` fallback: `[data-spine="quiet"]`
+               binds it to the new paper in light and back to `--surface-panel`
+               in both dark blocks (tokens.css, right after that spine's own
+               block), and the mango spine never sets it at all, so the fallback
+               alone keeps mango's own two papers exactly as measured above.
+               This file names no palette and no spine — the whole branch is a
+               cascade a caller or a future spine can repoint without touching
+               this component, which is the same argument TAB-C1 already made
+               for declaring both papers as custom properties instead of
+               classes.
+
+               THE ALTERNATIVE CONSIDERED BEFORE THE NEW PAPER, AND WHY IT WAS
+               NOT TAKEN. `--muted` (#FAF9F7 / #2F2D28, whose own comment in
+               tokens.css reads "inactive tabs, idle wells") is the kit's third
+               paper and was the retired folder tab's idle fill; it clears the
+               ground on quiet, and it costs mango-light, where rest and live
+               would sit 1.021 apart instead of 1.103. `--surface-quiet`
+               (#E2DDD4, "cancel buttons, disabled wells") was tried next and
+               also withdrawn — a reuse the client did not choose once she saw
+               the alternatives drawn. */
+            "[--kw-crumb-live:var(--surface-raised)]",
+            "[--kw-crumb-rest:var(--spine-crumb-rest,var(--surface-panel))]",
+            className,
+            /* LAST, AND CONDITIONAL. Last so a caller's own display utility
+               cannot win the gate off this element in tailwind-merge — the
+               swap is a ruling, not a default. Conditional because a strip
+               that is the ONLY drawing (`onCurrentActivate`, above) must not
+               be gated away at a width where nothing would replace it, which
+               is how a phone would otherwise lose the assistant's close
+               control entirely. */
+            textTrail ? STRIP_ONLY : undefined,
+          )}
+          {...props}
+        >
+          <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
+            {rendered.map((entry) => {
+              if (entry.kind === "gap") {
+                return (
+                  <BreadcrumbItem key="breadcrumb-folders-gap" className="shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        data-slot="breadcrumb-folders-fold"
+                        className={cn(TAB, TAB_REST)}
+                      >
+                        <CrumbShape fill={FILL_REST} />
+                        {/* The kit's own elision, reused whole: the glyph is
+                            `aria-hidden` and the announced label sits OUTSIDE
+                            that wrapper, which is the half of this component
+                            everybody gets wrong. A second drawing of "the middle
+                            is missing" is exactly what this file must not
+                            invent. */}
+                        <BreadcrumbEllipsis label={ellipsisLabel} />
+                      </DropdownMenuTrigger>
+                      {/* …and it OPENS what it hides. `breadcrumb.tsx`'s own
+                          note on `BreadcrumbEllipsis` says where this belongs:
+                          "Where a call site makes the elision expandable it
+                          wraps this in a `DropdownMenuTrigger`, and that control
+                          owns every state including its ring." */}
+                      <DropdownMenuContent align="start" aria-label={ellipsisLabel}>
+                        {hidden.map((item, index) => (
+                          <DropdownMenuItem
+                            key={item.key ?? `breadcrumb-folders-hidden-${String(index)}`}
+                            asChild={item.href !== undefined}
+                            disabled={item.href === undefined}
+                          >
+                            {item.href === undefined ? (
+                              <span>{item.label}</span>
+                            ) : (
+                              <a href={item.href}>{item.label}</a>
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </BreadcrumbItem>
+                );
+              }
+
+              const live = entry.index === lastIndex;
+              const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
+
               return (
-                <BreadcrumbItem key="breadcrumb-folders-gap" className="shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      data-slot="breadcrumb-folders-fold"
+                <BreadcrumbItem key={key} className="shrink-0">
+                  {live ? (
+                    onCurrentActivate ? (
+                      /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. A
+                         real `<button>`, not `BreadcrumbPage` — that element
+                         is `role="link" aria-disabled="true"` BY DESIGN (see
+                         `breadcrumb.tsx`), which is correct for "you are here"
+                         and wrong for "press to act": a control a reader can
+                         activate must never also announce itself disabled.
+                         Same `TAB`/`TAB_LIVE` classes as the read-only path —
+                         one shape, two elements — with `cursor-pointer` put
+                         back over `TAB_LIVE`'s own `cursor-default`. */
+                      <button
+                        type="button"
+                        data-slot="breadcrumb-folders-current-control"
+                        aria-expanded={currentActivateExpanded}
+                        /* NO FALLBACK TO `entry.item.label`, and the type is the
+                           reason rather than an inconvenience: a crumb's label is
+                           a `ReactNode`, and `aria-label` takes a string. A node
+                           cannot be flattened to an accessible name here without
+                           guessing at what its markup reads as. Left undefined
+                           when no explicit label is given, React omits the
+                           attribute entirely, and the button's accessible name
+                           falls back to its own text content — which IS the
+                           crumb's label, rendered. So the un-labelled case is
+                           still named, by the browser, from the thing a sighted
+                           reader sees; `currentActivateLabel` exists to say
+                           something BETTER than that ("Close the assistant"
+                           rather than "Assistant"), not to rescue it. */
+                        aria-label={currentActivateLabel}
+                        onClick={onCurrentActivate}
+                        className={cn(TAB, TAB_LIVE, "cursor-pointer")}
+                      >
+                        <CrumbShape fill={FILL_LIVE} />
+                        {entry.item.label}
+                      </button>
+                    ) : (
+                      <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
+                        <CrumbShape fill={FILL_LIVE} />
+                        {entry.item.label}
+                      </BreadcrumbPage>
+                    )
+                  ) : entry.item.href === undefined ? (
+                    /* An ancestor with no route. `breadcrumbs.tsx` draws this as
+                       `BreadcrumbPage` too — a step you can see and not visit —
+                       but it must NOT take the live paper here, because the
+                       paper is what says "you are here". So it takes the page
+                       element for its semantics and the REST fill for its
+                       drawing, and `aria-current` is dropped: there is exactly
+                       one current location and it is the last tab. */
+                    <BreadcrumbPage
+                      aria-current={undefined}
+                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary")}
+                    >
+                      <CrumbShape fill={FILL_REST} />
+                      {entry.item.label}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink
+                      href={entry.item.href}
                       className={cn(TAB, TAB_REST)}
                     >
                       <CrumbShape fill={FILL_REST} />
-                      {/* The kit's own elision, reused whole: the glyph is
-                          `aria-hidden` and the announced label sits OUTSIDE
-                          that wrapper, which is the half of this component
-                          everybody gets wrong. A second drawing of "the middle
-                          is missing" is exactly what this file must not
-                          invent. */}
-                      <BreadcrumbEllipsis label={ellipsisLabel} />
-                    </DropdownMenuTrigger>
-                    {/* …and it OPENS what it hides. `breadcrumb.tsx`'s own
-                        note on `BreadcrumbEllipsis` says where this belongs:
-                        "Where a call site makes the elision expandable it
-                        wraps this in a `DropdownMenuTrigger`, and that control
-                        owns every state including its ring." */}
-                    <DropdownMenuContent align="start" aria-label={ellipsisLabel}>
-                      {hidden.map((item, index) => (
-                        <DropdownMenuItem
-                          key={item.key ?? `breadcrumb-folders-hidden-${String(index)}`}
-                          asChild={item.href !== undefined}
-                          disabled={item.href === undefined}
-                        >
-                          {item.href === undefined ? (
-                            <span>{item.label}</span>
-                          ) : (
-                            <a href={item.href}>{item.label}</a>
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      {entry.item.label}
+                    </BreadcrumbLink>
+                  )}
                 </BreadcrumbItem>
               );
-            }
-
-            const live = entry.index === lastIndex;
-            const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
-
-            return (
-              <BreadcrumbItem key={key} className="shrink-0">
-                {live ? (
-                  onCurrentActivate ? (
-                    /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. A
-                       real `<button>`, not `BreadcrumbPage` — that element
-                       is `role="link" aria-disabled="true"` BY DESIGN (see
-                       `breadcrumb.tsx`), which is correct for "you are here"
-                       and wrong for "press to act": a control a reader can
-                       activate must never also announce itself disabled.
-                       Same `TAB`/`TAB_LIVE` classes as the read-only path —
-                       one shape, two elements — with `cursor-pointer` put
-                       back over `TAB_LIVE`'s own `cursor-default`. */
-                    <button
-                      type="button"
-                      data-slot="breadcrumb-folders-current-control"
-                      aria-expanded={currentActivateExpanded}
-                      /* NO FALLBACK TO `entry.item.label`, and the type is the
-                         reason rather than an inconvenience: a crumb's label is
-                         a `ReactNode`, and `aria-label` takes a string. A node
-                         cannot be flattened to an accessible name here without
-                         guessing at what its markup reads as. Left undefined
-                         when no explicit label is given, React omits the
-                         attribute entirely, and the button's accessible name
-                         falls back to its own text content — which IS the
-                         crumb's label, rendered. So the un-labelled case is
-                         still named, by the browser, from the thing a sighted
-                         reader sees; `currentActivateLabel` exists to say
-                         something BETTER than that ("Close the assistant"
-                         rather than "Assistant"), not to rescue it. */
-                      aria-label={currentActivateLabel}
-                      onClick={onCurrentActivate}
-                      className={cn(TAB, TAB_LIVE, "cursor-pointer")}
-                    >
-                      <CrumbShape fill={FILL_LIVE} />
-                      {entry.item.label}
-                    </button>
-                  ) : (
-                    <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
-                      <CrumbShape fill={FILL_LIVE} />
-                      {entry.item.label}
-                    </BreadcrumbPage>
-                  )
-                ) : entry.item.href === undefined ? (
-                  /* An ancestor with no route. `breadcrumbs.tsx` draws this as
-                     `BreadcrumbPage` too — a step you can see and not visit —
-                     but it must NOT take the live paper here, because the
-                     paper is what says "you are here". So it takes the page
-                     element for its semantics and the REST fill for its
-                     drawing, and `aria-current` is dropped: there is exactly
-                     one current location and it is the last tab. */
-                  <BreadcrumbPage
-                    aria-current={undefined}
-                    className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary")}
-                  >
-                    <CrumbShape fill={FILL_REST} />
-                    {entry.item.label}
-                  </BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink
-                    href={entry.item.href}
-                    className={cn(TAB, TAB_REST)}
-                  >
-                    <CrumbShape fill={FILL_REST} />
-                    {entry.item.label}
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            );
-          })}
-        </BreadcrumbList>
-      </Breadcrumb>
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
+      </>
     );
   },
 );

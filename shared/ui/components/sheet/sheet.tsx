@@ -29,11 +29,18 @@
    `side` keeps its four values because 18 call sites already pass them. The
    POSITIONING is logical (`start-0` / `end-0`), so `side="left"` means "the
    reading-start edge" and mirrors with the document in Arabic, Urdu and
-   Persian. motion/motion.css §3 currently reads `left` as physically left and
-   says outright that there is nothing to flip for RTL, so the entrance
-   direction and the anchored edge disagree under `dir="rtl"`. This file cannot
-   fix that — motion.css is not its to edit. Logged as GAPS-A.md SHT-1 with the
-   three lines that would close it.
+   Persian. The entrance mirrors with it: motion/motion.css §3 swaps the two
+   keyframe pairs under [dir="rtl"], corrected there on 2026-08-22 after this
+   note originally reported the disagreement. GAPS-A.md SHT-1 is closed.
+
+   AND `side` IS NOW ALSO WHERE ONE SYSTEM-WIDE RULE LANDS. The client's
+   2026-09-04 ruling — "everythung that's slisde in in desktop, should be
+   slide up in mobile" — is about every panel, not about this component, but
+   it is IMPLEMENTED here because this component is the one place `left` and
+   `right` are centralised for 18 call sites. Below 45rem a side drawer
+   presents and animates as the bottom sheet. Geometry in `NARROW_BOTTOM`
+   below; motion in motion.css §3a; the rule for panels that are NOT sheets
+   in motion.css §3b as `.motion-edge-panel`. No call site changed.
 
    RENDERING CONTEXT
    `"use client"`. Radix Dialog (the drawer is a dialog) holds state, portals
@@ -58,6 +65,92 @@ const SCRIM = [
   "bg-[color-mix(in_srgb,var(--kw-charcoal)_28%,transparent)]",
   "motion-scrim",
 ] as const;
+
+/* ---------------------------------------------------------------------------
+   THE CLIENT'S RULE, VERBATIM, 2026-09-04:
+       "everythung that's slisde in in desktop, should be slide up in mobile"
+
+   Below 45rem a `left` or `right` drawer stops being a side drawer and
+   BECOMES the bottom sheet this file already draws for `side="bottom"` —
+   same geometry, same cap, same corners, same grabber. Not a similar one:
+   the same one. Two kinds of bottom sheet on one phone would be a worse
+   answer than the side drawer we started with.
+
+   The four declarations below are, line for line, the `bottom` variant:
+
+       bottom:  inset-x-0 bottom-0 w-full max-h-[85dvh] rounded-t-[var(--radius)]
+
+   WHAT EACH OVERRIDE IS FIGHTING, because none of them is decorative:
+     · `inset-x-0`   — adds the second horizontal inset. The base sets only
+                       ONE of `start-0`/`end-0`; a bottom sheet needs both
+                       edges pinned. It compiles to `inset-inline: 0` — the
+                       LOGICAL pair, checked in the emitted CSS rather than
+                       assumed from the utility's name — so it mirrors with
+                       the document like everything else in this file, and it
+                       agrees with whichever of `start-0`/`end-0` the base
+                       already set because both want 0.
+     · `top-auto`    — kills the `top: 0` half of `inset-y-0`. Without it the
+                       panel is still full-height and `max-h` is decoration.
+     · `bottom-0`    — restates the other half explicitly rather than relying
+                       on `inset-y-0` surviving alongside `top-auto`.
+     · `h-auto`      — kills `h-full`. `max-h` cannot cap a fixed height.
+     · `max-h-[85dvh]` — the client's "must not exceed the viewport", and the
+                       same 85dvh the `top`/`bottom` variants already cap at
+                       so the scrim is never fully covered. `dvh`, not `vh`:
+                       on a phone the browser chrome is the difference
+                       between a footer you can press and one under the
+                       address bar.
+     · `w-full`      — the same width `max-w-full` already produces at this
+                       size, written out so this block reads as the `bottom`
+                       variant rather than as a coincidence.
+     · `rounded-t` + `rounded-b-none` — the radius moves to the top corners.
+                       Deliberately NOT `rounded-none` first: `rounded-none`
+                       and `rounded-t-*` are both `border-radius` family
+                       utilities and which one Tailwind emits last is
+                       Tailwind's business, not this file's. `rounded-t-*`
+                       and `rounded-b-none` touch four different corners
+                       between them and share none, so the result is the same
+                       whatever order they land in — and it is correct in RTL
+                       too, where the base `rounded-s`/`rounded-e` resolve to
+                       the other pair of corners.
+
+   ORDERING IS NOT LEFT TO CHANCE ANYWHERE ELSE EITHER. Every override here
+   is a VARIANT utility and every base it overrides is not, and Tailwind
+   emits variants after their unvariant counterparts — that guarantee is the
+   same one that makes `sm:flex-row` beat `flex-col` everywhere in this kit.
+   Verified compiled rather than assumed, in verify/sheet-slide-up.
+
+   WHY THE BREAKPOINT IS `max-[45rem]` AND NOT A `matchMedia` READ. Tried in
+   the first draft and thrown away. `Sheet` renders on a server: a JS read
+   gives the server the desktop answer and the client the phone answer, which
+   is a hydration mismatch, and even where it hydrates cleanly the first
+   painted frame is a drawer flying in from the right before it corrects
+   itself. There is no first frame to get wrong in a media query. `45rem` is
+   720px at the 16px authoring base — the figure ch27.2, ch27.4, ch27.14 and
+   ch27.37 all state — and it stays 720px in a media query however the
+   text-size control has moved the root, because media-query lengths resolve
+   against the initial font-size.
+
+   THE MOTION IS NOT HERE. `.motion-sheet` reads `data-side`, and
+   foundations/motion/motion.css §3a flips `left`/`right` to the bottom
+   keyframes under the same `45rem`. This file writes no duration and no
+   curve, here or anywhere — that is the house law, and it is also why the
+   flip could be made once instead of eighteen times.
+
+   `data-side` STILL SAYS "right" ON A PHONE, and that is deliberate: the
+   prop is the call site's stated intent, the viewport is a separate fact,
+   and the attribute stays honest so the CSS can do the translating.
+   --------------------------------------------------------------------------- */
+const NARROW_BOTTOM = [
+  "max-[45rem]:inset-x-0",
+  "max-[45rem]:top-auto",
+  "max-[45rem]:bottom-0",
+  "max-[45rem]:h-auto",
+  "max-[45rem]:w-full",
+  "max-[45rem]:max-h-[85dvh]",
+  "max-[45rem]:rounded-t-[var(--radius)]",
+  "max-[45rem]:rounded-b-none",
+].join(" ");
 
 const sheetVariants = cva(
   [
@@ -96,9 +189,9 @@ const sheetVariants = cva(
        */
       side: {
         /** The reading-start edge. Kit width 420; `max-w-full` is the kit's own. */
-        left: "inset-y-0 start-0 h-full w-[26.25rem] max-w-full rounded-e-[var(--radius)]",
+        left: `inset-y-0 start-0 h-full w-[26.25rem] max-w-full rounded-e-[var(--radius)] ${NARROW_BOTTOM}`,
         /** The reading-end edge — the drawer the kit actually draws. */
-        right: "inset-y-0 end-0 h-full w-[26.25rem] max-w-full rounded-s-[var(--radius)]",
+        right: `inset-y-0 end-0 h-full w-[26.25rem] max-w-full rounded-s-[var(--radius)] ${NARROW_BOTTOM}`,
         /** Derived; the kit draws no horizontal drawer. GAPS-A.md SHT-2. */
         top: "inset-x-0 top-0 w-full max-h-[85dvh] rounded-b-[var(--radius)]",
         /** Derived; the kit draws no horizontal drawer. GAPS-A.md SHT-2. */
@@ -184,24 +277,49 @@ export interface SheetContentProps
  *                      its border.
  *
  * THREE BREAKPOINTS — the case that needed real thought.
- *  mobile   — `max-w-full` (the kit's own rule) makes a 420 drawer fill a 375
- *             phone, so it reads as a page rather than a panel. It is left
- *             full-bleed rather than inset for two reasons: the kit states
- *             `max-width: 100%` and nothing else, and an inset drawer on a
- *             phone puts the close chip inside the thumb-unreachable corner
- *             while wasting the only width there is. The inner-edge radius is
- *             KEPT at full bleed: it is the drawer's signature, and the 24
- *             corners let the dimmed page show through, which is the one cue
- *             that the record behind is still there. Head and foot stay fixed
- *             and the body still scrolls — that is what makes a full-height
- *             drawer usable one-handed.
- *  tablet   — UNCHANGED in kind, but the 420 now fits inside the viewport with
- *             the scrimmed page visible beside it, so the drawer stops being a
- *             page and starts being a panel with no class changing.
+ *  mobile   — REVISED 2026-09-04 on the client's rule, quoted in full at
+ *             `NARROW_BOTTOM` above: below 45rem a `left` or `right` drawer
+ *             presents and animates as the BOTTOM SHEET, capped at 85dvh.
+ *
+ *             What the previous ruling got right is kept and is in fact the
+ *             reason this one works. It said the drawer stays FULL-BLEED
+ *             rather than inset, because "an inset drawer on a phone puts the
+ *             close chip inside the thumb-unreachable corner while wasting
+ *             the only width there is". Full bleed is exactly what a bottom
+ *             sheet is, so the geometry did not have to be re-argued — only
+ *             re-anchored, from the inline edge to the block end. It also
+ *             said the inner-edge radius is the drawer's signature and the
+ *             one cue that the dimmed record is still behind; the radius
+ *             therefore MOVES to the top corners rather than being dropped,
+ *             and the 85dvh cap gives it a strip of scrim to show through,
+ *             which at full height it never had.
+ *
+ *             THE CLOSE AFFORDANCE, WHICH THE RULE MADE INTO A NUMBER. The
+ *             chip does not move in the panel — it stays at the top of the
+ *             inline end, where `side="bottom"` has always put it, because a
+ *             second bottom sheet with the chip somewhere else would be two
+ *             bottom sheets. The 85dvh cap moves it anyway: on a 380 × 812
+ *             handset the chip's centre was 775px up from the foot of the
+ *             screen and is now 653px, a 122px drop into the hand, measured
+ *             in verify/sheet-slide-up. Two further exits arrive with the
+ *             cap and are the thumb-reachable ones: the FOOTER is pinned
+ *             (`mt-auto`, never scrolls) and now sits at the very bottom of
+ *             the viewport, and the 15dvh of scrim above the sheet is
+ *             tappable, which at full height did not exist. Escape and the
+ *             grabber's own convention round it out. Rejected: moving the
+ *             chip to the sheet's bottom edge, which would have put it on
+ *             top of the pinned footer's commit control — the one press a
+ *             phone must not make ambiguous.
+ *  tablet   — UNCHANGED, and 834 is comfortably above 45rem so nothing in
+ *             this ruling reaches it. The 420 fits inside the viewport with
+ *             the scrimmed page visible beside it, so the drawer stops being
+ *             a page and starts being a panel with no class changing.
  *  desktop  — UNCHANGED. The drawer does not widen with the viewport; 420 is
  *             the measure the kit states and a wider drawer is a worse one.
  *  `top` and `bottom` cap at 85dvh at every width so the scrim is never fully
  *  covered — a sheet that reaches the opposite edge is a page, not a sheet.
+ *  Neither is touched by the narrow rule: a `top` sheet that rose from the
+ *  bottom would arrive at the edge it did not come from.
  *
  * RTL — positioned with `start-*` / `end-*` and `rounded-s-*` / `rounded-e-*`,
  * so the drawer and its radius mirror with the document. The ENTRANCE does not
@@ -233,15 +351,46 @@ const SheetContent = React.forwardRef<
         {/* THE GRABBER — ch27.2, verbatim: "On narrow it rises from the
             bottom as a sheet with a grabber." The artifact draws it 42 × 4,
             a pill in the strong hairline tone, centred at the sheet's top
-            (27.2's own narrow render). Bottom sheets only: a side drawer's
-            affordance is its inner rounded edge, and the kit's CH20 drawer
-            draws none. Decorative — dismissal is the scrim, the ✕ and
-            Escape, all of which Radix already owns. */}
-        {side === "bottom" ? (
+            (27.2's own narrow render). Decorative — dismissal is the scrim,
+            the ✕ and Escape, all of which Radix already owns.
+
+            IT NOW APPLIES TO `left` AND `right` TOO, BELOW 45rem. Not as an
+            extra: 27.2's sentence is about the narrow case specifically, and
+            below 45rem a side drawer IS a sheet that rises from the bottom.
+            A narrow drawer with the bottom sheet's geometry and none of its
+            affordance would be the odd one of two — which is the outcome
+            this whole change exists to avoid. Above 45rem nothing changes:
+            a side drawer's affordance is its inner rounded edge, and the
+            kit's CH20 drawer draws no grabber.
+
+            THE VISIBILITY IS CSS, NOT A VIEWPORT READ, for the same reason
+            the geometry is: `side` is a prop and can be branched on at
+            render, but the WIDTH cannot be without a hydration mismatch. So
+            the element is emitted from the prop and its `display` is decided
+            by the media query.
+
+            `hidden` IS A REAL `display: none`, WHICH THE HOUSE RULE REQUIRES
+            — not a zero-size box left in the tab order. Nothing here is in
+            the tab order to begin with: it is an `aria-hidden` `<span>` with
+            no tabindex and no handler, so it is unreachable by keyboard at
+            every width, and above 45rem it is not rendered at all. Proved
+            rather than asserted by the focus probe in verify/sheet-slide-up,
+            which focuses every candidate in the document and asks who took
+            it.
+
+            `block` is NOT in the shared class list. `hidden` and `block` are
+            both `display` utilities of the same specificity, and which wins
+            would be Tailwind's emission order rather than this file's
+            intent; giving each case its own display class removes the
+            question instead of betting on it. */}
+        {side === "bottom" || side === "left" || side === "right" ? (
           <span
             data-slot="sheet-grabber"
             aria-hidden="true"
-            className="mx-auto mt-[var(--space-2h)] block h-1 w-[2.625rem] shrink-0 rounded-pill bg-[var(--hair-strong)]"
+            className={cn(
+              "mx-auto mt-[var(--space-2h)] h-1 w-[2.625rem] shrink-0 rounded-pill bg-[var(--hair-strong)]",
+              side === "bottom" ? "block" : "hidden max-[45rem]:block",
+            )}
           />
         ) : null}
         {children}

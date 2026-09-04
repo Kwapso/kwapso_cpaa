@@ -23,6 +23,7 @@ import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/
 // between the two drawings); what changed is where it stands and what it is
 // made of. See the `breadcrumb` prop below for the client rule that governs
 // the strip: NAVIGATION TEXT ONLY, no controls on the ground.
+import { Button } from "@shared/ui/components/button/button"
 import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
 // The rule between the phone sheet's own named blocks (`railBlocks.map`,
 // below). Used to be a hand-rolled `<div className="bg-border h-px w-full"
@@ -34,6 +35,7 @@ import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-
 // itself inside one `<nav>`, so there is no seam to interleave a real node
 // into — see `RAIL_CONTENT_OVERRIDES`, below, for the same hairline painted
 // from outside instead.
+import { Sparkle } from "@shared/ui/foundations/icons"
 import { Separator } from "@shared/ui/components/separator/separator"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
@@ -1133,7 +1135,19 @@ export function AppShell({
           header band, because it is a full-bleed, bg-card, bordered surface
           and the header band's whole law is that it paints no fill of its
           own. */}
-      <header className="bg-card fixed inset-x-0 top-0 z-20 flex h-[var(--shell-top)] min-w-0 items-center justify-between gap-2 overflow-hidden shadow-[var(--hairline-under)] px-4 md:hidden">
+      {/* NO FILL AND NO HAIRLINE — client, 2026-09-04: "despite keeping the
+          top bar where it is fixed, with logo avatar and ai butto, merge the
+          background with the background (I dont want it being white, but no
+          difference from background)". It was `bg-card` plus
+          `shadow-[var(--hairline-under)]`, i.e. a paper plank with a rule
+          under it, and on a phone that read as a white strip pasted over the
+          spine. Both are gone; the controls now sit directly on the ground
+          and the bar is invisible AS A BAR while staying exactly where it
+          was. `--shell-top` still reserves its height, so nothing scrolls
+          underneath the logo — the content column starts below it, which is
+          what keeps "no difference from background" literally true instead
+          of merely mostly true. */}
+      <header className="fixed inset-x-0 top-0 z-20 flex h-[var(--shell-top)] min-w-0 items-center justify-between gap-2 overflow-hidden px-4 md:hidden">
         <div className="flex min-w-0 shrink items-center">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
         </div>
@@ -1147,6 +1161,36 @@ export function AppShell({
               collapse to an icon, and on a 375px screen it pushed the avatar
               off the edge and the whole PAGE sideways with it. It lives in
               Gear, under the text size, and in the profile menu. */}
+          {/* THE ASSISTANT, IMMEDIATELY LEFT OF THE FACE — client: "in mobile,
+              put the ai assistant icon on the left of my avtara picture o
+              top, visible all times". DOM order is the reading order, so
+              placing it before `ProfileMenu` puts it left in LTR and right
+              in RTL without a single directional class.
+
+              WHY THIS BAR DRAWS IT AND NOT THE KIT'S. `ScreenShell` grew a
+              mobile top bar of its own on 2026-09-04 that carries exactly
+              this button beside a face. This app cannot use that row: its
+              face is a profile MENU, not a drawn avatar, and the kit's
+              `navMember` takes a person's data rather than a control — so
+              adopting it would have cost the profile menu its menu, and
+              rendering both bars would have put two faces on one 380px
+              screen. `narrowTopBar={false}` below turns the kit's row off
+              and this line is the duty that comes with it.
+
+              Same handler and same two strings the kit's own trigger and
+              the desktop edge handle use, so one action never grows two
+              names. It is `md:hidden`'s child, so it exists only where the
+              desktop handle does not. */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label={assistantOpen ? t("Close the assistant") : t("Open the assistant")}
+            aria-expanded={assistantOpen}
+            onClick={() => setAgentOpen(!assistantOpen)}
+          >
+            <Sparkle aria-hidden="true" />
+          </Button>
           <ProfileMenu active={active} />
         </div>
       </header>
@@ -1287,6 +1331,10 @@ export function AppShell({
            "Close the assistant" is new (R28: extracted, catalogued, and the
            ceiling moved in the same commit). */
         aside={can("agent", "create") ? <AgentDockSlot /> : undefined}
+        /* THIS APP DRAWS ITS OWN MOBILE TOP BAR — see the `<header>` above and
+           the assistant trigger inside it for why the kit's row cannot carry
+           a profile menu. Without this the two would stack. */
+        narrowTopBar={false}
         asideLabel={t("Assistant")}
         asideOpen={assistantOpen}
         onAsideOpenChange={setAgentOpen}

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.46",
-  "sha": "ea8b8ec9aac05607328bbea81e5e37d293f40134",
+  "tag": "v1.2.49",
+  "sha": "90a0cab852a4221bd7cec53d9be8c328ab95f931",
   "syncedAt": "2026-09-04"
  },
- "generatedAt": "2026-09-04T12:58:20.722Z",
+ "generatedAt": "2026-09-04T16:16:13.092Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -6207,7 +6207,7 @@
     {
      "file": "components/sheet/sheet.tsx",
      "name": "sheetVariants",
-     "line": 62,
+     "line": 155,
      "base": "fixed z-[55] flex flex-col bg-popover text-popover-foreground shadow-xl motion-sheet [&>*:not([data-slot^=sheet-])]:min-h-0 [&>*:not([data-slot^=sheet-])]:flex-1 [&>*:not([data-slot^=sheet-])]:overflow-y-auto [&>*:not([data-slot^=sheet-])]:p-[var(--space-6)]",
      "groups": [
       {
@@ -6215,12 +6215,12 @@
        "options": [
         {
          "name": "left",
-         "classes": "inset-y-0 start-0 h-full w-[26.25rem] max-w-full rounded-e-[var(--radius)]",
+         "classes": "inset-y-0 start-0 h-full w-[26.25rem] max-w-full rounded-e-[var(--radius)] max-[45rem]:inset-x-0 max-[45rem]:top-auto max-[45rem]:bottom-0 max-[45rem]:h-auto max-[45rem]:w-full max-[45rem]:max-h-[85dvh] max-[45rem]:rounded-t-[var(--radius)] max-[45rem]:rounded-b-none",
          "note": "The reading-start edge. Kit width 420; `max-w-full` is the kit's own."
         },
         {
          "name": "right",
-         "classes": "inset-y-0 end-0 h-full w-[26.25rem] max-w-full rounded-s-[var(--radius)]",
+         "classes": "inset-y-0 end-0 h-full w-[26.25rem] max-w-full rounded-s-[var(--radius)] max-[45rem]:inset-x-0 max-[45rem]:top-auto max-[45rem]:bottom-0 max-[45rem]:h-auto max-[45rem]:w-full max-[45rem]:max-h-[85dvh] max-[45rem]:rounded-t-[var(--radius)] max-[45rem]:rounded-b-none",
          "note": "The reading-end edge — the drawer the kit actually draws."
         },
         {

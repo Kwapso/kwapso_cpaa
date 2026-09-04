@@ -757,16 +757,62 @@
    · BELOW `md` — THE RAIL COLUMN IS STILL ABSENT. That half of `SHELL.md`
      never moved and could not: 380 minus a 208 column is 172px of card. What
      changed is that its absence is no longer the end of the sentence. A
-     glyph-only menu control stands on the ground above the trail, `md:hidden`,
-     and opens the rail's own register as SECTIONS, then the chosen section's
-     PAGES. The whole argument for why this narrows "no hamburger" rather
-     than deleting it — and why it is a drill-down and not one flat scroll —
-     is at `NavSheet`, with the client's sentence beside it.
+     glyph-only menu control opens the rail's own register as SECTIONS, then
+     the chosen section's PAGES. The whole argument for why this narrows "no
+     hamburger" rather than deleting it — and why it is a drill-down and not
+     one flat scroll — is at `NavSheet`, with the client's sentence beside it.
+
+     WHERE THAT CONTROL STANDS WAS RULED ON AGAIN LATER THE SAME DAY, AFTER
+     THE CLIENT SAW IT. It shipped at the TOP-LEFT of the ground; she
+     redirected, verbatim: *"on mobile remove the section menu button from
+     top left, should only stay in bottom navbar"*. So below `md` the shell
+     now draws TWO ground-level bars around the card and the menu is in the
+     lower one:
+
+         TOP BAR    the assistant's trigger, then the reader's own face, at
+                    the reading END. Client, verbatim: *"in mobile, put the
+                    ai assistant icon on the left of my avtara picture o top,
+                    visible all times"*. Both are in normal flow above the
+                    trail, so "all times" is true by construction. The
+                    assistant's SHUT edge handle stood in exactly that corner
+                    and is `max-md:hidden` now, because it is the same
+                    control and two of it is one too many.
+         BOTTOM BAR the section menu, at the reading START, under the card.
+                    In normal flow at the end of the content column — `PAGE`
+                    is `h-dvh`/`overflow-hidden`, so that IS the foot of the
+                    window — which is why it cannot overlap or clip the card
+                    the way a `fixed` bar would.
+
+     WHAT IS IN THE BOTTOM BAR BESIDES THE MENU IS UNANSWERED AND IS LEFT
+     UNANSWERED. The client named the bar and named one occupant; the kit
+     does not get to invent a set of primary destinations on her behalf. The
+     row is built to take more and holds one. See the bottom bar itself.
    · BELOW `lg` — THE ASIDE STOPS DOCKING AND STARTS OVERLAYING. One mount,
      one tree, `max-lg:absolute`; the card keeps the full width between the
      gutters at every width under 1024, and the assistant is reachable at all
      of them through the handle it already had. The three mechanisms
      considered, and why the other two lose, are at the dock itself.
+   · BELOW `45rem` — THE ASIDE STOPS BEING A COLUMN AND BECOMES A BOTTOM
+     SHEET. Client-ordered 2026-09-04, and the sentence carries its own
+     arithmetic: *"assistan is a slide up"* / *"everythung that's slisde in in
+     desktop, should be slide up in mobile"* / *"for slide up, make them 85%
+     of the sccreen, make the 15% stay visible dut darkened (like in desktop
+     when we open slide in)"*. So under 720px the same one mount, in the same
+     one tree, is pinned to the foot of the window at the full width, 85dvh
+     tall, rounded on its top edge alone, painted on `Sheet`'s own drawer
+     surface, rising and falling on the block axis — with the remaining 15%
+     left showing under the kit's own drawer scrim, charcoal at 28%, which
+     dismisses on tap. The dock is full-bleed and lifted over the phone's top
+     bar to draw it; the panel is placed by this file and travelled by
+     motion.css §3c.
+
+     THE BOUNDARY IS 45rem AND NOT `md`, WHICH IS 48px OF DIFFERENCE AND IS
+     ARGUED IN FULL AT THE DOCK. Short version: in a media query `rem` is
+     always 16px, so `md` is 768 and `45rem` is 720, and 720 is already where
+     `Sheet` flips a side drawer into a bottom sheet and where all three of
+     motion.css's narrow rules live. The BARS still flip at `md`, because
+     that is a different question — between 720 and 768 the phone's top bar is
+     drawn and the assistant is still the side overlay it is today.
    · "DROPS CONTROLS, NEVER COUNTS" IS UNTOUCHED. The band's trailing cluster
      and the footer still drop at `sm`; every figure, count and identity chip
      still draws at 380.
@@ -847,6 +893,7 @@
 
 import * as React from "react";
 
+import { Avatar, AvatarFallback } from "../../components/avatar/avatar";
 import { Badge } from "../../components/badge/badge";
 import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
@@ -871,7 +918,13 @@ import {
   Sparkle,
 } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
-import { Rail, RAIL_PLACEHOLDER_GROUPS, type RailGroup, type RailItem } from "./rail";
+import {
+  Rail,
+  RAIL_PLACEHOLDER_GROUPS,
+  type RailGroup,
+  type RailItem,
+  type RailMember,
+} from "./rail";
 import { StatStrip, type StatStripFigure } from "./stat-strip";
 import { SHAPE_HEADING_SIZE, type ScreenDensity, type ShapeState } from "../states/states";
 
@@ -959,12 +1012,14 @@ export interface ScreenShellProps
    * anyway: the shell decides, not the call site, so no route can ship a
    * hamburger at a width that could have held a rail.
    *
-   * BELOW `md` THE SHELL DRAWS A MENU CONTROL INSTEAD, since 2026-09-04, and
-   * it is built from `navGroups` rather than from this node — sections first,
-   * then that section's pages, on the client's own instruction. Pass
-   * `navGroups` alongside this whenever you pass your own node; without it
-   * the menu falls back to showing this node flat, which works and is worse.
-   * See `navGroups` and the file header's NARROW section.
+   * BELOW `md` THE SHELL DRAWS A MENU CONTROL IN THE BOTTOM BAR INSTEAD,
+   * since 2026-09-04, and it is built from `navGroups` rather than from this
+   * node — sections first, then that section's pages, on the client's own
+   * instruction. Pass `navGroups` alongside this whenever you pass your own
+   * node; without it the menu falls back to showing this node flat, which
+   * works and is worse. Pass `navMember` in the same breath, or the phone's
+   * top bar has no face on it. See `navGroups`, `navMember`, and the file
+   * header's NARROW section.
    *
    * DEFAULTS TO `<Rail />` — the kit's own placeholder register — so a screen
    * that passes nothing still has navigation in it. `null` draws none, which
@@ -1110,6 +1165,77 @@ export interface ScreenShellProps
    * section needs to know what returning gets them.
    */
   navBackLabel?: string;
+
+  /**
+   * THE READER'S OWN FACE, AS **DATA**, FOR THE PHONE'S TOP BAR. Added
+   * 2026-09-04 on a client instruction that is one sentence and two
+   * requirements: *"in mobile, put the ai assistant icon on the left of my
+   * avtara picture o top, visible all times"*.
+   *
+   * "VISIBLE ALL TIMES" IS THE PART THAT MAKES THIS A PROP RATHER THAN A
+   * NODE. The face has to be on the ground at 380 — not inside the card that
+   * scrolls, not behind the menu that just moved to the foot of the screen,
+   * and not conditional on anything. That is a placement law, which is the
+   * shell's; WHO the person is, is the application's. The same division
+   * `navGroups` already makes one prop up, for the same reason and with the
+   * same three cases:
+   *
+   *  · GIVEN — the top bar draws this person. What an application passes,
+   *    and it is the SAME object it hands its own `<Rail member={…}>`, so
+   *    the face at the foot of the rail on a desktop and the face at the top
+   *    of a phone are one person by construction and cannot drift.
+   *  · OMITTED, AND THE SHELL BUILT THE RAIL (`rail === undefined`) — the
+   *    kit's own specimen member, so the ~44 screens in this repo that pass
+   *    nothing get a face at 380 exactly as they already get a register.
+   *  · OMITTED, AND THE CALL SITE PASSED ITS OWN RAIL NODE — NOTHING IS
+   *    DRAWN, and that is deliberate rather than a gap. The shell cannot see
+   *    inside a node; inventing the kit's placeholder person over an
+   *    application's real rail would put a fictional name and a fictional
+   *    pair of initials on a phone, which is worse than an empty corner and
+   *    is not a bug a reader could report usefully. Pass this alongside
+   *    `navGroups` — one line, at the same call site, out of the same
+   *    object.
+   *
+   * `null` DRAWS NONE, explicitly, and is the opt-out for a screen whose
+   * chrome must carry no identity at all.
+   *
+   * IT IS `RailMember` AND NOT A SHAPE OF ITS OWN. A second type for "the
+   * person in the top bar" would be a second place to add a field to, and
+   * the two would describe the same row of the same table. `givenName` is
+   * unread here — the top bar draws the face alone, never the name (see the
+   * top bar in the render for why the name is not repeated there) — and is
+   * accepted anyway so one object serves both call sites.
+   */
+  /**
+   * WHAT THE PRODUCT PUTS AT THE READING START OF THE MOBILE TOP BAR — its
+   * logo, its workspace switcher, whatever it already composed. Drawn only
+   * below `md`, beside the assistant trigger and the face, and it is what
+   * lets a consuming app delete a bespoke mobile `<header>` of its own
+   * instead of stacking one on top of this row. See the render for the
+   * argument. Omitted, the row is the assistant and the face alone, pinned
+   * to the reading end exactly as before this prop existed.
+   */
+  /**
+   * WHETHER THIS SHELL DRAWS THE MOBILE TOP BAR AT ALL. Default `true`.
+   *
+   * It exists for one real case, not for taste: a product that already had
+   * its own fixed mobile `<header>` before this shell grew one. The app that
+   * prompted it has a bar holding a workspace switcher, a running timer and
+   * a profile MENU — a face that opens things, not a face that is drawn —
+   * and none of that fits `navLead` plus `navMember`, which take a cluster
+   * and a person's data respectively. Forcing it through them would have
+   * cost the profile menu its menu.
+   *
+   * So such a caller passes `false`, keeps its own bar, and takes on the one
+   * duty this row was carrying for it: drawing a control that opens the
+   * assistant on a phone. Nothing else in the narrow layout changes — the
+   * bottom navbar, the trail and the assistant sheet are all independent of
+   * this flag. Prefer `navLead` where it fits; this is the escape hatch, and
+   * a caller that uses it owns the consequence.
+   */
+  narrowTopBar?: boolean;
+  navLead?: React.ReactNode;
+  navMember?: RailMember | null;
 
   /**
    * THE SPINE — 26.02's per-member Settings · Appearance choice, now
@@ -1566,7 +1692,18 @@ const CARD = cn(
 
    Kept as a separate constant rather than a ternary inside `CARD` so the two
    states are legible side by side and neither is a modifier of the other. */
-const CARD_JOINED = "rounded-ss-none";
+/* `md:` — THE SQUARE CORNER ONLY WHERE A TAB ACTUALLY ATTACHES. The corner is
+   square because a folder tab is welded to it (client-approved 2026-09-02,
+   "I choose option 1 to square it"). Below `md` the client's 2026-09-04
+   ruling — "in mobile, lets use normal breadcrumbs (like they were before,
+   just the text)" — replaces that strip with a plain text trail, so nothing
+   is attached there any more and the card was left with one squared corner
+   and three round ones for no reason a reader could see. Measured at 380:
+   `borderTopLeftRadius` 0px against 22.5px on the other three. Gating the
+   removal at `md` restores the box's own radius exactly where the joint
+   stops existing, and changes nothing at or above it. Found by the agent
+   that made the mobile trail, in a file it correctly would not reach into. */
+const CARD_JOINED = "md:rounded-ss-none";
 
 /* ----------------------------------------------------------------------------
    THE BODY — the card's tone, and NOT a container.
@@ -1852,6 +1989,227 @@ function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandle
       className={cn(HANDLE_HIT, placement)}
     >
       {icon}
+    </button>
+  );
+}
+
+/* ----------------------------------------------------------------------------
+   THE PHONE'S TOP BAR — THE ASSISTANT AND THE READER'S OWN FACE, IN THAT
+   ORDER, ON THE GROUND, AT EVERY MOMENT. CLIENT-ORDERED 2026-09-04.
+
+   HER SENTENCE, VERBATIM AND WHOLE, BECAUSE EVERY CLAUSE OF IT IS A
+   REQUIREMENT: *"in mobile, put the ai assistant icon on the left of my
+   avtara picture o top, visible all times"*.
+
+     · "in mobile"        — below `md`, and nowhere else. Every class in this
+                            section is `md:hidden` or lives inside something
+                            that is. Desktop and tablet do not move.
+     · "the ai assistant  — the Sparkle. It is the SAME control the corner
+        icon"               handle was; it did not gain a second handler, a
+                            second label or a second piece of state. See the
+                            trigger below.
+     · "on the left of my — DOM ORDER, not a physical side. The cluster is
+        avtara picture"     laid out from the reading END, assistant first
+                            and face second, so in LTR the icon is to the
+                            left of the face and in RTL it is to its right,
+                            which is what "left of" means to a reader of
+                            Arabic and is the file's own standing rule ("no
+                            physical side is named anywhere").
+     · "o top"            — the ground above the trail, which is where the
+                            menu control stood until this ruling replaced it.
+     · "visible all       — not behind a menu, not inside the card's
+        times"              scroller, not conditional on scroll position and
+                            not conditional on state. The row is in normal
+                            flow at the head of the content column, so it is
+                            drawn on the first frame and stays drawn.
+
+   WHAT THIS REPLACES, AND WHY THE CORNER HANDLE HAD TO GO WITH IT. Until
+   today the phone's assistant opener was `EdgeHandle`, shut, standing at
+   `top-[var(--shell-gutter)] end-[var(--shell-gutter)]` — measured at 380 on
+   2026-09-04 at x 323.75, y 18.75, 37.5 square. That is the SAME 37.5 square
+   of ground this cluster now occupies, so leaving both drawn would have put
+   two assistant openers on top of each other in one corner. The handle is
+   therefore `max-md:hidden` IN ITS SHUT STATE ONLY (see its `placement`),
+   which is the narrowest suppression that clears the collision: the OPEN
+   state's handle is a mid-edge close grab against a column that is covering
+   the top bar anyway, it collides with nothing, and removing a close
+   affordance nobody asked to remove is not this pass's business.
+
+   THE FACE IS THE RAIL'S FACE. It is not a second avatar concept and it must
+   never become one: same `Avatar`, same `variant="brand"`, same
+   `--spine-active-fill` / `--spine-active-ink` pair `rail.tsx`'s `MemberChip`
+   spends, same `size="md"` (`--avatar-md`), same initials. 26.02 draws the
+   foot circle as "the same fill and the same ink as the lit row above it" in
+   all three spine specimens; a phone showing a different circle for the same
+   person would be a second decision about one thing.
+
+   AND THE NAME IS NOT REPEATED BESIDE IT. The rail's chip draws
+   `givenName` next to the face because a 208-wide column has room for a word
+   and 26.02 draws one; 380 minus two gutters is 342.5 of ground with a
+   breadcrumb trail already competing for it, and the client asked for a
+   "picture", not for a chip. The full name is still SAID — it rides in an
+   `sr-only` span, or as the control's `aria-label` when the member is
+   pressable — so the ear loses nothing the eye gives up.
+
+   THE TWO CIRCLES ARE NOT THE SAME DIAMETER, AND THAT IS MEASURED AND
+   DELIBERATE RATHER THAN UNNOTICED. The assistant is `Button size="icon"`,
+   which is `--control-height-button` (2.5rem, 37.5px at the 15px root); the
+   face is `--avatar-md` (2rem, 30px). Both are rungs the kit already ships
+   and each is the RIGHT rung for what it is — the icon button is the size
+   every other glyph-only control in this shell takes (the menu trigger, both
+   handles, a collection's `+`), and the avatar is the size the rail draws
+   this exact person at. Bending either to match the other would have made
+   one of the two a number invented here. The row is `items-center`, so they
+   share a centre line and the 3.75px difference reads as a face beside a
+   button rather than as a misalignment. LOGGED AS OWED: if the client wants
+   them identical, the honest fix is one ruling naming one diameter for
+   "circular chrome on the ground", not a literal in this file.
+   -------------------------------------------------------------------------- */
+
+/**
+ * THE KIT'S SPECIMEN MEMBER — A MIRROR OF `rail.tsx`'s OWN
+ * `PLACEHOLDER_MEMBER`, AND THE DUPLICATION IS LOGGED RATHER THAN HIDDEN.
+ *
+ * `RAIL_PLACEHOLDER_GROUPS` is exported from `rail.tsx` precisely so this
+ * file's narrow menu can re-present the register the default `<Rail />` is
+ * drawing, and `menuGroups` below reads it. The member at the foot of that
+ * same default rail is NOT exported — it is a module-private const — so the
+ * identical trick is not available for the face, and this pass may not edit
+ * `rail.tsx` (another agent holds that file today).
+ *
+ * SO THIS IS A COPY, AND IT IS A COPY OF THREE PLACEHOLDER STRINGS RATHER
+ * THAN OF ANY LOGIC OR ANY VALUE. It is only ever reached on a screen that
+ * passed NO rail of its own — i.e. one where the rail beside it is the kit's
+ * specimen too — so the worst a drift between the two can produce is a
+ * specimen whose two faces disagree, in a repository whose harnesses would
+ * show it. It cannot reach an application's real person.
+ *
+ * OWED, AND IT IS ONE LINE: export `PLACEHOLDER_MEMBER` from `rail.tsx` as
+ * `RAIL_PLACEHOLDER_MEMBER`, beside `RAIL_PLACEHOLDER_GROUPS`, and delete
+ * this const and `narrowInitials` below with it.
+ */
+const NARROW_PLACEHOLDER_MEMBER: RailMember = {
+  name: "Member name",
+  givenName: "Member",
+  initials: "AC",
+};
+
+/**
+ * TWO CHARACTERS, THE WAY THE RAIL DERIVES THEM — a mirror of `rail.tsx`'s
+ * un-exported `initialsOf`, owed upstream with the const above.
+ *
+ * IT IS COPIED RATHER THAN APPROXIMATED, AND THE DIFFERENCE MATTERS. The
+ * obvious shortcut is to hand `member.name` straight to `AvatarFallback`,
+ * which cuts a string to two characters itself — but it cuts the FIRST two
+ * ("Member name" → "ME"), while the rail takes the first letter of the first
+ * word and the first letter of the last ("MN"). One person would then wear
+ * two different pairs of letters depending on the width of the window, which
+ * is exactly the "second avatar concept" this whole section exists to avoid.
+ * `initials`, when the application supplies them, wins in both places and the
+ * derivation never runs.
+ */
+function narrowInitials(name: string, supplied?: string): string {
+  if (supplied !== undefined && supplied !== "") return supplied;
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].slice(0, 2);
+  return (words[0][0] ?? "") + (words[words.length - 1][0] ?? "");
+}
+
+/**
+ * The face at the end of the phone's top bar, pressable or not.
+ *
+ * THE BRANCH IS THE RAIL'S OWN BRANCH, taken on the same test: a member with
+ * neither `href` nor `onSelect` is a label and gets no control around it (a
+ * button that does nothing is a promise the shell cannot keep); a member with
+ * either is a link or a button, exactly as `MemberControl` decides it one
+ * file over, and for the same PAG-2 reason — a destination is an `<a>` and an
+ * action is a `<button>`, never one wearing the other's clothes.
+ *
+ * THE ACCESSIBLE NAME IS THE WHOLE NAME IN BOTH BRANCHES, AND NEITHER BRANCH
+ * LEAVES A SCREEN READER WITH THE INITIALS. Pressable, the control carries
+ * `aria-label={member.name}` and the two letters inside it are hidden, so the
+ * ear hears "María José García" where the eye sees "MG". Not pressable, the
+ * face is `aria-hidden` and an `sr-only` span carries the name — the same
+ * device the rail's own chip uses for its abbreviated first name, read here
+ * for an abbreviation of a different kind. A bare `<Avatar>MG</Avatar>` on
+ * the ground would announce "MG" and nothing else, which is not an identity,
+ * it is a typo.
+ *
+ * NO TOOLTIP, AND THAT IS THE ONE PLACE THIS DELIBERATELY DIVERGES FROM THE
+ * COLLAPSED RAIL. `rail.tsx` wraps its collapsed face in a `Tooltip` because
+ * a 32px column of glyphs on a DESKTOP needs hover to be legible. This
+ * surface exists only below `md` and is never operated by a mouse; a tooltip
+ * with no hover is dead markup and one more thing in the tab order.
+ */
+function MemberFace({ member }: { member: RailMember }) {
+  const face = (
+    <Avatar
+      size="md"
+      variant="brand"
+      /* THE RAIL'S TWO TOKENS, NOT A COLOUR. `variant="brand"` supplies the
+         shape and the size and these two overrule its fill, which is
+         `MemberChip`'s own line copied exactly: on ink and paper the face is
+         mango with charcoal ink, on the mango spine it is charcoal with
+         off-beige, because those are the values the LIT ROW takes and 26.02
+         draws the foot circle as the lit row's twin. */
+      className="bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)]"
+    >
+      <AvatarFallback>{narrowInitials(member.name, member.initials)}</AvatarFallback>
+    </Avatar>
+  );
+
+  if (member.href === undefined && member.onSelect === undefined) {
+    return (
+      <span data-slot="screen-shell-member" className="flex items-center">
+        <span aria-hidden="true" className="flex">
+          {face}
+        </span>
+        <span className="sr-only">{member.name}</span>
+      </span>
+    );
+  }
+
+  /* THE TARGET IS THE BUTTON'S RUNG, NOT THE FACE'S. A 30px control is under
+     WCAG 2.5.5's minimum on the one surface in this file that is only ever
+     touched, so the pressable branch pads the face out to
+     `--control-height-button` — the same number the assistant button beside
+     it takes, which is also what makes the two controls in this cluster the
+     same target size even though the two MARKS are not (see the section
+     header). `rounded-pill` at equal width and height so the global focus
+     ring (tokens.css §8) reads as the circle it is wrapping. */
+  const target = cn(
+    "flex size-[var(--control-height-button)] shrink-0 items-center justify-center",
+    "rounded-pill border-0 bg-transparent p-0 no-underline",
+  );
+
+  if (member.href !== undefined) {
+    return (
+      <a
+        data-slot="screen-shell-member"
+        href={member.href}
+        onClick={member.onSelect}
+        aria-label={member.name}
+        className={target}
+      >
+        <span aria-hidden="true" className="flex">
+          {face}
+        </span>
+      </a>
+    );
+  }
+
+  return (
+    <button
+      data-slot="screen-shell-member"
+      type="button"
+      onClick={member.onSelect}
+      aria-label={member.name}
+      className={cn(target, "cursor-pointer")}
+    >
+      <span aria-hidden="true" className="flex">
+        {face}
+      </span>
     </button>
   );
 }
@@ -2395,13 +2753,17 @@ function NavSheet({
  * THREE BREAKPOINTS — REWRITTEN 2026-09-04. Two of the three were wrong on a
  * real device and the numbers are in the file header's NARROW section.
  *  mobile  — NO RAIL COLUMN, but navigation is REACHABLE: a glyph-only menu
- *            control stands on the ground above the breadcrumb (`md:hidden`)
- *            and opens the sections-then-pages drawer. The assistant is
- *            reachable too — its column OVERLAYS the card rather than
- *            docking beside it, so the card keeps the full width between the
- *            gutters and the round handle is the way in. No title-row
- *            controls and no mango; no footer. Every figure, every count and
- *            every identity chip stays: "drops controls, never counts".
+ *            control stands in the BOTTOM BAR under the card (`md:hidden`)
+ *            and opens the sections-then-pages drawer. Client, 2026-09-04:
+ *            "should only stay in bottom navbar" — it used to stand at the
+ *            top-left and does not any more. The assistant is reachable too,
+ *            and now from the TOP BAR: its trigger sits immediately before
+ *            the reader's own face at the reading end of the ground, both
+ *            drawn at all times, on her instruction. The column itself still
+ *            OVERLAYS the card rather than docking beside it, so the card
+ *            keeps the full width between the gutters. No title-row controls
+ *            and no mango in the band; no footer. Every figure, every count
+ *            and every identity chip stays: "drops controls, never counts".
  *  tablet   — the RAIL docks at `md` and the menu control disappears with
  *            it, because a width that can seat a rail must not fold one into
  *            a button. The ASIDE still overlays here: at 834 a docked
@@ -2435,6 +2797,9 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       onNavSelect,
       navMenuLabel = "Open the menu",
       navBackLabel = "All sections",
+      narrowTopBar = true,
+      navLead,
+      navMember,
       spine = "mango",
       ambient,
       breadcrumb,
@@ -2481,6 +2846,49 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
 
     const [selfAsideOpen, setSelfAsideOpen] = React.useState(defaultAsideOpen);
     const isAsideOpen = asideOpen ?? selfAsideOpen;
+
+    /* HAS THE ASSISTANT EVER BEEN OPEN? — A LATCH, AND IT EXISTS TO STOP A
+       DARK FLASH ON EVERY PHONE PAGE LOAD. Added 2026-09-04 with the bottom
+       sheet below.
+
+       THE BUG IT PREVENTS, EXACTLY. The narrow scrim (see the aside dock) is
+       a permanently-mounted element carrying `.motion-scrim` and this file's
+       own `data-state`. `.motion-scrim[data-state="closed"]` is
+       `motion-fade-out … both` — a real CSS animation, and a CSS animation
+       RUNS ON MOUNT. So a scrim that is simply always in the tree plays its
+       140ms fade FROM FULLY PAINTED on the first frame of every page load at
+       380: a charcoal wash over the whole phone, once, on a screen nobody has
+       touched. Measured before this latch existed, not suspected.
+
+       WHY NOT THE OBVIOUS FIXES. Mounting the scrim on `isAsideOpen` alone
+       kills the exit — motion.css §3b contract point 5, the one it says will
+       be got wrong first: the element has to survive `--duration-exit` for
+       the fade-out to play at all. `hidden` when shut is the same mistake
+       spelled differently. Starting the scrim at `opacity: 0` and letting the
+       animation win is a component writing its own motion, which is law 6.1.
+
+       SO THE SCRIM IS NOT IN THE TREE UNTIL THE FIRST OPEN, AND IS IN IT
+       FOR EVER AFTER. Before the first open there is nothing to fade out
+       from, which is exactly the state the reader is in; from the first open
+       onward both animations play on a mounted element, entrance and exit,
+       for the rest of the session.
+
+       IT IS NOT A BREAKPOINT AND IT IS NOT A `matchMedia`. It reads STATE,
+       never width — the same value on a server render and on the first
+       client render (`false`, or the caller's own `defaultAsideOpen` /
+       `asideOpen`), so it cannot produce a hydration mismatch. The narrow
+       scrim's own `hidden` / `max-[45rem]:block` pair does the width half in
+       the cascade, where this file's house rule requires it.
+
+       THE RENDER-TIME ADJUSTMENT IS DELIBERATE AND IS REACT'S OWN DOCUMENTED
+       PATTERN for state derived from props ("adjusting state when a prop
+       changes"). `toggleAside` alone would not catch it: `asideOpen` is a
+       CONTROLLED prop, so an application can open the assistant without this
+       component's handler ever running, and the latch has to notice that too.
+       React re-runs this render immediately and commits once; nothing else in
+       the tree observes the intermediate value. */
+    const [asideEverOpen, setAsideEverOpen] = React.useState(asideOpen ?? defaultAsideOpen);
+    if (isAsideOpen && !asideEverOpen) setAsideEverOpen(true);
 
     const toggleRail = () => {
       const next = !isRailCollapsed;
@@ -2533,6 +2941,32 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
        rail on desktop and a menu on a phone, which is one screen with two
        different answers to "is there navigation here?". */
     const hasNarrowNav = Boolean(railNode);
+
+    /* THE FACE FOR THE PHONE'S TOP BAR, RESOLVED ON THE SAME THREE-CASE
+       LADDER `menuGroups` IS TWO STATEMENTS UP, AND ON THE SAME TEST
+       (`rail === undefined` — "did the SHELL build the rail?"). What is
+       different is the LAST rung, and it is different on purpose.
+
+       `menuGroups` falls back to the rail NODE drawn flat, because a menu
+       with the wrong shape is still navigation and a reader can still get
+       somewhere. There is no equivalent degraded face: the only thing this
+       file could substitute for an application's real person is the kit's
+       fictional one, and a phone displaying "Member name / AC" over a real
+       workspace's rail is not a degraded identity, it is a wrong one. So the
+       third case draws NOTHING and `navMember`'s own doc says to pass it
+       alongside `navGroups`.
+
+       `!== undefined` AND NOT `??`, WHICH IS NOT PEDANTRY HERE. `navMember`
+       is `RailMember | null | undefined` and the three values mean three
+       different things — a person, "draw none", and "decide for me". `??`
+       collapses the first two of those into one and would quietly turn the
+       documented opt-out into the placeholder. */
+    const narrowMember =
+      navMember !== undefined
+        ? navMember
+        : rail === undefined
+          ? NARROW_PLACEHOLDER_MEMBER
+          : null;
 
     /* An omitted `aside` is the two-column shell, unchanged. `null` says the
        same thing, so both are read the same way and no call site has to
@@ -2832,60 +3266,240 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             hasAside ? "pe-[var(--shell-gutter)] lg:pe-0" : "pe-[var(--shell-gutter)]",
           )}
         >
-          {/* THE MENU — THE PHONE'S WHOLE NAVIGATION, AND THE ONLY THING IN
-              THIS FILE THAT LOOKS LIKE A HAMBURGER. Client-ordered
-              2026-09-04; the law it narrows, and why "narrows" rather than
-              "deletes", is argued in full at `NavSheet` above, along with the
-              trigger's own variant, size and label rules.
+          {/* ── THE PHONE'S TOP BAR — THE ASSISTANT, THEN THE FACE, AT THE
+              READING END OF THE GROUND. CLIENT-ORDERED 2026-09-04; the whole
+              sentence and every clause of it is quoted and answered at THE
+              PHONE'S TOP BAR above, with the collision that forced the corner
+              handle to stand down.
 
-              WHY IT STANDS HERE, ON THE GROUND, ABOVE THE BREADCRUMB. It is
-              CHROME — it is the rail, at a width the rail cannot stand at —
-              and every other piece of chrome in this shell (the rail, the
-              trail, both handles) lies on the spine rather than inside the
-              card. Putting it in the header band instead was tried and
-              rejected twice over: the band is INSIDE the card and scrolls out
-              of reach on a long screen at exactly the width where reaching
-              matters, and the band's trailing cluster is already the one
-              place ruling 26 lets a mango stand, so a second control there
-              would sit beside the screen's one mango and read as a peer of it.
+              WHAT USED TO BE IN THIS EXACT PLACE, AND WHY IT IS GONE. Until
+              today this row was `screen-shell-nav-bar`: one glyph-only menu
+              control at the LEADING edge, opening the sections-then-pages
+              drawer. The client has seen it and redirected, verbatim: *"on
+              mobile remove the section menu button from top left, should only
+              stay in bottom navbar"*. So the control is REMOVED FROM HERE
+              rather than duplicated — there is exactly one `NavSheet` in this
+              file and it is now mounted in the bottom bar below the card. Her
+              word is "only", and a menu reachable from two places on one
+              screen is not "only".
 
-              IT IS A SEPARATE SIBLING AND NOT A WRAPPER AROUND THE TRAIL. The
-              breadcrumb's own block below states, at length, that its wrapper
-              may take no block-end padding and open no stacking context,
-              because the folder tabs' overlap and their z-order both depend
-              on it. So this row pays its own `--space-3` beneath itself and
-              touches nothing of the trail's.
+              THE DRAWER ITSELF IS UNCHANGED AND THAT IS ALSO A RULING. She
+              approved the sections-then-pages structure ("i want that the
+              navigatuin menu is with the navbar sections first, and the
+              submenu with the pages"); what moved is the button that opens
+              it, not what it opens. `NavSheet`'s own argument, its trigger's
+              variant/size/label rules and its two levels are untouched.
 
-              `md:hidden` IS THE WHOLE GATE, AND IT IS ON THE WRAPPER SO IT
-              CATCHES THE DRAWER'S TRIGGER TOO. Above `md` the rail is docked,
-              this row is `display: none`, and a `display: none` button is not
-              merely invisible — it is out of the tab order and out of the
-              accessibility tree, which is what "genuinely unreachable" means.
-              Measured: at 1440 and at 834 the trigger takes no focus.
+              WHY THE ROW ITSELF SURVIVED THE MOVE RATHER THAN BEING DELETED
+              AND REBUILT. Everything the old block argued about WHERE chrome
+              stands is still exactly true of this one and is not restated:
+              it is on the GROUND, not in the card, because the band is inside
+              the card and scrolls out of reach on a long screen at exactly
+              the width where reaching matters; and it is a SEPARATE SIBLING
+              above the trail rather than a wrapper around it, because
+              `screen-shell-breadcrumb` may take no block-end padding and open
+              no stacking context (the folder tabs' overlap and their z-order
+              both depend on that), so this row pays its own `--space-3`
+              beneath itself and touches nothing of the trail's.
 
-              THE DRAWER ITSELF PORTALS OUT OF THIS TREE, so `md:hidden` does
-              not reach it — and it does not need to. Radix mounts no overlay
-              and no content until the trigger is pressed, and the trigger
-              cannot be pressed above `md`, so above `md` there is nothing in
-              the document to hide. A reader who opens the menu on a phone and
-              then rotates to a tablet keeps a working drawer rather than
-              having it vanish mid-gesture, which is what a second `md:hidden`
-              around the content would have caused. */}
-          {hasNarrowNav ? (
+              `md:hidden` IS STILL THE WHOLE GATE, AND IT IS STILL ON THE
+              WRAPPER. Above `md` the rail is docked with the member's own
+              chip at its foot and the assistant has its edge handle, so
+              neither control in here has anything to do; the row is
+              `display: none`, which is not merely invisible — it is out of
+              the tab order and out of the accessibility tree, which is what
+              "genuinely unreachable" means. Measured at 1440 and 834: neither
+              takes focus.
+
+              `justify-end` IS THE WHOLE OF "ON THE RIGHT", and it is logical
+              rather than physical, so the cluster sits at the reading end in
+              both directions. DOM order inside it is assistant, then face —
+              which paints the icon to the LEFT of the picture in LTR and to
+              its right in RTL, exactly as the client asked for in the one
+              direction she reads.
+
+              IT IS DRAWN WHENEVER EITHER HALF EXISTS, not only when both do.
+              A screen with no assistant still shows the reader's face; a
+              screen with no member still shows the assistant. Only a screen
+              with neither draws no row at all, and then it costs no padding
+              either. */}
+          {narrowTopBar && (hasAside || narrowMember || navLead) ? (
             <div
-              data-slot="screen-shell-nav-bar"
+              data-slot="screen-shell-top-bar"
               data-level="ground"
-              className="flex min-w-0 shrink-0 items-center pb-[var(--space-3)] md:hidden"
+              className={cn(
+                /* `justify-between`, NOT `justify-end`, THE MOMENT A LEAD
+                   EXISTS. With only the assistant and the face this row was
+                   one cluster pinned to the reading end, and `justify-end`
+                   said exactly that. `navLead` puts a second cluster at the
+                   reading START — the consuming app's own logo or workspace
+                   switcher — and two clusters that must sit at opposite ends
+                   is what `justify-between` means. Chosen over a spacer div
+                   because a spacer is a layout instruction disguised as an
+                   element, and over `me-auto` on the lead because that fails
+                   the day the lead is absent and the cluster drifts. */
+                navLead ? "justify-between" : "justify-end",
+                "flex min-w-0 shrink-0 items-center",
+                "gap-[var(--space-2)] pb-[var(--space-3)] md:hidden",
+                /* `relative z-[4]` — ONE STEP OVER THE ASIDE DOCK, AND IT IS
+                   THE DIFFERENCE BETWEEN "VISIBLE" AND "USABLE". MEASURED,
+                   NOT SUSPECTED: with the assistant OPEN at 380 the dock is
+                   `max-lg:absolute inset-y-0 end-0 z-[3]` and it spans the
+                   whole 380 — so `document.elementFromPoint` at the centre
+                   of this bar's assistant button returned the assistant's
+                   own breadcrumb list, not the button. Both controls were
+                   painted, both were in the tab order, and a TAP on either
+                   went to the panel lying over them. The client's words are
+                   "visible all times"; a control you can see and cannot
+                   press is the worse half of that, not the better one, and
+                   this button is the very control that CLOSES the thing
+                   covering it.
+
+                   THE LADDER, WHICH IS THE SCREEN'S OWN AND IS NOT EXTENDED
+                   LIGHTLY: `CursorGlow` negative, the trail's rest tabs 1,
+                   the card 2, the trail's live tab and the aside dock 3, and
+                   now this bar at 4 — still inside the SCREEN's own
+                   `isolate`, so nothing outside this shell is reordered.
+                   Four is the first index over the dock and no higher.
+
+                   IT IS A SIBLING OF THE BREADCRUMB, NOT AN ANCESTOR OF IT,
+                   which is why this may declare a stacking context at all.
+                   `screen-shell-breadcrumb`'s own block forbids a context on
+                   THAT wrapper because the folder tabs' 1/3 indices have to
+                   resolve against the SCREEN; this element sits beside it in
+                   the same flex column, overlaps it nowhere, and traps
+                   nothing of its.
+
+                   UNCONDITIONAL RATHER THAN `max-md:`, because it is already
+                   a no-op everywhere else: from `md` this row is
+                   `display: none`, which has no stacking level to argue
+                   about. One class that is always true beats two that have
+                   to agree — the same reasoning the aside handle's own
+                   `pointer-events-auto` is written with.
+
+                   AND THE BOTTOM BAR DELIBERATELY DOES NOT GET THIS. It is
+                   under the open panel at 380 by the same mechanism, and
+                   that is a question rather than a bug: the assistant is
+                   about to become a sheet rising to 85% of the height with
+                   the top 15% left visible, which puts THIS bar in the strip
+                   that stays and the foot of the screen under the sheet. So
+                   the top bar is lifted because the client's sentence
+                   demands it and the coming shape agrees; whether a reader
+                   should be able to reach the section menu while the
+                   assistant is open is hers to answer, and it is in the
+                   report rather than decided here.
+
+                   THE SHEET LANDED LATER THE SAME DAY AND THE PARAGRAPH
+                   ABOVE IS NOW HISTORY RATHER THAN A FORECAST — kept because
+                   it is the reasoning that put the 4 here, and the 4 is still
+                   what makes this button pressable in the 720–768 band where
+                   the bars have flipped and the sheet has not. BELOW 45rem
+                   THE LADDER INVERTS: the aside dock takes `z-[5]` and its
+                   scrim covers this bar along with everything else, because
+                   the client's "make the 15% stay visible dut darkened" does
+                   not have a bright rectangle cut out of it. The button is
+                   covered, not dead — a tap on it lands on the scrim, and
+                   the scrim closes the assistant. The whole argument, with
+                   the alternative that was rejected, is at the dock's own
+                   `max-[45rem]:z-[5]`. And the bottom bar's question is
+                   answered by the shape: at 380 the sheet's foot IS the
+                   window's foot, so the section menu is under it and is
+                   reached by closing the assistant, which is one tap on the
+                   scrim from anywhere in the strip. */
+                "relative z-[4]",
+              )}
             >
-              <NavSheet
-                groups={menuGroups}
-                fallback={railNode}
-                current={navCurrent}
-                onSelect={onNavSelect}
-                title={railLabel}
-                backLabel={navBackLabel}
-                triggerLabel={navMenuLabel}
-              />
+              {/* THE LEAD CLUSTER, at the reading start — whatever the
+                  consuming product puts its own identity in. The kit does
+                  not name it "logo", because the app that prompted it passes
+                  a workspace switcher (a control), not a mark, and a prop
+                  called `logo` would have made every future caller wonder
+                  whether a control belonged in it.
+
+                  IT EXISTS SO THERE IS ONE MOBILE TOP BAR AND NOT TWO. The
+                  consuming app drew its own fixed `<header>` on phones for
+                  as long as this shell had no mobile chrome at all — its
+                  source said so in as many words ("ScreenShell has no
+                  mobile-chrome concept of its own … the rail simply
+                  disappears below `md`"). That stopped being true on
+                  2026-09-04, and the two bars would have stacked: the app's
+                  logo and face in one, this bar's assistant and face in
+                  another, two faces on one 380px screen. Rather than teach
+                  the app to suppress this row, the row takes what the app
+                  had, and the app's bespoke header goes away. One bar, one
+                  face, one place the client's "logo avatar and ai butto"
+                  can all be true at once.
+
+                  Rendered raw, with no wrapper of its own: the caller is
+                  handing over a cluster it has already composed, and a
+                  wrapper here would add a box it cannot see to reason about.
+                  `min-w-0` on the row is what keeps a long workspace name
+                  from pushing the face off the end. */}
+              {navLead}
+              {/* THE ASSISTANT'S OWN CONTROL — THE SAME CONTROL, RELOCATED,
+                  AND NOT A SECOND ONE. It calls `toggleAside`, the identical
+                  handler the edge handle and the assistant's folder tab both
+                  call, and it announces the identical pair of strings
+                  (`asideOpenLabel` / `asideCloseLabel`, defaults "Open the
+                  assistant" / "Close the assistant"). So a reader who meets
+                  this button on a phone and the handle on a desktop meets one
+                  action with one name, never two that can disagree — and
+                  nothing about how the assistant PANEL is positioned or
+                  animated is touched here. That is another pass's work
+                  (`foundations/motion/motion.css` is not this file's to
+                  edit); this is a trigger and only a trigger.
+
+                  `Sparkle` IS THE ASSISTANT'S BRAND MARK, constant across
+                  states — the same glyph the edge handle carries, for the
+                  reason stated at `EdgeHandle.icon`: the state is announced
+                  by the label, never by swapping the mark, so the icon does
+                  not flicker between two shapes as the column opens.
+
+                  `variant="secondary"` — PAPER, NOT MANGO, AND THAT IS
+                  RULING 26 RATHER THAN A DEMOTION. The corner handle this
+                  replaces spends `--btn-primary-fill`, which is the brand
+                  fill; the FACE beside it spends `--spine-active-fill`,
+                  which is that same mango on the ink and paper spines. Two
+                  mango circles touching each other in one corner is two
+                  brand fills on one screen, which 26.02 forbids, and of the
+                  two the face is the one that cannot move — 26.02 fixes the
+                  member circle as the lit row's twin in all three spine
+                  specimens, and the client's sentence makes the picture the
+                  anchor the icon is placed relative to. So the assistant
+                  takes the ground's paper chip, which is exactly what the
+                  menu trigger one file-section down already does and for
+                  the identical reason. `--btn-secondary-fill` is rebound to
+                  `--spine-chip-fill` on the SCREEN (see THE PAPER LAW), so
+                  this reads correctly on all three spines without naming a
+                  colour. LOGGED AS OWED: if the client wants the assistant
+                  to be the phone's one brand fill instead, the change is
+                  this one word plus a ruling that the top bar's face is
+                  something other than mango — not one without the other.
+
+                  `size="icon"` AND AN `aria-label` — 26.01's glyph rule, and
+                  the label is the control's ONLY name, which is why it is a
+                  translated prop rather than a string typed here.
+
+                  `aria-expanded` IS WRITTEN BY HAND HERE, unlike the menu
+                  trigger's, and the difference is where the state lives.
+                  Radix owns the sheet's open state and therefore owns that
+                  announcement; the assistant's open state is THIS file's
+                  (`isAsideOpen`), so this file has to say it. It is the same
+                  attribute `EdgeHandle` publishes from the same value. */}
+              {hasAside ? (
+                <Button
+                  data-slot="screen-shell-assistant-trigger"
+                  variant="secondary"
+                  size="icon"
+                  aria-label={isAsideOpen ? asideCloseLabel : asideOpenLabel}
+                  aria-expanded={isAsideOpen}
+                  onClick={toggleAside}
+                >
+                  <Sparkle aria-hidden="true" />
+                </Button>
+              ) : null}
+
+              {narrowMember ? <MemberFace member={narrowMember} /> : null}
             </div>
           ) : null}
 
@@ -2989,6 +3603,90 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               )}
             </div>
           </main>
+
+          {/* ── THE BOTTOM NAVBAR — THE PHONE'S NAVIGATION, MOVED HERE FROM
+              THE TOP-LEFT CORNER. CLIENT-ORDERED 2026-09-04, verbatim: *"on
+              mobile remove the section menu button from top left, should only
+              stay in bottom navbar"*.
+
+              WHAT IS IN IT TODAY IS THE SECTION MENU AND NOTHING ELSE, AND
+              THAT IS AN HONEST STATE RATHER THAN A FINISHED ONE. The client
+              named the bar and named one thing that lives in it; she has not
+              said what else belongs there. This file will not guess: a set of
+              "primary destinations" invented here would be a product decision
+              taken by a design kit, and it would be wrong in a way nobody
+              could argue with because nobody asked for it. So the bar is a
+              real flex row with a real gap and one item in it — adding a
+              second is one JSX sibling and no layout change — and the
+              question is asked out loud in the report instead of answered in
+              code.
+
+              `justify-start` WHILE IT HOLDS ONE ITEM, AND THAT IS THE
+              DEFENSIBLE ARRANGEMENT OF A ONE-ITEM BAR RATHER THAN A HIDDEN
+              PREFERENCE. The menu sits at the READING START of the foot,
+              which is the same edge the rail it stands for occupies at every
+              wider width, and it is diagonally opposite the top bar's cluster
+              at the reading end — so the phone's chrome reads as
+              start/bottom = where you can go, end/top = the assistant and
+              you. Centring it instead was considered and is the shape a
+              five-item bar wants, not a one-item one: a single glyph floating
+              in the middle of an otherwise empty strip reads as an
+              unfinished bar, while a glyph at the edge reads as the first
+              slot of a row. Both are one class; the choice is the client's
+              and it is in the report.
+
+              IT IS IN NORMAL FLOW, NOT FIXED, AND THAT IS WHAT MAKES
+              "DOES NOT OVERLAP THE CONTENT" TRUE BY CONSTRUCTION RATHER THAN
+              BY A COMPENSATING PADDING SOMEBODY HAS TO MAINTAIN. `PAGE` is
+              `h-dvh` + `overflow-hidden` and the card's BODY is the only
+              scroller, so a `shrink-0` row at the end of this flex column is
+              pinned to the bottom of the window exactly as a fixed bar would
+              be — and the card, which is `flex-1`, simply ends above it. A
+              `fixed`/`sticky` bar would have painted over the card's last
+              rows and needed the card to pay a bottom inset equal to a height
+              this file would then have to know; measured at 380, the card is
+              47.5px shorter with this row present and its bottom edge clears
+              the bar by the `--space-3` this row pays above itself. Nothing
+              is clipped and nothing is covered.
+
+              `md:hidden` IS THE GATE, ON THE WRAPPER, for the third time in
+              this file and for the same reason each time: above `md` the rail
+              is docked and this row is `display: none`, which takes the
+              trigger out of the tab order and out of the accessibility tree
+              rather than merely out of sight.
+
+              IT IS A `<nav>` AND THE ONLY ONE A PHONE HAS. `Rail` draws a
+              real `<nav aria-label>` at its own root, and below `md` that
+              whole subtree is inside `screen-shell-rail-dock`'s
+              `hidden md:flex` — so a phone's landmark list had no navigation
+              entry at all, and this element is now it. The name is
+              `railLabel`, the SAME translated word the rail's landmark and
+              the drawer's heading already carry, because three names for one
+              region is three things to get wrong. Above `md` this element is
+              `display: none` and the rail's own `<nav>` is the live one, so
+              the two are never both in the tree and the name is never
+              duplicated. */}
+          {hasNarrowNav ? (
+            <nav
+              data-slot="screen-shell-bottom-bar"
+              data-level="ground"
+              aria-label={railLabel}
+              className={cn(
+                "flex min-w-0 shrink-0 items-center justify-start",
+                "gap-[var(--space-2)] pt-[var(--space-3)] md:hidden",
+              )}
+            >
+              <NavSheet
+                groups={menuGroups}
+                fallback={railNode}
+                current={navCurrent}
+                onSelect={onNavSelect}
+                title={railLabel}
+                backLabel={navBackLabel}
+                triggerLabel={navMenuLabel}
+              />
+            </nav>
+          ) : null}
         </div>
 
         {/* THE ASIDE DOCK — the gutter BEFORE the column, mirroring the rail
@@ -3150,8 +3848,189 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               "max-lg:pointer-events-none max-lg:absolute max-lg:inset-y-0 max-lg:end-0 max-lg:z-[3]",
 
               isAsideOpen && "pe-[var(--shell-gutter)]",
+
+              /* ── AND BELOW 45rem THE DOCK IS THE WHOLE WINDOW, BECAUSE THE
+                 ASSISTANT STOPPED BEING A COLUMN AND BECAME A BOTTOM SHEET.
+                 CLIENT-ORDERED 2026-09-04, three sentences in one breath:
+
+                     "assistan is a slide up"
+                     "everythung that's slisde in in desktop, should be slide
+                      up in mobile"
+                     "for slide up, make them 85% of the sccreen, make the 15%
+                      stay visible dut darkened (like in desktop when we open
+                      slide in)"
+
+                 The third sentence is the specification and the parenthesis
+                 is the acceptance test: the strip she wants left over is not
+                 empty space, it is the SAME scrimmed page a desktop slide-in
+                 already shows past its own edge. So this dock now has to hold
+                 two things it never held — a full-bleed sheet and a scrim
+                 over everything behind it — and neither of them fits inside a
+                 gutter-wide strip pinned to the reading end.
+
+                 WHY 45rem AND NOT `md`, WRITTEN DOWN BECAUSE THE TWO ARE 48px
+                 APART AND THE FILE USES BOTH. In a media query `rem` is
+                 always the INITIAL font size (16px) and never this kit's 15px
+                 root, so `md` is 768px and `45rem` is 720px, and the band
+                 between them is real. Everything the client's sentence is
+                 about already draws its line at 720:
+                   · `Sheet` flips a side drawer into a bottom sheet at
+                     `max-[45rem]:` (components/sheet/sheet.tsx, NARROW_BOTTOM)
+                   · motion.css §3a flips the sheet's own travel there
+                   · motion.css §3b flips a non-sheet panel's travel there
+                   · motion.css §3c, added for this panel, exists only there
+                 Anchoring the GEOMETRY to `md` would put the shell 48px out
+                 of step with the motion layer that moves it: between 720 and
+                 768 the panel would have been a bottom sheet that still
+                 travelled sideways, or a side column that slid up. One
+                 boundary, four files, and the one already written into three
+                 of them wins. The `md:`/`max-md:` rules elsewhere in this
+                 file are about the phone's BARS, which is a different
+                 question with its own settled answer, and they are left
+                 alone — in the 720–768 band the top bar is drawn and the
+                 assistant is still the side overlay it is today, which is
+                 exactly what that band does now.
+
+                 `max-[45rem]:start-0` IS THE WHOLE OF "FULL BLEED" and it is
+                 an addition rather than a replacement: `max-lg:inset-y-0` and
+                 `max-lg:end-0` are already true down here, so pinning the
+                 remaining side is one class and the box becomes the viewport.
+                 No `inset-0`, which would have restated three insets to
+                 change one and left two spellings of the same edge.
+
+                 THE PADDING GOES TO ZERO, AND IT IS NOT COSMETIC. An
+                 absolutely positioned child is laid out against its
+                 containing block's PADDING box, so the sheet's `inset-x-0`
+                 and the scrim's `inset-0` would each land one gutter in on
+                 every side while looking correct in the source. The client's
+                 own arithmetic (85 + 15 = the screen) has no room in it for a
+                 gutter. Each side is zeroed by name rather than with `p-0`
+                 deliberately: Tailwind emits the `padding` shorthand BEFORE
+                 the per-side properties, so a `p-0` would have lost to the
+                 `pb-`/`ps-`/`pe-` above it at equal specificity and the bug
+                 would have been invisible in the class list.
+
+                 `max-[45rem]:z-[5]` LIFTS THE WHOLE DOCK OVER THE PHONE'S TOP
+                 BAR, WHICH IS THE ONE GENUINELY CONTESTED DECISION HERE.
+                 The bar is `relative z-[4]`, one step over this dock's
+                 `max-lg:z-[3]`, and that was put there so its assistant
+                 button stayed PRESSABLE under an open side panel — the exact
+                 "visible but dead" defect that block describes finding and
+                 fixing. A scrim at `z-[3]` would darken the whole screen
+                 except a bright rectangle in the top corner, which is not
+                 "the 15% stay visible dut darkened", it is 15% minus a hole.
+
+                 So down here the ladder inverts and the scrim covers the bar
+                 too — and the defect does not come back, because TAPPING THE
+                 SCRIM CLOSES THE ASSISTANT. The button's own square of ground
+                 still closes the assistant when it is tapped; what answers
+                 the tap is the scrim rather than the button, which is the
+                 standard bottom-sheet dismissal and is the behaviour of the
+                 desktop slide-in the client's parenthesis names as the model.
+                 The control is also still on the keyboard's path and still
+                 announces "Close the assistant", so it is covered, not dead.
+                 The alternative — keeping the bar above the scrim — was
+                 rejected in the same breath as the hole: an undimmed cluster
+                 floating over a dimmed strip contradicts the sentence that
+                 asked for the strip.
+
+                 FIVE IS THE FIRST INDEX OVER THE BAR AND NO HIGHER, and it is
+                 still inside the SCREEN's own `isolate`, so nothing outside
+                 this shell is reordered. The bar keeps its 4: between 720 and
+                 768 there is no scrim and no sheet, and 4-over-3 is still
+                 what makes its button pressable there. */
+              "max-[45rem]:start-0 max-[45rem]:z-[5]",
+              "max-[45rem]:pb-0 max-[45rem]:ps-0 max-[45rem]:pe-0",
             )}
           >
+            {/* ── THE NARROW SCRIM — "make the 15% stay visible dut darkened
+                (like in desktop when we open slide in)". CLIENT-ORDERED
+                2026-09-04 and it is the second half of one sentence, not a
+                flourish: the strip of page the sheet leaves uncovered is
+                REQUIRED to still be there and REQUIRED to be dimmed, and her
+                own reference for how dim is the drawer scrim the kit already
+                draws on a desktop.
+
+                SO IT IS THAT SCRIM, TO THE CHARACTER. The colour expression
+                is copied from `components/sheet/sheet.tsx`'s own `SCRIM`
+                const — `color-mix(in srgb, var(--kw-charcoal) 28%,
+                transparent)` — rather than re-derived, because the kit's
+                drawer scrim is a stated value (`.kw-scrim--drawer`, charcoal
+                at 28%, GAPS-A.md OVL-2) and two places computing it is two
+                places for it to drift. `--kw-charcoal` is the raw palette
+                layer and is reached deliberately for that file's reason: no
+                semantic token stays charcoal in both palettes. Measured
+                against a `Sheet` at 380 and it is the same colour and the
+                same 28%.
+
+                `.motion-scrim` AND `data-state`, WHICH IS THE WHOLE OF ITS
+                MOTION. motion.css §3 fades it in over `--duration-overlay`
+                and out over `--duration-exit`, matched to the panel beside
+                it; this file names no duration and no curve, per law 6.1.
+
+                `hidden` / `max-[45rem]:block` IS A PAIR RATHER THAN A `max-`
+                PREFIX, AND IT IS THE ONE PLACE IN THIS DOCK WHERE THAT IS
+                RIGHT. Everywhere else the default is the desktop's and the
+                narrow rule is the exception, so `max-*` keeps the desktop
+                cascade literally untouched. This element has no desktop
+                behaviour to preserve — it is NEW, and above 45rem it must not
+                exist at all — so the safe default is `display: none` and the
+                exception is the one width that wants it. Written the other
+                way round (`max-[45rem]:block` alone) a future change to the
+                media query would leave a full-screen charcoal wash on every
+                desktop.
+
+                IT DISMISSES ON TAP, AND THAT IS LOAD-BEARING RATHER THAN
+                CONVENIENT. Because the dock is lifted over the phone's top
+                bar (argued at the dock's own `max-[45rem]:z-[5]`), this
+                surface is what a finger meets where the assistant's trigger
+                is painted — and it calls `toggleAside`, the identical handler
+                that trigger, the folder tab and the edge handle all call. So
+                the trigger's square of ground still closes the assistant when
+                it is tapped, and the "visible but dead control" defect this
+                file already found and fixed once does not come back through
+                the scrim.
+
+                `aria-hidden` AND NO ROLE, WHICH IS DELIBERATE AND IS NOT AN
+                OVERSIGHT. A scrim is a pointer affordance and a redundant
+                one: the assistant already has three keyboard-reachable
+                closes — the top bar's trigger (still focusable, still
+                announcing "Close the assistant" while it is covered), the
+                folder tab inside the panel, and the edge handle above 45rem.
+                Giving this box a fourth name and a fourth tab stop would make
+                a screen reader announce a decoration; Radix's own
+                `Dialog.Overlay`, which `Sheet` renders, is the same shape for
+                the same reason.
+
+                IT TAKES POINTER EVENTS ONLY WHILE OPEN. The dock is
+                `max-lg:pointer-events-none` and what is painted takes them
+                back, so this line is the taking-back — and it is conditional
+                because a closed scrim is a fully transparent box over the
+                whole viewport. `opacity: 0` does NOT stop hit testing; a
+                permanently-live scrim would swallow every tap on the card
+                for as long as the page was open, which is the worst bug in
+                this block's neighbourhood and the reason the condition is
+                written on the state rather than assumed from the fade.
+
+                AND IT IS NOT MOUNTED UNTIL THE ASSISTANT HAS BEEN OPENED
+                ONCE — see `asideEverOpen` above for the dark flash that
+                buys, and for why the latch reads state and never width. */}
+            {asideEverOpen ? (
+              <div
+                data-slot="screen-shell-aside-scrim"
+                data-state={isAsideOpen ? "open" : "closed"}
+                aria-hidden="true"
+                onClick={toggleAside}
+                className={cn(
+                  "hidden max-[45rem]:block",
+                  "absolute inset-0",
+                  "bg-[color-mix(in_srgb,var(--kw-charcoal)_28%,transparent)]",
+                  "motion-scrim",
+                  isAsideOpen && "pointer-events-auto",
+                )}
+              />
+            ) : null}
+
             {/* IT COLLAPSES NOW RATHER THAN VANISHING — client, 2026-09-04:
                 "that should minimize it with a nice animation."
 
@@ -3186,6 +4065,14 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 outermost edge, during a 140ms exit; logged here rather than
                 left for someone to rediscover. */}
             <div
+              /* IT IS NAMED NOW — `screen-shell-aside-collapse`, added
+                 2026-09-04. It was the one anonymous box in this dock, and
+                 below 45rem it is the box that decides whether the sheet is
+                 painted at all (see the paragraph on its `opacity`, further
+                 down), so a harness has to be able to ask it. A `data-slot`
+                 is inert: no rule in this kit selects on it and no
+                 measurement above 45rem moves by a pixel for its presence. */
+              data-slot="screen-shell-aside-collapse"
               /* `flex min-h-0` IS LOAD-BEARING, NOT TIDINESS. The dock is a
                  flex row and the column used to be its DIRECT child, so it
                  stretched to the row's height for free. Putting this wrapper
@@ -3232,12 +4119,140 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 data-level="aside"
                 role="complementary"
                 aria-label={asideLabel}
+                /* `data-state` ON THE PANEL ITSELF, AND NOT ONLY ON THE
+                   WRAPPER. motion.css §3c reads it here — its contract
+                   (inherited from §3b, point 1) is that the class goes on the
+                   PANEL, never a wrapper, because the keyframes translate
+                   100% of the ANIMATED BOX and the wrapper's box is a
+                   different height. The wrapper keeps its own copy for
+                   `.motion-column-collapse`; the two are the same expression
+                   of the same value and cannot disagree. */
+                data-state={isAsideOpen ? "open" : "closed"}
                 className={cn(
                   "flex w-[23.75rem] min-h-0 flex-none flex-col overflow-y-auto",
                   /* THE TWIN OF THE CUSTOM PROPERTY ABOVE. Same two values,
                      same two breakpoints; they are written next to each other
                      so a change to one is an obvious omission in the other. */
                   "max-w-[calc(100vw-var(--shell-gutter)*2)] lg:max-w-[40vw]",
+
+                  /* ── AND BELOW 45rem IT IS A BOTTOM SHEET. The client's own
+                     arithmetic, verbatim: "for slide up, make them 85% of the
+                     sccreen, make the 15% stay visible dut darkened".
+
+                     THE GEOMETRY IS THIS FILE'S JOB AND NOT THE MOTION
+                     LAYER'S. motion.css §3c says so in as many words
+                     (contract point 4, inherited from §3b): the class travels
+                     the panel, it does not place it. Placed wrong, the travel
+                     would still be perfect and the destination still wrong.
+
+                     `inset-x-0` + `bottom-0` + `w-full` AND ALL THREE ARE
+                     NEEDED. `w-[23.75rem]` above is still in the cascade, and
+                     an absolutely positioned box with `left: 0; right: 0` and
+                     a stated width is over-constrained — the reading-start
+                     inset wins and the sheet comes out 356.25 wide against a
+                     380 screen, off-centre, with a stripe of card down one
+                     side. `max-w-none` retires the narrow cap for the same
+                     reason: the cap exists to hold an OVERLAY COLUMN one
+                     gutter off each window edge, and this is not that any
+                     more.
+
+                     `h-[85dvh]` IS THE CLIENT'S 85, AND IT IS A HEIGHT RATHER
+                     THAN A CAP. `Sheet` spells the same number
+                     `max-h-[85dvh]` with `h-auto`, which is right for a menu
+                     that should be as short as its contents; the assistant is
+                     a conversation with its own scroller, so a cap would make
+                     the sheet's height a property of how many turns had been
+                     said and the strip above it would move as the reader
+                     talked. She asked for 85 and 15, not for "up to 85".
+                     `dvh` and not `vh`, `Sheet`'s own reason: a phone's
+                     visual viewport shrinks under the browser chrome, and
+                     `vh` would put the composer under it.
+
+                     `rounded-t-[var(--radius)]` — the same corner, from the
+                     same token, that `Sheet`'s `bottom` variant takes. The
+                     radius is on the edge the page shows past, which here is
+                     the top one, and only that one: the other three meet the
+                     window.
+
+                     THE SURFACE IS THE ONE THING THAT IS NOT MERELY MOVED,
+                     AND WITHOUT IT THE WHOLE FEATURE IS A BUG. This column
+                     paints NOTHING on a desktop by design — `ASIDE_BODY` is
+                     "paper on the ground, painting nothing", because up there
+                     it stands beside the card on the same ground. A
+                     transparent box over the card is not a sheet, it is the
+                     conversation and the card's own rows printed on top of
+                     each other; measured at 380 before this line existed and
+                     it is exactly that. `bg-popover` /
+                     `text-popover-foreground` / `shadow-xl` are the three
+                     `Sheet` itself spends (the kit's drawer surface:
+                     `--popover` under `--shadow-overlay`), taken from there
+                     rather than chosen here, so the assistant and every other
+                     drawer on the phone are one material.
+
+                     `.motion-edge-panel-narrow` IS THE TRAVEL, AND IT IS A
+                     CLASS THAT DOES NOTHING ABOVE 45rem — the whole rule
+                     lives inside that media query, which is what lets this
+                     one panel slide up on a phone while keeping the inline
+                     MINIMISE (`.motion-column-collapse`, on the wrapper) that
+                     the client asked for by name on a desktop. It is
+                     unprefixed here for that reason: there is no `max-` to
+                     write, because there is no desktop rule to switch off.
+                     See §3c for the three ways of avoiding a new class and
+                     why each is worse.
+
+                     THE PANEL IS UNREACHABLE BY POINTER THE MOMENT IT IS
+                     CLOSED, not when the exit finishes. §3c's contract point
+                     5 splits those two events on purpose, and this is the
+                     pointer half of it — `inert` on the wrapper is the
+                     keyboard and accessibility half and is already there. The
+                     exit still plays: `pointer-events` is not a paint. And
+                     once it has played, the animation's `both` fill parks the
+                     panel at `translateY(100%)`, one whole sheet-height below
+                     the window, where the SCREEN's own `overflow-hidden`
+                     clips it — so a closed assistant costs no dead zone and
+                     no scrollbar. Both are measured, not assumed.
+
+                     WHY THERE IS NO `max-[45rem]:` HIDE ON TOP OF THAT. The
+                     panel must survive the exit (§3c point 5) and it must
+                     stay out of the tab order while it is gone — `inert` on
+                     the wrapper does the second without touching the first,
+                     which is the pairing that block already argues for. On
+                     load, before anything has been opened, the wrapper is
+                     `opacity: 0` with no transition to run on a first paint,
+                     so the mount-time exit animation plays on an invisible
+                     box and nobody sees the sheet fall past. That is the
+                     wrapper's collapse rule doing a second job, and it is
+                     written down here because it is not obvious and because
+                     removing that `opacity` would break this. */
+                  /* AND THE INLINE INSET HAS TO BE PAID HERE NOW, WHICH IS
+                     THE ONE THING THE MOVE TOOK AWAY WITHOUT SAYING SO.
+                     Above 45rem this column has no inline padding of its own
+                     and never needed any: the DOCK pays it, one
+                     `--shell-gutter` on each side (`ps-` always, `pe-` when
+                     open), which is what holds the conversation off the
+                     card and off the window. Zeroing those paddings so the
+                     sheet could reach both window edges took the
+                     conversation's own margins with them — measured at 380,
+                     every turn started at x 0, hard against the glass. It is
+                     `--aside-inset` and not `--shell-gutter` because this is
+                     now the assistant's INTERNAL measure rather than the
+                     ground's, and the two are the same value at every
+                     density (see `DENSITY_ASIDE`/`DENSITY_GUTTER`), so
+                     nothing moves and no new number enters the file. It sits
+                     on the PANEL rather than on the body so the folder tab
+                     is inset by exactly the same amount, which is the
+                     relationship the dock's padding already produced above
+                     45rem — tab and body flush with each other, both one
+                     inset from the column's edge. The block-start and
+                     block-end are already paid inside (`ASIDE_TAB`'s `pt-`,
+                     `ASIDE_BODY`'s `pb-`) and are not doubled here. */
+                  "max-[45rem]:absolute max-[45rem]:inset-x-0 max-[45rem]:bottom-0",
+                  "max-[45rem]:h-[85dvh] max-[45rem]:w-full max-[45rem]:max-w-none",
+                  "max-[45rem]:px-[var(--aside-inset)]",
+                  "max-[45rem]:rounded-t-[var(--radius)]",
+                  "max-[45rem]:bg-popover max-[45rem]:text-popover-foreground max-[45rem]:shadow-xl",
+                  "max-[45rem]:data-[state=closed]:pointer-events-none",
+                  "motion-edge-panel-narrow",
                 )}
               >
                 {/* `role="complementary"` IS THE FIX, NOT DECORATION. A `<div>`
@@ -3296,21 +4311,23 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     literal `true` — it is always true here, and stays
                     correct if that ever stops being so.
 
-                    NO ANIMATION IS WIRED TO THE CLOSE ITSELF. "Minimise"
-                    wants the column collapsing toward its edge rather than
-                    the instant unmount below; `foundations/motion/motion.css`
-                    has a grid-template-ROWS 0fr/1fr collapse for a row
-                    (`.motion-row-collapse`) and for a disclosure
-                    (`.motion-disclosure-grid`), but nothing that collapses on
-                    the INLINE axis (columns/width), which is this column's
-                    own direction of travel — and `rail.tsx`'s own collapse
-                    (the only other column that shrinks in this file) is
-                    ALSO unanimated today, confirming there is no existing
-                    class to reach for instead. Motion is a foundation this
-                    file may not edit while another agent owns it, so the
-                    close/open toggle stays exactly the instant swap it
-                    already was rather than growing a local transition —
-                    see the report for the class this needs.
+                    THE CLOSE IS ANIMATED NOW, AND THE PARAGRAPH THAT USED TO
+                    STAND HERE IS RETIRED. It said there was no inline-axis
+                    collapse in `foundations/motion/motion.css` to reach for
+                    and that motion was a foundation this file could not edit,
+                    so the toggle stayed an instant swap; both halves were
+                    true when it was written and neither is now.
+                    `.motion-column-collapse` (motion.css §7) was added for
+                    exactly this ruling and is on the wrapper one level up —
+                    "minimise" is the column's track easing shut on the inline
+                    axis, which is the direction the client's own word points
+                    in. BELOW 45rem THE SAME TAP DOES SOMETHING ELSE AGAIN:
+                    the panel is a bottom sheet down there, so it falls rather
+                    than narrows (motion.css §3c, and the geometry is on the
+                    panel itself). One control, one handler, two shapes,
+                    neither of them a duration written in this file.
+                    `rail.tsx`'s own collapse is still unanimated and is still
+                    a separate question nobody has asked.
 
                     UNPADDED AT THE BLOCK-END, same reasoning as
                     `screen-shell-breadcrumb`: the strip's own negative margin
@@ -3357,11 +4374,83 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                  no-op above `lg` — the dock keeps events there and this
                  element already inherits them — and one class that is always
                  true beats two that have to agree. */
+              /* AND SHUT, BELOW `md`, IT IS NOT DRAWN AT ALL — ADDED
+                 2026-09-04 WITH THE PHONE'S TOP BAR, AND IT IS A COLLISION
+                 RATHER THAN A CHANGE OF MIND. The corner this handle takes
+                 when shut (`top-gutter` / `end-gutter`) measured at 380 on
+                 the build before this one at x 323.75, y 18.75, 37.5 square.
+                 The top bar's assistant button now stands in that same
+                 square of ground, and it is the SAME control — same
+                 `toggleAside`, same `asideOpenLabel` — so both drawn is one
+                 action wearing two buttons stacked on each other, which is
+                 the client's own "should only stay in" objection to the menu
+                 applied to the assistant.
+
+                 `max-md:hidden` AND NOT A `hidden md:block` PAIR, so the
+                 cascade at `md` and above resolves to the identical
+                 unprefixed rules this handle has always had — desktop and
+                 tablet are not restored, they are never left. Same `max-`
+                 direction and same reasoning as the aside dock's own
+                 `max-lg:` block one level up.
+
+                 IT IS ON THE SHUT BRANCH ONLY, WHICH IS THE NARROWEST
+                 SUPPRESSION THAT CLEARS THE COLLISION. Open, this handle is a
+                 mid-edge CLOSE grab (`top-1/2`) against a column that is
+                 already covering the top bar at 380, so it collides with
+                 nothing and it is a second way out of a panel that fills the
+                 phone. Removing a close affordance the client did not ask to
+                 remove is not this pass's business — and the assistant's
+                 own folder tab (its other close control) is still there
+                 beside it.
+
+                 `hidden` IS `display: none`, so the button is out of the tab
+                 order and out of the accessibility tree, not merely
+                 unpainted. Measured with the focus sweep, not with
+                 `checkVisibility`. */
+              /* AND OPEN, BELOW 45rem, IT IS NOT DRAWN EITHER — ADDED
+                 2026-09-04 WITH THE BOTTOM SHEET, AND IT IS THE SAME KIND OF
+                 COLLISION AS THE SHUT BRANCH'S, NOT A CHANGE OF MIND ABOUT
+                 CLOSE AFFORDANCES.
+
+                 THE BLOCK ABOVE ARGUES, CORRECTLY FOR THE SHAPE IT WAS
+                 WRITTEN AGAINST, that the OPEN handle collides with nothing:
+                 it was a mid-edge grab on the inline edge of a column that
+                 ran the full height of the window, which is what a mid-edge
+                 grab is for. The sheet has no inline edge. `top-1/2` at 380
+                 puts this circle at y 406 — 40% of the way DOWN the sheet's
+                 own face, floating over the conversation, pinned to nothing
+                 and grabbing nothing. Measured: the handle's centre lands
+                 inside `screen-shell-aside-body`, not on any edge of it.
+
+                 THE ASSISTANT IS STILL CLOSABLE THREE WAYS DOWN HERE, WHICH
+                 IS WHY THIS IS A SUPPRESSION AND NOT A LOSS: the folder tab
+                 at the head of the sheet (`onCurrentActivate`, argued above),
+                 the top bar's own trigger — still on the keyboard's path,
+                 still announcing "Close the assistant" — and the scrim, which
+                 answers a tap anywhere in the 15% including the square of
+                 ground the trigger is painted on. That is one more than a
+                 desktop has.
+
+                 `max-[45rem]:hidden` RATHER THAN `max-md:hidden`, WHICH IS
+                 THE ONE ASYMMETRY IN THIS TERNARY AND IS DELIBERATE. The two
+                 branches are answering two different questions: the SHUT
+                 handle stands down because the phone's TOP BAR took its
+                 corner, and the bars flip at `md`; this one stands down
+                 because the panel became a SHEET, and the sheet flips at
+                 45rem (see the dock's own block for why that boundary and not
+                 the other). Written with one breakpoint for tidiness, the
+                 720–768 band would either lose a close control it still has a
+                 use for or keep one that no longer points at an edge.
+
+                 `hidden` IS `display: none`, so the button is out of the tab
+                 order and out of the accessibility tree, not merely
+                 unpainted — measured with the focus sweep, not with
+                 `checkVisibility`. */
               placement={cn(
                 "pointer-events-auto",
                 isAsideOpen
-                  ? "top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
-                  : "top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+                  ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
+                  : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
               )}
             />
           </div>
