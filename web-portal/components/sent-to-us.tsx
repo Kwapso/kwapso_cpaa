@@ -34,12 +34,27 @@ import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
+import * as React from "react"
 import { usePortalTodos } from "@/lib/todos"
+import { useDoorSearch } from "@/lib/search"
+import { delivery } from "@/lib/api"
+import { Input } from "@shared/ui/components/input/input"
+import { MagnifyingGlass, X } from "@shared/ui/foundations/icons"
 import { useLanguage } from "@shared/web/language"
 
 export function SentToUs() {
   const { t, lang } = useLanguage()
   const { todos, loading, error, refresh, total, hasMore, loadingMore, loadMore } = usePortalTodos("done")
+  const [term, setTerm] = React.useState("")
+  const searching = term.trim().length > 0
+  const search = useDoorSearch(
+    term,
+    async (q) => {
+      const page = await delivery.todos("done", null, q)
+      return { rows: page.todos, total: page.doneTotal }
+    },
+    "portal-sent-to-us.search"
+  )
 
   // LOADING AND ERROR, BEFORE EMPTINESS — see the identical note in
   // waiting-on-you.tsx, the section this one trades rows with.
@@ -70,8 +85,53 @@ export function SentToUs() {
       {/* R16: the server's exact count for the WHOLE pile, once — not the length
           of the page in front of us, which is what "Load more" keeps changing. */}
       <CollectionHeading label={t("What you've sent us")} total={total} />
+
+      {/* R48: a growing collection carries search. Drawn only once there is
+        * something to search — R50's reasoning, one screen along: the empty
+        * case above already returns null, so this box never appears over
+        * nothing. It asks the door (`?q=`), so it reaches every document this
+        * company has ever sent us, not the page in front of us. */}
+      <div className="relative">
+        <MagnifyingGlass
+          className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
+          aria-hidden
+        />
+        <Input
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          placeholder={t("Search what you've sent")}
+          aria-label={t("Search what you've sent")}
+          className="pr-12 pl-12"
+        />
+        {term ? (
+          <button
+            type="button"
+            onClick={() => setTerm("")}
+            aria-label={t("Clear the search")}
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+      </div>
+
+      {searching && search.failed ? (
+        <ErrorPanel
+          title={t("We couldn't run that search.")}
+          description={t("Check your connection and try again.")}
+          onRetry={() => setTerm(term)}
+        />
+      ) : searching && search.rows === null ? (
+        <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
+      ) : searching && (search.rows?.length ?? 0) === 0 ? (
+        <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
+          <p>{t("Nothing matched that.")}</p>
+          <p className="mt-1 text-sm">{t("Try fewer words, or clear the search to see everything.")}</p>
+        </div>
+      ) : null}
+
       <ul className="flex flex-col gap-2">
-        {rows.map((todo) => {
+        {(searching ? (search.rows ?? []) : rows).map((todo) => {
           // Through `safeHref` like every other file on a screen, even though
           // this path is one THIS app minted (/media/…): the seam decides, not
           // the origin of the string. A URL it refuses prints as plain text.
@@ -114,7 +174,7 @@ export function SentToUs() {
       </ul>
       {/* R14: the done pile only grows — a client three years in has every
           document they have ever sent us behind this button. */}
-      {hasMore ? (
+      {hasMore && !searching ? (
         <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore}>
           {loadingMore ? <Spinner /> : null}
           {t("Show older")}
