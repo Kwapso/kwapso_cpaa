@@ -2289,7 +2289,54 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               isAsideOpen && "pe-[var(--shell-gutter)]",
             )}
           >
-            {isAsideOpen ? (
+            {/* IT COLLAPSES NOW RATHER THAN VANISHING — client, 2026-09-04:
+                "that should minimize it with a nice animation."
+
+                The column used to be mounted on `isAsideOpen` and unmounted
+                the instant it flipped, so there was nothing left in the tree
+                for an exit to play on. This wrapper is what stays: it holds
+                the column at all times and collapses the track it sits in,
+                `.motion-column-collapse` (motion.css §7) — the inline-axis
+                twin of the row collapse, added for this, so the timing and
+                curve stay in the motion layer where law 6.1 requires them.
+
+                `inert` WHEN SHUT IS NOT OPTIONAL. A collapsed track is zero
+                pixels wide and fully transparent, but its contents are still
+                in the accessibility tree and still in the tab order — a
+                keyboard reader would tab into a panel nobody can see, which
+                is a worse bug than the instant disappearance this replaces.
+                `inert` removes the whole subtree from focus and from the
+                accessibility tree in one attribute, which is exactly the
+                "shows nothing" the client's own earlier ruling asked for
+                ("closed assistant show nothing, it's literally only the
+                bar") — now true for a keyboard and a screen reader, not only
+                for the eye.
+
+                ONE THING STILL STEPS RATHER THAN EASING, said plainly: the
+                dock's own trailing gutter (`pe-[var(--shell-gutter)]`, above)
+                is dropped the moment the state flips, so the ~22px of air
+                beyond the column disappears in one frame while the column
+                itself eases away. It sits OUTSIDE this wrapper — moving it
+                inside would either double the shut state's gutter or shrink
+                the open panel's own width, both of which are measured
+                properties other rulings depend on. A small step at the
+                outermost edge, during a 140ms exit; logged here rather than
+                left for someone to rediscover. */}
+            <div
+              className="motion-column-collapse flex-none"
+              data-state={isAsideOpen ? "open" : "closed"}
+              inert={!isAsideOpen}
+              /* THE OPEN WIDTH IS DECLARED HERE, ONCE, and read by the motion
+                 layer through `--motion-column-size` — see that rule for why
+                 it cannot derive the width itself inside a flex row. It is
+                 the same `min(23.75rem, 40vw)` the column below spells as
+                 `w-[23.75rem] max-w-[40vw]`, which is the one duplication
+                 this approach costs: Tailwind's arbitrary values cannot be
+                 read back out as a custom property. Kept adjacent and
+                 measured together in verify/shell-chat so the two cannot
+                 drift silently. */
+              style={{ "--motion-column-size": "min(23.75rem, 40vw)" } as React.CSSProperties}
+            >
               <div
                 data-slot="screen-shell-aside"
                 data-level="aside"
@@ -2321,19 +2368,66 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     role attribute doing its one job. */}
                 {/* THE TAB — `asideLabel` drawn as ONE folder tab, through the
                     same component the content trail uses rather than a second
-                    drawing of the shape: a single, non-interactive crumb is
-                    exactly `BreadcrumbFolders`' own "one tab, nothing to its
-                    left" state (its TEN STATES #1), so nothing about that
-                    component changes for this call site. `label` reuses
-                    `asideLabel` too — the landmark's name is the same word
-                    the tab shows, not a second string to translate.
+                    drawing of the shape. `label` reuses `asideLabel` too — the
+                    landmark's name is the same word the tab shows, not a
+                    second string to translate.
+
+                    CLIENT, 2026-09-04: "i want to close the assistant by
+                    clicking on its folder tab, that should minimize it." A
+                    single, otherwise-read-only crumb is `BreadcrumbFolders`'
+                    own "one tab, nothing to its left" state (its TEN STATES
+                    #1) — but THIS tab is not a location, it is furniture that
+                    doubles as the column's close control, so it now takes
+                    that component's `onCurrentActivate` escape hatch instead:
+                    the ONLY call site in the kit that does, added to
+                    `BreadcrumbFolders` for exactly this. Every real
+                    breadcrumb trail (the content column's own, above) never
+                    passes it and renders BYTE-IDENTICAL to before this
+                    change — see that prop's own doc for why a real trail's
+                    "current page is not a link" law cannot be reached by a
+                    call site that leaves it out.
+
+                    `toggleAside` / `asideCloseLabel` ARE THE EDGE HANDLE'S
+                    OWN — not a second pair invented for the tab. Both
+                    controls flip the identical `isAsideOpen` state through
+                    the identical handler, and both announce the identical
+                    string ("Close the assistant" by default) while the
+                    column is open, so a screen reader hears one description
+                    of one action from either control, never two. This block
+                    only renders while `isAsideOpen` is true (see the
+                    ternary above), which is also why `currentActivateExpanded`
+                    can safely read `isAsideOpen` directly rather than a
+                    literal `true` — it is always true here, and stays
+                    correct if that ever stops being so.
+
+                    NO ANIMATION IS WIRED TO THE CLOSE ITSELF. "Minimise"
+                    wants the column collapsing toward its edge rather than
+                    the instant unmount below; `foundations/motion/motion.css`
+                    has a grid-template-ROWS 0fr/1fr collapse for a row
+                    (`.motion-row-collapse`) and for a disclosure
+                    (`.motion-disclosure-grid`), but nothing that collapses on
+                    the INLINE axis (columns/width), which is this column's
+                    own direction of travel — and `rail.tsx`'s own collapse
+                    (the only other column that shrinks in this file) is
+                    ALSO unanimated today, confirming there is no existing
+                    class to reach for instead. Motion is a foundation this
+                    file may not edit while another agent owns it, so the
+                    close/open toggle stays exactly the instant swap it
+                    already was rather than growing a local transition —
+                    see the report for the class this needs.
 
                     UNPADDED AT THE BLOCK-END, same reasoning as
                     `screen-shell-breadcrumb`: the strip's own negative margin
                     (`--folder-tab-overlap`) is the whole attachment mechanic,
                     so padding here would be subtracted from it. */}
                 <div data-slot="screen-shell-aside-tab" className={cn("min-w-0 shrink-0", ASIDE_TAB)}>
-                  <BreadcrumbFolders items={[{ label: asideLabel }]} label={asideLabel} />
+                  <BreadcrumbFolders
+                    items={[{ label: asideLabel }]}
+                    label={asideLabel}
+                    onCurrentActivate={toggleAside}
+                    currentActivateLabel={asideCloseLabel}
+                    currentActivateExpanded={isAsideOpen}
+                  />
                 </div>
                 {/* THE PANEL'S OWN SLOT. Still "paper on the ground, painting
                     nothing" — the caller's node fills this exactly as it
@@ -2342,7 +2436,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                   {aside}
                 </div>
               </div>
-            ) : null}
+            </div>
             <EdgeHandle
               edge="aside"
               open={isAsideOpen}

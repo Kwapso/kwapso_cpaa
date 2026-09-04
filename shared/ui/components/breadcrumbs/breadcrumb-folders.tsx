@@ -362,6 +362,41 @@ export interface BreadcrumbFoldersProps
   ellipsisLabel?: string;
   /** Classes for the `<ol>`, for a call site that needs to change the strip. */
   listClassName?: string;
+  /**
+   * Turns the LAST crumb into a real control instead of the read-only
+   * "you are here" page — for the one call site where the tab IS the
+   * interactive element (the assistant column's own close button,
+   * `screen-shell.tsx`) and not a location in a navigational trail.
+   *
+   * OMIT IT — every real breadcrumb call site does, and always will — and
+   * the live crumb renders exactly as it always has: `BreadcrumbPage`, not
+   * focusable, not clickable, `aria-current="page"`. This prop adds a
+   * second path through the same tab shape rather than changing the first
+   * one, which is what keeps a real trail's "current page is not a link"
+   * law (`breadcrumb.tsx`'s own header) intact for every consumer that
+   * never passes it.
+   *
+   * When given, the live crumb becomes a real `<button>` — not
+   * `BreadcrumbPage`'s `role="link" aria-disabled="true"` span, because a
+   * control a reader can activate must not also announce itself as
+   * disabled. Keyboard-reachable, `Enter`/`Space` fire it natively, no ring
+   * to write (tokens.css §8 already rings it).
+   */
+  onCurrentActivate?: () => void;
+  /**
+   * The accessible name for the button `onCurrentActivate` turns the live
+   * crumb into. Falls back to the crumb's own visible label. A caller whose
+   * tab doubles as a toggle should say what THIS press does —
+   * `screen-shell.tsx` passes "Close the assistant", not "Assistant", so a
+   * reader hears the action rather than the location.
+   */
+  currentActivateLabel?: string;
+  /**
+   * Published as the button's `aria-expanded` when `onCurrentActivate` is
+   * given. Omit it if the control this crumb doubles as is not a
+   * disclosure.
+   */
+  currentActivateExpanded?: boolean;
 }
 
 /**
@@ -394,8 +429,15 @@ export interface BreadcrumbFoldersProps
  *  8. error          — does not apply. A trail reports nothing.
  *  9. selected       — the last tab, always: the card's fill, primary ink at
  *                      `--font-weight-medium`, and `aria-current="page"` — so
- *                      the meaning survives without colour.
- * 10. read-only      — always.
+ *                      the meaning survives without colour. UNLESS the call
+ *                      site passed `onCurrentActivate`, in which case this
+ *                      tab is a control, not a location, and renders as a
+ *                      real `<button>` with the caller's own label and
+ *                      `aria-expanded` in place of `aria-current` — see that
+ *                      prop's own doc. Every other call site is untouched.
+ * 10. read-only      — always, UNLESS `onCurrentActivate` is given, in which
+ *                      case the live tab alone becomes a real control; every
+ *                      tab before it stays read-only regardless.
  *
  * THREE BREAKPOINTS
  *  mobile / tablet / desktop — the geometry is UNCHANGED at every width; what
@@ -416,6 +458,9 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       ellipsisLabel,
       className,
       listClassName,
+      onCurrentActivate,
+      currentActivateLabel,
+      currentActivateExpanded,
       ...props
     },
     ref,
@@ -638,10 +683,46 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
             return (
               <BreadcrumbItem key={key} className="shrink-0">
                 {live ? (
-                  <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
-                    <CrumbShape fill={FILL_LIVE} />
-                    {entry.item.label}
-                  </BreadcrumbPage>
+                  onCurrentActivate ? (
+                    /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. A
+                       real `<button>`, not `BreadcrumbPage` — that element
+                       is `role="link" aria-disabled="true"` BY DESIGN (see
+                       `breadcrumb.tsx`), which is correct for "you are here"
+                       and wrong for "press to act": a control a reader can
+                       activate must never also announce itself disabled.
+                       Same `TAB`/`TAB_LIVE` classes as the read-only path —
+                       one shape, two elements — with `cursor-pointer` put
+                       back over `TAB_LIVE`'s own `cursor-default`. */
+                    <button
+                      type="button"
+                      data-slot="breadcrumb-folders-current-control"
+                      aria-expanded={currentActivateExpanded}
+                      /* NO FALLBACK TO `entry.item.label`, and the type is the
+                         reason rather than an inconvenience: a crumb's label is
+                         a `ReactNode`, and `aria-label` takes a string. A node
+                         cannot be flattened to an accessible name here without
+                         guessing at what its markup reads as. Left undefined
+                         when no explicit label is given, React omits the
+                         attribute entirely, and the button's accessible name
+                         falls back to its own text content — which IS the
+                         crumb's label, rendered. So the un-labelled case is
+                         still named, by the browser, from the thing a sighted
+                         reader sees; `currentActivateLabel` exists to say
+                         something BETTER than that ("Close the assistant"
+                         rather than "Assistant"), not to rescue it. */
+                      aria-label={currentActivateLabel}
+                      onClick={onCurrentActivate}
+                      className={cn(TAB, TAB_LIVE, "cursor-pointer")}
+                    >
+                      <CrumbShape fill={FILL_LIVE} />
+                      {entry.item.label}
+                    </button>
+                  ) : (
+                    <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
+                      <CrumbShape fill={FILL_LIVE} />
+                      {entry.item.label}
+                    </BreadcrumbPage>
+                  )
                 ) : entry.item.href === undefined ? (
                   /* An ancestor with no route. `breadcrumbs.tsx` draws this as
                      `BreadcrumbPage` too — a step you can see and not visit —

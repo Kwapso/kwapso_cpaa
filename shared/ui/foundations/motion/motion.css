@@ -368,6 +368,58 @@
 }
 .motion-row-collapse > * { overflow: hidden; min-height: 0; }
 
+/* THE INLINE-AXIS TWIN, 2026-09-04 — client ruling: "i want to close the
+   assistant by clicking on its folder tab, that should minimize it with a
+   nice animation."
+
+   The rule above collapses a row on the BLOCK axis, which is every case this
+   file had until now: a row folding away, a disclosure panel opening. The
+   assistant is a COLUMN, and it minimises toward its own edge — the inline
+   axis — so it needed the same mechanic turned ninety degrees rather than a
+   bespoke width transition written at the component (law 6.1: a primitive
+   never writes its own duration or curve).
+
+   IT IS NOT THE ROW RULE WITH THE AXIS SWAPPED, AND THE FIRST VERSION OF IT
+   WAS. `grid-template-columns: 1fr -> 0fr` was written here on the assumption
+   that a fraction would interpolate against the grid's own resolved track the
+   way `grid-template-rows` does above, so the column would collapse from
+   whatever width it actually had without that width being restated in the
+   motion layer. Measured in the browser, the track never moved off 356.25px:
+   the collapsing wrapper is a FLEX ITEM, so its grid is sized under an
+   intrinsic (max-content) constraint, and under an intrinsic constraint a
+   `0fr` track is floored at its own base size rather than resolving to zero.
+   The panel went transparent and kept every pixel of its width. The row rule
+   does not hit this because its containers are block-level — the inline size
+   is definite there and the block axis is the free one, which is exactly the
+   asymmetry that makes this a different rule rather than a mirror.
+
+   So this one transitions `inline-size` against a width the CALLER supplies,
+   `--motion-column-size`. That is a value, not a duration or a curve, which
+   is the line law 6.1 actually draws: the shell already owns how wide its
+   assistant is (`min(23.75rem, 40vw)` today) and passing that number in keeps
+   the single source of truth at the shell, while the timing stays here. A
+   caller that sets no `--motion-column-size` gets `auto` and no animation
+   rather than a collapsed column — failing open, since a panel stuck shut is
+   far worse than one that merely does not ease.
+
+   `overflow: hidden` is what actually hides the content while the box
+   shrinks; `min-width: 0` on the child stops its intrinsic width propping the
+   wrapper open, the inline-axis counterpart of the row rule's `min-height`.
+   --duration-exit and --ease-exit, so minimising reads as the same class of
+   event as every other dismissal in the system. */
+.motion-column-collapse {
+  inline-size: var(--motion-column-size, auto);
+  overflow: hidden;
+  transition:
+    inline-size var(--duration-exit) var(--ease-exit),
+    opacity     var(--duration-exit) var(--ease-exit);
+}
+.motion-column-collapse[data-state="closed"] {
+  inline-size: 0;
+  opacity: 0;
+}
+.motion-column-collapse > * { min-width: 0; }
+
 /* Reorder. --duration-settle, because the row is crossing a real distance
    and arriving somewhere, which is the same event as a dropped card. */
 .motion-row-move {
@@ -821,37 +873,88 @@
    The one pointer-following flourish in the system (1 direct call site,
    `CursorGlow`, mounted once by `ScreenShell`'s ground).
 
-   POSITION TAKES A DURATION TOO, SINCE 2026-09-03 — CLIENT RULING, "i want
-   that it has a more 'smooth' movement", which overturns this section's own
-   first answer. That answer was: position is written straight to `transform`
-   from a `mousemove` handler on every event, so it is pointer-driven travel
-   with no duration of its own (the third exception §REDUCED MOTION names
-   above), and a transition would "fight that handler on every frame."
+   RESTORED FROM THE ORIGINAL, 2026-09-04. The client looked at the
+   single-gradient build this section used to describe twice, said she was
+   still not happy with it, and asked again whether the original existed in
+   the repo. It did — `AmbientBackground` in the sibling app repo
+   (kwapso_system, commit c2b963d1), materially richer than the fresh build
+   it was recovered to replace. `cursor-glow.tsx`'s own header carries the
+   full account, restored-behaviour by restored-behaviour; this section only
+   states what changed about the MOTION this file owns.
 
-   THE PREMISE WAS WRONG, and it is worth saying why rather than just
-   deleting it. A transition on `transform` does not fight a per-event write
-   — it CHASES it: each new value restarts the ease toward the newest pointer
-   position, so the orb trails the cursor by roughly one duration instead of
-   being pinned to it. That trailing lag IS the smoothness she is asking for,
-   and it is exactly what the reference she supplied did (`transition-all
-   duration-300 ease-out`, covering position). The handler still writes every
-   event; the compositor still owns the interpolation.
+   POSITION AND SIZE ARE NO LONGER A CSS TRANSITION — SUPERSEDED. Until
+   today this section held `.motion-cursor-glow`, one `transition: transform,
+   width, height` on `--duration-settle`, added 2026-09-03 on the reasoning
+   that a transition CHASES a per-event `transform` write rather than
+   fighting it — correct, and still true. But the recovered original does
+   the same job more smoothly still, with a `requestAnimationFrame` loop
+   that LERPs toward the pointer every frame (`x += (targetX - x) * 0.05`,
+   in `cursor-glow.tsx` — see that file's header for why the factor lives in
+   the component and not here). A CSS transition's eased velocity resets to
+   zero at the start of each new leg every time a fresh event retargets it;
+   a lerp's "distance still to close" is continuous state that carries
+   across events without ever restarting from zero. That difference is the
+   whole reason this class is gone rather than kept alongside the loop —
+   running both would have the loop's per-frame writes fighting the
+   transition's own interpolation of those same properties, which is the
+   exact failure mode the 2026-09-03 change already reasoned about, just on
+   the other side of it. Position and size no longer have a duration or a
+   curve to hand to this file at all.
 
-   ONE TOKEN FOR BOTH, deliberately: `--duration-settle` (280ms) is
-   "something travelling a real on-screen distance and coming to rest"
-   (tokens.css), which describes the trailing orb as exactly as it describes
-   the size easing back on an idle pointer. Running position and size on the
-   same duration and the same curve keeps the two halves of one flourish in
-   step — a glow that grew on a different clock than it moved would read as
-   two effects.
+   WHAT DOES BELONG HERE, AND IS NEW: the slow, independent drift that keeps
+   the field alive while the pointer is not moving. The flat build this
+   replaces had no such drift — nothing to draw when the pointer was still,
+   which is very likely part of why it read as thin. TWO periods, not one,
+   matching the original's own 47s / 61s `ease-in-out infinite alternate` on
+   its two gradient layers, so the whole field never re-synchronises on a
+   period a viewer could learn to see. `ease-in-out` itself is not a curve
+   this kit names; `--ease-move` ("A to B on screen," already
+   `.motion-ambient`'s own curve immediately above) is the nearest existing
+   one and is reused rather than adding a synonym. The two periods are
+   DERIVED as multiples of `--duration-pulse` (1600ms) — the same technique
+   `.motion-ambient` already uses on the line above — at ×29 and ×38,
+   landing within a second of 47s/61s without a new duration token, which
+   this file may never introduce (law 3).
    ========================================================================= */
 
-.motion-cursor-glow {
-  transition:
-    transform var(--duration-settle) var(--ease-move),
-    width var(--duration-settle) var(--ease-move),
-    height var(--duration-settle) var(--ease-move);
+@keyframes motion-cursor-glow-drift-a {
+  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1); }
+  to   { transform: translate3d(2.5%, 2%, 0) scale(1.08); }
 }
+@keyframes motion-cursor-glow-drift-b {
+  from { transform: translate3d(2%, 1.5%, 0) scale(1.06); }
+  to   { transform: translate3d(-2%, -2%, 0) scale(1); }
+}
+
+.motion-cursor-glow-drift-a {
+  animation: motion-cursor-glow-drift-a calc(var(--duration-pulse) * 29) var(--ease-move) infinite alternate;
+}
+.motion-cursor-glow-drift-b {
+  animation: motion-cursor-glow-drift-b calc(var(--duration-pulse) * 38) var(--ease-move) infinite alternate;
+}
+
+/* DARK-MODE PRESENCE — the one rule below that is not a duration or a curve,
+   and it is worth being plain about why it sits in this file rather than
+   where a colour rule belongs. `--kw-mango` (tokens.css §2, behind
+   `--primary` throughout) is the identical #FED069 in both palettes —
+   brand colours are not themed — so without an explicit dark-mode
+   adjustment this glow would carry more contrast against charcoal than it
+   ever does against off-beige. The recovered original dims it in dark,
+   "so it reads as warmth on charcoal rather than a light leak" (its own
+   comment, kept). The correct home for that is `tokens.css` (RULES §8.2:
+   "the only file where a colour or a size is decided") — it is here only
+   because this delivery's file ownership is `cursor-glow.tsx` + this file +
+   `verify/cursor-glow/*`, not `tokens.css`. Written the way RULES §2.1
+   requires of a token regardless — once for a viewer who never chose dark,
+   once for a viewer who did, byte-identical in both — so this does not
+   reproduce the exact bug that rule exists to prevent. Flagged here for
+   whoever next owns `tokens.css` to relocate. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .motion-cursor-glow-drift-a { opacity: .34; }
+  :root:not([data-theme="light"]) .motion-cursor-glow-drift-b { opacity: .26; }
+}
+:root[data-theme="dark"] .motion-cursor-glow-drift-a { opacity: .34; }
+:root[data-theme="dark"] .motion-cursor-glow-drift-b { opacity: .26; }
 
 
 /* ============================================================================
@@ -872,7 +975,13 @@
          in-place rotation that carries no travel across the screen — and the
          loops that are DECORATION are switched off and pinned to a resting
          value: the skeleton breathe, the thinking dots, the caret blink, the
-         ambient drift.
+         ambient drift, and — since 2026-09-04 — the cursor glow's own two
+         drifts. `CursorGlow` additionally never STARTS its
+         `requestAnimationFrame` loop for a reduced-motion reader in the
+         first place (bailing out before the listener is attached, in the
+         component itself, is stronger than a CSS rule can be — see that
+         file's header) so what is zeroed here only has to stop the two
+         drift animations a plain CSS media query can actually reach.
 
      B · THE INDETERMINATE PROGRESS SWEEP is status, but unlike the spinner
          it travels the full width of the bar. It is replaced by a static
@@ -914,6 +1023,12 @@
   }
 
   .motion-ambient {
+    animation: none;
+    transform: none;
+  }
+
+  .motion-cursor-glow-drift-a,
+  .motion-cursor-glow-drift-b {
     animation: none;
     transform: none;
   }
