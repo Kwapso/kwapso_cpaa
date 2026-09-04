@@ -180,7 +180,7 @@ const DEFAULT_LABELS: NoResultsLabels = {
   heading: "Collection",
   exportLabel: "Export",
   createLabel: "Add a record",
-  searchLabel: "MagnifyingGlass this collection",
+  searchLabel: "Search this collection",
   searchPlaceholder: "Search",
   addFilterLabel: "Add a filter",
   tabsLabel: "Collection subsets",
@@ -192,7 +192,7 @@ const DEFAULT_LABELS: NoResultsLabels = {
   dropLead: "Dropping",
   dropTail: "would show",
   clear: "Clear filters",
-  archive: "MagnifyingGlass the archive instead",
+  archive: "Search the archive instead",
 };
 
 const DEFAULT_TABS: readonly NoResultsTab[] = [

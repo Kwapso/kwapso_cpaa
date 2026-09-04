@@ -873,7 +873,7 @@ function CommandDialog({
   open,
   onOpenChange,
   title = "Command palette",
-  description = "MagnifyingGlass for a record or run a command.",
+  description = "Search for a record or run a command.",
   children,
   className,
   ...props

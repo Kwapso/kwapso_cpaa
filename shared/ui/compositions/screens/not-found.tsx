@@ -176,7 +176,7 @@ const SYSTEM_LABELS: NotFoundLabels = {
   movedAction: "Open it in Collection B",
 
   missingTitle: "There is no record 9999 in Collection",
-  missingBody: "CheckFat the number, or look for it from the collection.",
+  missingBody: "Check the number, or look for it from the collection.",
 
   back: "Back to Collection",
   log: "Open the log",
@@ -194,7 +194,7 @@ const PORTAL_LABELS: NotFoundLabels = {
   movedTitle: "This isn't in your workspace.",
   movedBody: "It is not one of your requests. Nothing is wrong with the link.",
   missingTitle: "This isn't in your workspace.",
-  missingBody: "CheckFat the number, or start from your overview.",
+  missingBody: "Check the number, or start from your overview.",
   back: "Back to your overview",
   log: "",
 };

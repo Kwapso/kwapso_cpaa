@@ -2992,6 +2992,35 @@ describe("RULES — the laws of the base", () => {
       ).toBe(true)
     }
 
+    // ii(b) · IT MUST END WHERE THE CARD ENDS. Two separate causes, both
+    // regressions this law has already seen once. The wrapper must be a FLEX
+    // container with `min-h-0`: the dock is a flex row, so a plain block
+    // wrapper does not stretch its child and the column sizes to its CONTENT
+    // and runs off the bottom of the window. And the dock must pay the
+    // BOTTOM shell gutter the content column has always paid, or the column
+    // ends at the window's edge instead of level with the card.
+    /* TOKENS, NOT SUBSTRINGS. A plain `includes("flex")` is satisfied by
+       `flex-none`, and a `includes("min-h-0")` is satisfied by the COLUMN's
+       own `min-h-0` a few lines further down the window — both passed while
+       the wrapper had neither, which a sabotage run caught. Read the
+       wrapper's own class attribute and compare whole class names. */
+    const wrapperClasses = shell.slice(wrapAt, shell.indexOf('"', wrapAt)).trim().split(/\s+/)
+    for (const [cls, why] of [
+      ["flex", "a block wrapper does not stretch its child, so the column grows past the viewport instead of ending level with the card"],
+      ["min-h-0", "without it the column's own overflow-y-auto grows the box instead of scrolling inside it"],
+    ] as const) {
+      expect(
+        wrapperClasses.includes(cls),
+        `R51 — the .motion-column-collapse wrapper must carry \`${cls}\`: ${why}`
+      ).toBe(true)
+    }
+    const dockAt = shell.indexOf('data-slot="screen-shell-aside-dock"')
+    expect(dockAt, "R51 — screen-shell must render an aside dock").toBeGreaterThan(-1)
+    expect(
+      shell.slice(dockAt, dockAt + 500).includes("pb-[var(--shell-gutter)]"),
+      "R51 — the aside dock must pay `pb-[var(--shell-gutter)]`, the same bottom gutter the content column pays, or the assistant ends at the window's edge instead of level with the card"
+    ).toBe(true)
+
     // iii · THE SHAPE THAT SILENTLY DOES NOTHING. `0fr` inside a flex item is
     // floored at the item's own base size, so the column stays full width and
     // merely turns transparent — it type-checks, lints and reads correctly.

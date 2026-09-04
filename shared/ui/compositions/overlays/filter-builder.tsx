@@ -237,7 +237,7 @@ const DEFAULT_LABELS: FilterBuilderLabels = {
   eyebrow: "Group · 24 open",
   heading: "Collection",
   tabsLabel: "Collection subsets",
-  searchLabel: "MagnifyingGlass this collection",
+  searchLabel: "Search this collection",
   searchPlaceholder: "Search",
   openLabel: "Filter",
   exportLabel: "Export",

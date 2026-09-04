@@ -1625,8 +1625,23 @@ const ROOT_DEPTH = 1;
  * whole affordance and does not also need to grow to be seen.
  */
 const HANDLE_HIT = cn(
-  "absolute top-1/2 z-10 -translate-y-1/2",
-  "flex size-[32px] shrink-0 items-center justify-center",
+  /* NO VERTICAL POSITION HERE — `placement` carries BOTH axes now. It used to
+     hard-code `top-1/2 -translate-y-1/2`, which was right while every handle
+     was a mid-edge grab, and wrong the moment one of them had to live in a
+     CORNER: the client, 2026-09-04, on the shut assistant's opener — "move
+     the open assistant button to the top right corner of the screen, real top
+     right corner, outside of main content, where i would naturally search for
+     it after i close it." A class fixed in here could not express that, and
+     the alternative — a second boolean prop meaning "but not centred" — is
+     the shape that grows a third and a fourth. One `placement` string, both
+     axes, chosen by the caller from its own state. */
+  "absolute z-10",
+  /* SAME SIZE AS A COLLECTION'S `+`, on the client's instruction: "make the
+     button same size as the + button on collections, needs to be bigger." It
+     was 32px against that button's 40. `--control-height-button` is the token
+     `<Button size="icon">` itself spends, so the two are now the same number
+     BY DERIVATION rather than by two hand-typed values that agree today. */
+  "flex size-[var(--control-height-button)] shrink-0 items-center justify-center",
   "cursor-pointer rounded-pill border-0 p-0",
   "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)] shadow-lg",
   "transition-[background-color] duration-[var(--duration-colour)] ease-kwapso",
@@ -2100,7 +2115,10 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 )
               }
               onToggle={toggleRail}
-              placement={isRailCollapsed ? "end-[var(--shell-gutter)]" : "start-0"}
+              placement={cn(
+                "top-1/2 -translate-y-1/2",
+                isRailCollapsed ? "end-[var(--shell-gutter)]" : "start-0",
+              )}
             />
           </div>
         ) : null}
@@ -2285,7 +2303,25 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             data-slot="screen-shell-aside-dock"
             data-state={isAsideOpen ? "open" : "shut"}
             className={cn(
-              "relative hidden flex-none ps-[var(--shell-gutter)] md:flex",
+              /* `py-[var(--shell-gutter)]` MAKES THE ASSISTANT END WHERE THE
+                 CARD ENDS. The content column's own wrapper has always paid
+                 this vertical gutter, which is what insets the card away from
+                 the window's top and bottom edges. This dock paid only the
+                 horizontal one, so the assistant ran the full height of the
+                 viewport and its composer sat hard against the bottom edge,
+                 past where the card stops (client, 2026-09-04: "the assistant
+                 frame is too long and it exits the screen. make it exactly as
+                 the main content"). Same token, same number, both columns —
+                 so the two can never disagree about where the page ends.
+
+                 BOTTOM ONLY, and the top is not an oversight. `py-` was tried
+                 first and pushed the whole column down 18.75px: the aside
+                 pays its top gutter INSIDE the tab already, which is what
+                 puts the tab's control level with the breadcrumb (18.75) and
+                 the body's top level with the card's (47.33). A top padding
+                 here double-counts that. Measured both ways before settling
+                 on `pb-`. */
+              "relative hidden flex-none pb-[var(--shell-gutter)] ps-[var(--shell-gutter)] md:flex",
               isAsideOpen && "pe-[var(--shell-gutter)]",
             )}
           >
@@ -2323,7 +2359,18 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 outermost edge, during a 140ms exit; logged here rather than
                 left for someone to rediscover. */}
             <div
-              className="motion-column-collapse flex-none"
+              /* `flex min-h-0` IS LOAD-BEARING, NOT TIDINESS. The dock is a
+                 flex row and the column used to be its DIRECT child, so it
+                 stretched to the row's height for free. Putting this wrapper
+                 between them broke that: a block box does not stretch its
+                 child, so the column sized to its CONTENT and ran off the
+                 bottom of the viewport while the card beside it still ended
+                 correctly (client screenshot, 2026-09-04: "the assistant
+                 frame is too long and it exits the screen"). Making the
+                 wrapper a flex container hands the stretch back down, and
+                 `min-h-0` is what lets the column's own `overflow-y-auto`
+                 scroll instead of pushing the box taller. */
+              className="motion-column-collapse flex min-h-0 flex-none"
               data-state={isAsideOpen ? "open" : "closed"}
               inert={!isAsideOpen}
               /* THE OPEN WIDTH IS DECLARED HERE, ONCE, and read by the motion
@@ -2443,7 +2490,23 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               label={isAsideOpen ? asideCloseLabel : asideOpenLabel}
               icon={<Sparkle aria-hidden="true" />}
               onToggle={toggleAside}
-              placement={isAsideOpen ? "end-[var(--shell-gutter)]" : "end-0"}
+              /* TWO DIFFERENT PLACES, because it is answering two different
+                 questions. OPEN, it is a close control belonging to the
+                 column it sits against, so it stays where that column's own
+                 edge is — vertically centred, the mid-edge grab every other
+                 handle uses. SHUT, the column is gone and the button is the
+                 only way back to the assistant; the client looked for it in
+                 the screen's top-right corner and it was floating in the
+                 middle of the right edge instead. So when shut it takes the
+                 corner: one shell gutter down from the top, one in from the
+                 end, the same inset the content column pays, which is what
+                 makes it read as sitting in the page's corner rather than
+                 stuck to its side. */
+              placement={
+                isAsideOpen
+                  ? "top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
+                  : "top-[var(--shell-gutter)] end-[var(--shell-gutter)]"
+              }
             />
           </div>
         ) : null}

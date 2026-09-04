@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### Fixed — an icon rename had reached inside the sentences people read
+
+The Iconoir -> Phosphor swap renamed `Search` to `MagnifyingGlass` and `Check`
+to `CheckFat`, and it went through STRING LITERALS as well as identifiers.
+Twelve places across eight shipped files have since been offering to
+"MagnifyingGlass this collection" and advising people to "CheckFat the number":
+`components/command/command.tsx` (the palette's own description),
+`compositions/templates/collection-screen.tsx`, `compositions/states/
+no-results.tsx` and `empty-collection.tsx` (their search labels),
+`compositions/overlays/filter-builder.tsx`, `compositions/screens/home.tsx`
+(placeholder and label), `compositions/overlays/import.tsx` (the commit step)
+and `compositions/screens/not-found.tsx` (its advice, twice).
+
+Every one is a DEFAULT, so a consumer passing its own copy never saw it —
+kwapso-system passes `t("Search members…")` and its own `NotFound`, and none of
+the corrupted strings appear in its translation catalogue. Latent there, and
+plainly visible in this repo's own demo, which is where it was found.
+
+Fixes are quote-anchored (`"MagnifyingGlass ` -> `"Search `), so no JSX usage
+moved: `<MagnifyingGlass size={16} />` is the icon and stays the icon. The
+discriminator that makes this findable again: a MULTI-WORD CamelCase glyph name
+cannot occur in English prose, while `Record`, `Ticket`, `Check` and `List` are
+ordinary words and yield nothing but false positives.
+
+### Changed — `demo/` is a book you navigate, not a completeness check
+
+Not a delivered surface, so nothing an app imports changes. Recorded because
+the demo is how a reader finds a component, and the way in is now different:
+five parts and thirty pages (foundations · components · charts · data views ·
+screens) with an address per page, replacing one scrolling document filed under
+the commission's 27 numbered chapters. `demo/artifact.ts` is deleted; the
+component's NAME is the largest thing on its card, with its source path
+copyable beneath. Live at https://kwapso-ui-ux.kwapso.workers.dev
+
+`demo/book.ts` is the map and `demo/check-book.mjs` guards it in `npm run
+check`: a section on no page, a page holding nothing, a map entry naming a slug
+nothing uses, a data view drawn without its toolbar, an exemption that stopped
+being true, and a component folder no section draws. `docs/BUILD-A-COMPONENT.md`
+§12.2 carries the two steps this asks of a new component.
+
 ### Added — `FilterBar`'s "+ filter" slot takes an optional badge node
 
 A consuming app's filter row (kwapso-system's `shared/web/screen-engine/

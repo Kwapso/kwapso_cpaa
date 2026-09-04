@@ -300,7 +300,7 @@ const DEFAULT_LABELS: ImportLabels = {
   stepFile: "The file",
   stepWhat: "What it is",
   stepMatch: "Match the columns",
-  stepCommit: "CheckFat and commit",
+  stepCommit: "Check and commit",
   stepReport: "The report",
   notYetRail: "Nothing is written until the last step. Leaving now loses the mapping, not any records.",
   notYetFooter: "Two columns will be ignored. Nothing is written yet.",
@@ -582,7 +582,7 @@ function ImportScreen({
     outcome: "invalid" as const,
   }));
 
-  /* THE NUMBER IS ON THE BUTTON, in both of 27.30's words: "CheckFat 148 rows,
+  /* THE NUMBER IS ON THE BUTTON, in both of 27.30's words: "Check 148 rows,
      then Import 148 records". The report has neither — it is past the write,
      and the only thing left to press is the way out. */
   const commitLabel = written

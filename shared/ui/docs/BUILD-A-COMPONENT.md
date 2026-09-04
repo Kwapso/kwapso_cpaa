@@ -746,14 +746,17 @@ Add an entry under `components`, keyed by folder name:
 `exports` lists every named export. `props` lists each variant axis and every
 value on it. `states` is the ten, always all ten.
 
-### 12.2 The demo
+### 12.2 The book — a section, and a page to put it on
 
-Every primitive gets a section. The registry is alphabetical, split across five
-files by first letter:
+`demo/` is the BOOK: five parts and thirty pages a reader navigates, one page
+at a time. A component with no section is a component nobody can find, so this
+is **two steps and the build fails on either.**
+
+**First, a section.** The registries are alphabetical by folder name:
 
 ```
-demo/sections/a-b.tsx  c-d.tsx  f-m.tsx  n-s.tsx  t-z.tsx
-demo/sections/index.tsx     ← merges them, and asserts the count
+demo/sections/a-b.tsx  c-d.tsx  f-m.tsx  n-s.tsx  t-z.tsx   ← the ex-controls
+demo/collections/*.tsx                                       ← the ex-structures
 ```
 
 Import your component **from its real path** and add one line to the right
@@ -763,11 +766,37 @@ file's exported array:
 { slug: "badge", title: "Badge", render: () => <BadgeSection /> },
 ```
 
-`slug` is the folder name and the anchor id. `index.tsx` asserts
-`SECTIONS.length === EXPECTED_PRIMITIVES` at module load and logs loudly if it
-does not — bump `EXPECTED_PRIMITIVES` when you add one.
+`slug` is the folder name and the anchor id. **Nothing to bump:** the expected
+count is read off the `components/` folder itself, so adding a folder raises
+the bar automatically. (It used to be a typed `EXPECTED_PRIMITIVES` constant,
+which is exactly how the demo once asserted 12 against a folder holding 16.)
 
-**The demo never re-implements a component or copies its classes.** If
+**Second, a page.** Add your slug to `COMPONENT_PAGE` in `demo/book.ts`:
+
+```ts
+badge: "chips-badges",
+```
+
+Put it where a reader would look for it, not where its folder sits — `table` is
+on Data views beside `DataTable`, `stopwatch` is a Figure. The pages are listed
+in `PAGES` at the top of the same file, each with the reasoning for anything
+non-obvious.
+
+**If it is a data view** — anything that takes a SET OF RECORDS and draws them
+— it must also wear its toolbar, per the client's ruling: *"every design in
+data views must have its own toolbar as well."* Wrap the primary specimen in
+the shared `ViewPreview` (`demo/collections/view-preview.tsx`), which uses the
+real `CollectionFrame`. Never hand-roll a second toolbar. If it genuinely
+cannot wear one, add a reasoned `TOOLBAR_EXEMPT` entry saying why — there is
+one, and it explains itself.
+
+`demo/check-book.mjs` asserts all of this off the disk and **exits 1**: a
+section on no page, a page holding nothing, a map entry naming a slug nothing
+uses, a data view drawn bare, an exemption that stopped being true, and a
+component folder no section draws. Three of those fail in both directions, so
+the exemption lists can only shrink.
+
+**The book never re-implements a component or copies its classes.** If
 something looks wrong there, that is a finding about the component, logged in
 `GAPS-DEMO.md`, not something to paper over in the demo.
 
@@ -784,13 +813,14 @@ does not exist for them.
 npm run check
 ```
 
-Four things, all of which must pass:
+Five things, all of which must pass:
 
 | | What it checks |
 |---|---|
 | `node foundations/tokens/build-tokens.mjs --check` | dark-block drift · orphan tokens · px leaks · unresolved `var()` chains |
 | `node foundations/icons/generate-icons.mjs --check` | the generated icon module is not stale |
 | `node demo/gen-states.mjs --check` | `states.generated.ts` matches the TEN STATES blocks |
+| `node demo/check-book.mjs` | every component is drawn by a section and filed on a page; every page holds something; every data view wears its toolbar |
 | `tsc --noEmit` | types |
 
 Then look at it. `npm run dev` opens the demo: every component, every state,
