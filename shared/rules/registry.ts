@@ -751,9 +751,21 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
-  de: 189,
-  es: 189,
-  ca: 189,
+  // RAISED 189 -> 196 in all three on 4 Sep 2026, and the reason is recorded
+  // because R44's whole point is that a ceiling cannot move quietly. R48's portal
+  // search shipped seven new English sentences — the two search fields, their
+  // clear buttons, the no-match copy and the match count — and none of the three
+  // languages answers them yet.
+  //
+  // NOT TRANSLATED HERE ON PURPOSE. `scripts/i18n-translate.mjs` spends the
+  // OWNER'S own API key and has rate-limited his personal account before, so a
+  // translation run is his to authorise and never a lane's to trigger. Accepted,
+  // visible, bounded debt is the shape R44 was written for; this is exactly it.
+  //
+  // It only ever falls. The next reviewed run takes all three back down together.
+  de: 196,
+  es: 196,
+  ca: 196,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -1147,6 +1159,21 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
  * `<ToolbarRow>` a screen writes is expected to carry search unless it is
  * named here. */
 export const TOOLBAR_EXEMPT: Record<string, string> = {
+  // ── THE PORTAL'S BOUNDED ROOMS (R48 census ii-b, added 4 Sep 2026). The
+  // client portal draws no <ToolbarRow> at all, so until this census existed the
+  // law passed on that whole front door by matching nothing. Its two GROWING
+  // collections — tickets and what the client has sent us — now search the door
+  // and are not listed here; a paging room cannot be exempted at all. These four
+  // are bounded, which is the law's own stated ground: a search box over a
+  // handful of rows is a control that cannot do anything.
+  "web-portal/components/home-screen.tsx":
+    "not a collection — a dashboard PREVIEW of the newest few tickets with a link to the rest. The collection it previews is tickets-screen.tsx, which searches. A box here would search the preview, which is the lie R48 exists to stop.",
+  "web-portal/components/company-screen.tsx":
+    "bounded by the account itself — the company's own record and its contacts, a handful of people. This is the one screen where a contact list is the whole content; it does not page, and it cannot grow past the people at one client.",
+  "web-portal/components/ticket-attachments.tsx":
+    "bounded by ONE ticket — the files on the ticket in front of you. It does not page, and a client who can see the ticket can see all of them at once.",
+  "web-portal/components/deliverables-screen.tsx":
+    "bounded today: what the agency has deliberately marked visible for this client, unpaged. THIS ENTRY DIES THE DAY IT PAGES — the census refuses an exemption for any portal room carrying hasMore/loadMore, so adding paging here fails the build until it also searches.",
   // ── THE SIX PAGED RECIPES — search lives in the host's <PagedFind>, never
   // in the recipe's own in-memory engine (SEARCH.md's layered model: a
   // GROWING collection's search has to ask the door, because the frame can

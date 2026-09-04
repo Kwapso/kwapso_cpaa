@@ -130,9 +130,9 @@ export const support = {
   /** R14: a PAGE of this client's tickets — hand `cursor` back from the previous
    * response for the next one. `total` is the exact server count of what this
    * caller may see (R16). */
-  tickets: (cursor?: string | null) =>
+  tickets: (cursor?: string | null, q?: string | null) =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      `/api/content/help?scope=all${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      `/api/content/help?scope=all${cursor ? `&cursor=${enc(cursor)}` : ""}${q ? `&q=${enc(q)}` : ""}`
     ),
   /** One ticket by id — the same door, narrowed. Outside the fence it simply
    * isn't there. */
@@ -228,9 +228,9 @@ export const delivery = {
    * a client three years in has every document they have ever sent us behind
    * this door, and a ceiling would eventually be a refusal to show them their
    * own. `total` counts the view asked for; both piles' counts ride along (R16). */
-  todos: (view: TodoViewName = "open", cursor?: string | null) =>
+  todos: (view: TodoViewName = "open", cursor?: string | null, q?: string | null) =>
     api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
-      `/api/content/todos?view=${view}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      `/api/content/todos?view=${view}${cursor ? `&cursor=${enc(cursor)}` : ""}${q ? `&q=${enc(q)}` : ""}`
     ),
   /** Mark one done, and send the file with it if there is one. `fileDataUrl` is
    * a base64 data URL; the door caps it, parses it and stores it under a key

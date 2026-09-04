@@ -2595,10 +2595,75 @@ describe("RULES — the laws of the base", () => {
       `R48 — every <ToolbarRow> call site carries a \`search\` prop, or is named in TOOLBAR_EXEMPT with a real reason:\n  ${rowOffenders.join("\n  ")}`
     ).toEqual([])
 
+    // ii-b · THE PORTAL ROOM CENSUS — and this is the clause with the teeth.
+    //
+    // Census (ii) walks `<ToolbarRow>` CALL SITES. The portal has none and never
+    // has, so for as long as it existed this law passed on the client's whole
+    // front door by finding no rooms to inspect. It would have reported green if
+    // every search box in `web-portal/` were deleted tomorrow, because there were
+    // none to delete — the exact failure the owner's own words were meant to
+    // close ("absolutely everywhere we have a data view or a collection view").
+    //
+    // So the portal is censused by ROOM rather than by toolbar, and the room is
+    // identified POSITIONALLY, the way R20 identifies a checked field: a file
+    // that renders `<CollectionHeading` is a collection screen, because that is
+    // the portal's own count seam (R16) and every collection on this door draws
+    // it. That oracle does not depend on the fix being present, which is the
+    // whole point — adding one search box must not be what makes the law able to
+    // see the room.
+    //
+    // A PAGING ROOM MAY NOT BE EXEMPTED AT ALL. `hasMore`/`loadMore` in the file
+    // means the collection GROWS (R14), and a growing list is precisely the one a
+    // person cannot read to the end — so its exemption is refused even if
+    // somebody writes one. A bounded room (a client's three contacts, the files
+    // on one ticket) may be exempted with a reason, which is the law's own
+    // already-stated ground: a search box over a handful of rows is a control
+    // that cannot do anything.
+    const portalRooms = sourceFiles([join(ROOT, "web-portal")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })
+    const roomOffenders: string[] = []
+    const roomExemptUsed = new Set<string>()
+    for (const f of portalRooms) {
+      const src = stripComments(f.source)
+      if (!src.includes("<CollectionHeading")) continue
+      const grows = /\b(hasMore|loadMore)\b/.test(src)
+      // A search field, positionally: the kit's search glyph beside a real input.
+      // Both, so a stray magnifier in a heading and a stray input in a dialog
+      // each fail to satisfy it on their own.
+      // The RENDERED tag, not the identifier: an `import { MagnifyingGlass }`
+      // line survives deleting the field it was imported for, and a census that
+      // matched the import would call that screen searchable. Proved by mutation
+      // on 4 Sep 2026 — the first draft of this line did exactly that.
+      const hasSearch = /<Input\b/.test(src) && /<MagnifyingGlass\b/.test(src)
+      if (hasSearch) continue
+      if (grows) {
+        roomOffenders.push(
+          `${f.rel}: a portal collection that PAGES (hasMore/loadMore) and draws no search field — ` +
+            `a growing list is the one a reader cannot reach the end of, so this may not be exempted`
+        )
+        continue
+      }
+      if (f.rel in TOOLBAR_EXEMPT) {
+        roomExemptUsed.add(f.rel)
+        continue
+      }
+      roomOffenders.push(
+        `${f.rel}: a portal collection screen with no search field and no TOOLBAR_EXEMPT entry — ` +
+          `either draw one, or name the reason it is bounded`
+      )
+    }
+    expect(
+      roomOffenders,
+      `R48 — every portal collection screen searches, or is a bounded room named in TOOLBAR_EXEMPT:\n  ${roomOffenders.join("\n  ")}`
+    ).toEqual([])
+
     // iii · THE RATCHET, BOTH DIRECTIONS — the same shape R29/R31/R32 already
     // run: an entry nothing uses is a pin left behind by a screen that got
     // fixed, and it has to go, or the list stops being able to only shrink.
-    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed])
+    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed, ...roomExemptUsed])
     const stale = Object.keys(TOOLBAR_EXEMPT).filter((k) => !usedKeys.has(k))
     expect(
       stale,
