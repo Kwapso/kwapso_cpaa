@@ -40,6 +40,7 @@ import {
   GOOGLE_SERVICES,
   type GoogleEventType,
   type GoogleService,
+  type GoogleSource,
   type GoogleSourceKind,
 } from "@shared/types"
 import { forgetGoogleKind, rewindGoogleLane } from "../lib/knowledge-google"
@@ -1329,9 +1330,23 @@ export async function getGoogleChatSpaces(request: Request, env: Env): Promise<R
   const { cfg, guard } = await gated(request, env, "google", "read")
   await refusePortalCaller(cfg, guard)
   const { token } = await accessTokenFor(env, cfg, guard, "chat")
-  const named = new Map(
-    (await listNamedSources(cfg, guard, "chat")).map((s) => [s.externalId, s])
-  )
+  // A SPACE IS SHARED IF ANY LIVE ROW SAYS SO — and before 4 Sep 2026 this line
+  // decided it with whichever row happened to land last in a Map, which is the
+  // OLDEST one (`listNamedSources` orders `created_at DESC`). With seven rows for
+  // one space, six of them headstones, that was a headstone from three weeks
+  // earlier, and the assistant told the owner a space he had shared "hasn't been
+  // shared with kwapso yet". `addNamedSource` no longer makes the duplicates;
+  // this is the reading that must not depend on there being none, because the
+  // rows already written outlive the fix — and because "is it shared?" has an
+  // answer that does not depend on which row you happen to read.
+  //
+  // Live first, then the most recent, so the id handed back is one the messages
+  // door will actually accept.
+  const named = new Map<string, GoogleSource>()
+  for (const source of await listNamedSources(cfg, guard, "chat")) {
+    const held = named.get(source.externalId)
+    if (!held || (source.active && !held.active)) named.set(source.externalId, source)
+  }
   return json({
     spaces: (await chatSpaces(token)).map((s) => {
       const source = named.get(s.name)

@@ -543,30 +543,60 @@ export async function addNamedSource(
       "google_not_connected",
       `Connect ${serviceLabel(input.service)} first, then choose what to read.`
     )
-  const existing = await d1Query<{ id: string }>(
+  // ── ONE SHARE, ONE ROW — the tombstone bug, fixed 4 Sep 2026 ───────────────
+  //
+  // This read used to end `AND deactivated_at IS NULL`, so a source somebody had
+  // stopped sharing was INVISIBLE here and re-sharing it INSERTED a second row.
+  // Every toggle left a headstone. On staging one Chat space (FluClinic) had
+  // SEVEN rows, six of them retired; fourteen (external_id, service) pairs were
+  // duplicated; Chat held 37 rows for 8 live shares and Drive 35 for 3.
+  //
+  // AND IT WAS NOT MERELY UNTIDY. The spaces door built a lookup off the list,
+  // which is ordered `created_at DESC`, so the OLDEST row won — a headstone from
+  // three weeks earlier — and the assistant told the owner a space he had shared
+  // "hasn't been shared with kwapso yet". He replied "??? it is a shared
+  // space..". He was right.
+  //
+  // SO THE KEY IS THE PERSON, THE SERVICE AND GOOGLE'S OWN ID, not the
+  // connection. `connection_id` looks like the natural key and is not: a
+  // reconnect writes a NEW connection row and `disconnect` retires that
+  // connection's sources with it, so six of FluClinic's seven rows were six
+  // reconnections, each one re-sharing the same space under a fresh id. Keying
+  // on the connection would have collapsed one of the six. Keying on the person
+  // collapses all of them, and re-points the row at whichever connection is live
+  // now — which is also what keeps the row's own history (activity hangs off its
+  // id) attached to the thing it is about.
+  //
+  // R14: at most one row by (user_id, service) + Google's id, LIMIT 1. The order
+  // puts a LIVE row first — which is also what keeps the partial unique index
+  // (`connection_id, external_id WHERE deactivated_at IS NULL`) safe below: if
+  // ANY live row exists we return here, so the revive can never point a second
+  // live row at the same connection.
+  //
+  // `user_id = ?` rides both statements even where the guard already settles it,
+  // because the redundancy is what makes the rule uniform, and a rule that holds
+  // on every statement is one a check can prove; a rule that holds on most of
+  // them, with the rest safe "because of where the id came from", is a rule
+  // whose next exception nobody notices. (A test wrote that line: the scan in
+  // test/google-doors.test.ts found this statement fenced only transitively.)
+  const existing = await d1Query<{ id: string; deactivated_at: string | null }>(
     cfg,
     guard.databaseId,
-    // R14: one row by a unique index. A repeat is not an error — somebody
-    // sharing the same folder twice means it, and answering with the row they
-    // already have is kinder than a refusal they have to interpret.
-    //
-    // `user_id = ?` is redundant TODAY — the connection was already resolved as
-    // the caller's own, so the connection id could only be theirs. It is here
-    // because the redundancy is what makes the rule uniform, and a rule that
-    // holds on every statement is one a check can prove; a rule that holds on
-    // most of them, with the rest safe "because of where the id came from", is a
-    // rule whose next exception nobody notices. (A test wrote this line: the
-    // scan in test/google-doors.test.ts found this one statement fenced only
-    // transitively.)
-    `SELECT id FROM google_sources
-      WHERE connection_id = ? AND user_id = ? AND external_id = ? AND deactivated_at IS NULL LIMIT 1`,
-    [connection.id, guard.userId, input.externalId]
+    `SELECT id, deactivated_at FROM google_sources
+      WHERE user_id = ? AND service = ? AND external_id = ?
+      ORDER BY (deactivated_at IS NULL) DESC, created_at DESC LIMIT 1`,
+    [guard.userId, input.service, input.externalId]
   )
-  if (existing[0]) return existing[0].id
+  // A repeat is not an error — somebody sharing the same folder twice means it,
+  // and answering with the row they already have is kinder than a refusal they
+  // have to interpret.
+  if (existing[0] && existing[0].deactivated_at === null) return existing[0].id
 
   // A folder filed under a client has to name one this team really has, for the
   // reason lib/knowledge.ts gives about a source: a compartment built from an id
   // nobody owns is a slice of the knowledge base nothing can ever reach again.
+  // Asked BEFORE the branch below, because a bad client id must be refused
+  // whether the row is being made or brought back.
   if (input.accountId) {
     const rows = await d1Query<{ id: string }>(
       cfg,
@@ -576,6 +606,53 @@ export async function addNamedSource(
       [input.accountId]
     )
     if (!rows[0]) throw new GuardError(404, "not_found", "That account doesn't exist.")
+  }
+
+  // SHARING SOMETHING BACK IS BRINGING ITS ROW BACK.
+  //
+  // R17, exactly: `deactivated_at IS NOT NULL` rides the UPDATE, so two people
+  // sharing the same space at once move one row between them and the loser
+  // writes no activity and rings no bell — it returns the id the winner revived,
+  // which is the same id it would have returned had it gone first.
+  //
+  // THE NEW WORDS WIN. Name, shelf, kind and client come off THIS request rather
+  // than being kept from the dead row: nobody has been reading it, and what the
+  // person just typed on the form is what they mean by sharing it today. (The
+  // live branch above is the other case and correctly leaves a live row alone —
+  // it is already shared, and this is not the door that edits one.)
+  if (existing[0]) {
+    const now = new Date().toISOString()
+    const revived = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `UPDATE google_sources
+          SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL,
+              deactivator_name = NULL, connection_id = ?, name = ?, shelf = ?, kind = ?,
+              account_id = ?, updated_at = ?, editor_id = ${sqlString(actor.id)},
+              editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)}
+        WHERE id = ? AND user_id = ? AND deactivated_at IS NOT NULL
+        RETURNING id`,
+      [
+        connection.id,
+        input.name,
+        input.shelf,
+        input.kind,
+        input.accountId ?? null,
+        now,
+        existing[0].id,
+        guard.userId,
+      ]
+    )
+    if (revived[0])
+      await logActivity(cfg, guard.databaseId, actor, {
+        type: SHARE_ACTIVITY[input.kind],
+        description: SCOPE_KIND.has(input.kind)
+          ? `${actor.name} let ${brand.name} read "${input.name}" again`
+          : `${actor.name} shared "${input.name}" again with ${input.shelf === "team" ? "the team" : "just themselves"}`,
+        relatedTable: "google_sources",
+        relatedRowId: existing[0].id,
+      })
+    return existing[0].id
   }
 
   const id = ulid()
