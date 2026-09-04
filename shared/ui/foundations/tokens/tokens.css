@@ -766,7 +766,35 @@
   --spine-paper-fill:      var(--kw-soft-paper);
   --spine-paper-chip:      var(--kw-off-beige);
   --spine-paper-member-fill: var(--kw-off-beige);
-  --spine-ink-member-fill:   var(--kw-unlit-raised);
+  /* RULED 2026-09-04 — THE MEMBER CHIP TAKES THE TOP OF THE LADDER.
+     `--kw-unlit-raised` measured 1.111 against Ink's dark ground and 1.132
+     against its light one: the pill's shape was very nearly invisible, and
+     the note further down this file had logged it for a ruling rather than
+     guessing at one. Five options were drawn at real size on the real
+     ground and put to the client; she returned the decision ("the member
+     chip - your pick").
+
+     `--kw-unlit-secondary`, at 1.50, is the LIGHTEST TONE THE PALETTE
+     ALREADY HAS, and it already means "secondary surface" — which is what a
+     resting identity chip is. So the pill reads as an object without a new
+     colour entering the system.
+
+     THE OPTION THAT MET 3.0 WAS REJECTED, AND ON PURPOSE. A new #676560
+     cleared the 3:1 non-text guideline, but that guideline governs the
+     visual information REQUIRED TO IDENTIFY a component — and this chip is
+     identified by a mango avatar and off-beige text, both enormous against
+     this ground. The fill is decoration around something already
+     unmistakable, so 3.0 was never owed here. Buying it would have cost a
+     palette-wide colour, dropped the name's own contrast from 15.4 to 5.77,
+     and made a resting chip read like a button, which is a lie about what
+     it does.
+
+     ONLY THIS TOKEN MOVES. `--spine-chip-fill` carries the identical
+     literal and the identical thinness, and is deliberately left alone: the
+     ruling was about the member chip, and repointing a shared token would
+     restyle surfaces the client never saw — the same trap the comment above
+     `--spine-ink-fill` already records. */
+  --spine-ink-member-fill:   var(--kw-unlit-secondary);
 
   /* RULED, 2026-09-03 — THE BREADCRUMB'S RESTING TAB COLLIDES WITH ITS OWN
      GROUND ON TWO OF THE THREE SPINES, NOT JUST THE ONE THAT SURFACED IT.
@@ -1693,9 +1721,13 @@
    regardless of palette: 1.132 against the light ground, 1.111 against the
    dark one. That is not new — it is 26.02's own chip colour for this spine,
    unchanged since before any of this quarter's spine rulings — and it reads
-   the same on a full window as it did on a rail. LOGGED FOR A CLIENT RULING,
-   not fixed here: nothing about restoring three spines requires touching a
-   value the two-spine cut never touched either.
+   the same on a full window as it did on a rail. RULED AND FIXED 2026-09-04
+   for `--spine-ink-member-fill`, which now points at `--kw-unlit-secondary`
+   and measures 1.50 — see that token for the argument and for why the 3.0
+   option was rejected. `--spine-chip-fill` still carries the old literal and
+   the old 1.13, deliberately: the ruling was about the member chip, and this
+   file does not repoint a shared token on the strength of a decision made
+   about one of its users.
 
    `ScreenShell` stamps `data-spine` on the screen root. BARE `:root` GOES
    BACK TO CARRYING PAPER — see the note above that block below for why the

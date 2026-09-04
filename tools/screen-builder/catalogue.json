@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.49",
-  "sha": "90a0cab852a4221bd7cec53d9be8c328ab95f931",
+  "tag": "v1.2.50",
+  "sha": "85535d396c84ae91bcd283ed303d4f069847775f",
   "syncedAt": "2026-09-04"
  },
- "generatedAt": "2026-09-04T16:16:13.092Z",
+ "generatedAt": "2026-09-04T17:39:29.967Z",
  "counts": {
   "components": 116,
   "hooks": 2,
