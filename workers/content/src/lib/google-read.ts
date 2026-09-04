@@ -448,7 +448,14 @@ export async function readGoogleMaterial(
           service: "drive",
           sourceId: source?.id ?? null,
           externalId: file.id,
-          title: file.name,
+          // THE ONE READER OF THE FOUR WITH NO FALLBACK, until now. Mail says
+          // "(no subject)" and an event says "(no title)"; a document said
+          // whatever Google's `name` field held, and `str()` turns a missing one
+          // into "". A source with no title is not merely untidy — it is a
+          // citation a reader cannot identify, which is the same thing as no
+          // citation (R23), and downstream it rendered as a link with nothing
+          // inside it.
+          title: file.name || "(untitled document)",
           url: file.webViewLink,
           text: request.withText ? await driveFileText(env, token, file.id) : "",
           updatedAt: file.modifiedTime,

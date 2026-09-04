@@ -29,6 +29,7 @@ import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
 import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
+import { googleServiceOfPath } from "@shared/knowledge-chips"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { alwaysConfirms, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
@@ -48,6 +49,14 @@ export type AgentTool = {
   confirm: boolean | ((input: Record<string, unknown>) => boolean)
   /** never exposed actions guard (identity acts) — true = always refuse. */
   identityBlocked?: boolean
+  /** A SECOND GOOGLE SERVICE THIS DOOR READS, where its own path does not say so.
+   * The source chips gate a Google tool by the service in its path
+   * (`googleServiceOfPath`), which is the truth for twenty of the twenty-one
+   * doors. `google_mail_to_drive` is `/drive/save-mail` and reads somebody's
+   * MAIL to do it, so unticking Gmail has to stop it. Declared here and PROVED
+   * against the handler's own `accessTokenFor` calls by
+   * test/source-chip-gate.test.ts — the tool is not believed, it is checked. */
+  alsoReads?: readonly string[]
   buildQuery?: (input: Record<string, unknown>) => string
   buildBody?: (input: Record<string, unknown>) => Record<string, unknown>
   /** The other doors this ONE tool forwards to (`set_record_active`, over the
@@ -537,6 +546,9 @@ const AGENT_ONLY: AgentTool[] = [
     path: "/api/content/google/drive/save-mail",
     write: true,
     confirm: false,
+    // It reads the MESSAGE before it writes the document, so unticking Gmail
+    // stops it — see `alsoReads`.
+    alsoReads: ["gmail"],
     buildBody: (i) => ({
       sourceId: str(i, "sourceId"),
       ...(str(i, "threadId") ? { threadId: str(i, "threadId") } : {}),
@@ -878,4 +890,13 @@ export async function executeTool(
     ? undefined
     : (data as { message?: string })?.message ?? `Action failed (HTTP ${res.status}).`
   return { ok: res.ok, status: res.status, data, error }
+}
+
+/** THE LIVE GOOGLE SERVICES ONE TOOL TOUCHES — its door's own path, plus
+ * whatever second service it declared reading. Empty for every tool that is not
+ * a Google door, and for `list_google_connections`, whose path names no service
+ * because it reads no material through one. */
+export function googleServicesOf(tool: AgentTool): string[] {
+  const own = googleServiceOfPath(tool.path)
+  return [...new Set([...(own ? [own] : []), ...(tool.alsoReads ?? [])])]
 }

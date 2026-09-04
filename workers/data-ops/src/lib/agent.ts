@@ -22,7 +22,16 @@ import type { Env } from "../env"
 import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
 import { ModelError } from "@shared/workers/model-failure"
 import { TOOL_RESULT_TAG } from "@shared/workers/model-text"
-import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
+import { chipForService, servicesForChips } from "@shared/knowledge-chips"
+import {
+  executeTool,
+  getTool,
+  googleServicesOf,
+  requiresConfirm,
+  toolSpecs,
+  type AgentTool,
+  type ToolResult,
+} from "./tools"
 import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
 import { addBatchFile, createBatch, getBatchView, planBatch } from "./import-batch"
 import { GuardError, rightsSheet } from "@shared/workers/gating"
@@ -828,10 +837,15 @@ type StepCtx = {
  * no recovering that — so the scope OVERWRITES whatever the model sent, rather
  * than filling in a gap it left.
  *
- * ONE TOOL, deliberately: `ask_knowledge` is the only door the chips are ABOUT.
- * A chip does not narrow `query_records` — that is a question about the app's
- * live rows, with its own permission at its own door, and silently shrinking it
- * would make a count wrong rather than a search narrower.
+ * ONE TOOL NARROWS, deliberately: `ask_knowledge` is the only door whose ARGUMENTS
+ * the chips shape. A chip does not narrow `query_records` — that is a question
+ * about the app's live rows, with its own permission at its own door, and
+ * silently shrinking it would make a count wrong rather than a search narrower.
+ *
+ * THE OTHER HALF IS `chipRefusal` BELOW, and the two are different acts on
+ * purpose. Narrowing hands a door a smaller question. Refusing does not open the
+ * door at all — which is the only thing that can be said about somebody's live
+ * mailbox, because there is no smaller version of "search my Gmail".
  *
  * Absent or empty means every door, so a conversation nobody has touched the
  * chips on is byte for byte the call it was before this existed. */
@@ -843,6 +857,88 @@ function injectSources(
   if (name !== "ask_knowledge" || !sources?.length) return input
   return { ...input, sources }
 }
+
+/** THE CHIP'S OWN WORD, for the sentence the assistant repeats.
+ *
+ * A DELIBERATE SECOND COPY of the four labels in `web/components/agent-panel.tsx`,
+ * and not a shared one: a sentence a person reads is the front door's to say and
+ * to translate (R28/R33), and an English string in `shared/knowledge-chips.ts`
+ * would be extracted into the catalogue from a file with no translator in it.
+ * These are a WORKER's words — machine-facing tool-result text the model relays,
+ * the same class as the content worker's own "(no subject)" — so they live here.
+ * They are held to the chip keys by test/source-chip-gate.test.ts, which fails on
+ * a chip with a live service and no word. */
+const CHIP_WORD: Record<string, string> = {
+  meetings: "Meetings",
+  mail: "Gmail",
+  drive: "Google Drive",
+  chat: "Google Chat",
+}
+
+/** REFUSED AT THE DOOR — why this call is not being made, or null to make it.
+ *
+ * The chips said which live services this conversation may open, and a tool on
+ * an unticked one is refused rather than quietly left out of the catalogue. Two
+ * reasons it is a refusal and not an omission. A model that never saw the tool
+ * says "I can't read your mail" and cannot say WHY, so the person is left
+ * guessing at their own switch; and an omission is a hope about what a model
+ * does with a catalogue, while a refusal is a fact — the same reading that made
+ * `injectSources` OVERWRITE the model's argument rather than fill in a gap.
+ *
+ * READS AND WRITES ALIKE. The reasoning is in shared/knowledge-chips.ts, beside
+ * the chips themselves, because that is where the next person will look.
+ *
+ * Nothing named means nothing narrowed, exactly as everywhere else the chips are
+ * read: a conversation nobody has touched them on is the one it always was. */
+export function chipRefusal(tool: AgentTool, sources: string[] | undefined): string | null {
+  const allowed = servicesForChips(sources)
+  if (!allowed) return null
+  const off = googleServicesOf(tool).filter((s) => !allowed.includes(s))
+  if (!off.length) return null
+  const words = off.map((s) => CHIP_WORD[chipForService(s) ?? ""] ?? s)
+  return (
+    `${words.join(" and ")} ${words.length === 1 ? "is" : "are"} unticked for this conversation, so ` +
+    `this tool is not available in it. Tell the person that, and that ticking ` +
+    `${words.length === 1 ? "it" : "them"} back on under "Reading from" is what lets you use it. ` +
+    `Do not answer from memory instead.`
+  )
+}
+
+/** A STEP THAT DOES NOT HAPPEN, written down exactly like one that did.
+ *
+ * A refusal is not an absence: the model asked, and a trail that quietly dropped
+ * the question would make the next one of these invisible. So it emits its two
+ * step rows, persists a `failed` tool row (a reopened chat still shows what was
+ * refused, and why), and hands the model the REASON as the call's own result —
+ * which is what lets the wrap-up that follows a failed step say which chip,
+ * rather than "something went wrong", in the reader's own language.
+ *
+ * Two callers, one shape, for the reason `runToolCall` itself exists: the audit
+ * trail must not depend on WHICH branch decided. */
+async function refuseStep(
+  ctx: StepCtx,
+  tc: ToolCall,
+  summary: string,
+  reason: string
+): Promise<{ message: ChatMessage; ok: boolean }> {
+  ctx.emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
+  ctx.emit?.({ t: "step_end", tool: tc.name, ok: false, summary, error: reason.slice(0, 140) })
+  await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
+    role: "tool",
+    content: reason,
+    toolCallsJson: JSON.stringify([{ tool: tc.name, summary, status: "failed" }]),
+    source: ctx.source,
+  })
+  return { message: { role: "tool", content: reason, toolCallId: tc.id, toolName: tc.name }, ok: false }
+}
+
+/** WHAT A CONFIRM-NEEDING CALL IS TOLD when something else in its turn was
+ * refused by the chips — see the branch in `runPlanLoop` for why it may not be
+ * proposed. */
+const HELD_BACK_BY_CHIPS =
+  "Not run. Another step in this turn was refused because the person has unticked one of " +
+  "their source chips, and an action that asks for approval cannot be held open across that. " +
+  "Say what was refused and why; if they still want this one, they can ask again."
 
 /** RUN ONE TOOL CALL — the single step seam, shared by the plan loop and confirmAndRun.
  * Emits the step rows, runs the tool AS the caller, tallies the turn, and persists the
@@ -866,6 +962,15 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   const { emit, tally } = ctx
   const t = getTool(tc.name)
   const summary = t ? t.summarize(tc.input, ctx.names) : `Run ${tc.name}`
+  // THE CHIPS, BEFORE ANYTHING ELSE — see `chipRefusal`. FIRST, and that
+  // position is the point: ahead of the repeat cache (a refused call never ran,
+  // so there is nothing of its to recall — but a tool that was allowed EARLIER
+  // in a thread and unticked since must not answer from a cache either), and
+  // ahead of the door itself, because a door that is asked and then ignored has
+  // still been asked. The step row is emitted and written like any other refusal,
+  // so a reopened chat still shows what was refused and why.
+  const refused = t ? chipRefusal(t, ctx.sources) : null
+  if (refused) return refuseStep(ctx, tc, summary, refused)
   // THE SAME READ, TWICE, IN ONE TURN. Answered from the first one — see
   // repeatGuard for why this is reads only. It is not hidden: the step row is
   // still emitted and still written, and it SAYS which it was, because the model
@@ -1299,8 +1404,28 @@ async function runPlanLoop(
     }
 
     const valid = reply.toolCalls.filter((tc) => getTool(tc.name))
+    // THE CHIPS DECIDE BEFORE A CONFIRM PANEL CAN EXIST — and this is the half
+    // that a door-level refusal alone does not cover.
+    //
+    // `runToolCall` refuses a chip-blocked call at the door, which settles every
+    // ordinary step. A call that CONFIRMS never reaches it: the branch below
+    // ends the turn, stores the proposal server-side, and `confirmAndRun`
+    // executes it later from that stored row — on a REQUEST THAT CARRIES NO
+    // CHIPS, because they ride a chat turn and a confirm is a different one and
+    // nothing persists them. So `google_send_mail` — the sharpest tool in the
+    // catalogue, and one that always confirms — would have been proposed while
+    // Gmail was unticked, and then sent.
+    //
+    // Passing the chips through the confirm door was the other candidate and is
+    // worse: it widens a door's body (R20, R22's MCP parity, R27's prose) to
+    // carry a fact that was already true when the proposal was made, and it
+    // would let a client decide, per confirm, which chips applied.
+    const blockedByChips = new Set(
+      valid.filter((tc) => chipRefusal(getTool(tc.name)!, opts.sources)).map((tc) => tc.id)
+    )
     // input-aware: a (de)activate toggle confirms only when it's turning something OFF.
-    const anyConfirm = valid.some((tc) => requiresConfirm(getTool(tc.name)!, tc.input))
+    const anyConfirm =
+      blockedByChips.size === 0 && valid.some((tc) => requiresConfirm(getTool(tc.name)!, tc.input))
 
     if (anyConfirm) {
       // Store the FULL proposal (name + input) server-side so /confirm runs EXACTLY
@@ -1358,6 +1483,25 @@ async function runPlanLoop(
     const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
+      const t = getTool(tc.name)
+      // …AND NOTHING IN THAT TURN ASKS FOR APPROVAL EITHER. The blocked call is
+      // refused inside `runToolCall`; a call beside it that WOULD have opened a
+      // confirm panel is held back here, because the only way to ask is to store
+      // a proposal, and a stored proposal is resumed with no chips in front of
+      // it. An innocent call that needs no approval still runs: the chips have
+      // nothing to say about it, and refusing it would be punishing it for its
+      // neighbour.
+      if (blockedByChips.size && t && !blockedByChips.has(tc.id) && requiresConfirm(t, tc.input)) {
+        const { message } = await refuseStep(
+          stepCtx,
+          tc,
+          t.summarize(tc.input, names),
+          HELD_BACK_BY_CHIPS
+        )
+        convo.push(message)
+        failed = true
+        continue
+      }
       const { message, ok } = await runToolCall(stepCtx, tc)
       convo.push(message)
       if (!ok) failed = true
