@@ -393,7 +393,9 @@
    names, and the band's paper argument is untouched by that.)
    The density insets are the same numbers; `RAIL_WIDTH` is the same
    13rem; `rail={null}` still means no rail, `rail=undefined` still means the
-   kit's specimen; and the rail is still dropped whole below the breakpoint.
+   kit's specimen; and the rail COLUMN is still dropped whole below the
+   breakpoint (since 2026-09-04 a menu control stands in its place there —
+   see NARROW — but no route's call has changed shape for it).
 
    THE LADDER THE 2026-08-24 REBUILD WROTE IS STILL THE LADDER. What follows
    is kept verbatim because its reasoning about PAPER — that there are two
@@ -642,8 +644,14 @@
      application's nav (`rail` is a node). The shell owns the rail's
      PLACEMENT and its width — and, until 2026-09-02, ITS SPINE FILL; that
      fill is now the ground's and the column paints nothing — and the one
-     thing about it that is design law: it is dropped entirely below the
-     narrow breakpoint, because the kit draws no hamburger anywhere.
+     thing about it that is design law: THE COLUMN is dropped entirely below
+     the narrow breakpoint. It used to read "…because the kit draws no
+     hamburger anywhere", and since 2026-09-04 that clause is narrowed rather
+     than deleted: no hamburger at any width that can seat a rail, and a menu
+     control below the width that cannot, on the client's own ruling. The
+     shell still draws no navigation OF ITS OWN — the narrow menu is built
+     from `navGroups`, which is the same register the rail is drawn from. See
+     NARROW, and `NavSheet`.
 
      AMENDED 2026-08-24, AND THE AMENDMENT IS A DEFAULT AND NOT A REDEFINITION.
      That sentence stayed true for a day and cost forty screens their
@@ -709,12 +717,69 @@
    anything else standing on the ground all read on both spines without
    naming a colour. One declaration where there were two.
 
-   NARROW — the kit's own rule, not a guess
-   `SHELL.md`: "Drops the rail entirely — no hamburger is drawn anywhere in
-   the kit. Drops controls, never counts." The rail column is absent below
-   `md`, not collapsed and not behind a button. Nothing else about the shell
-   changes: the ground, the card and the body are all still drawn, because the
-   paper law has to hold at 380 as well as at 1440.
+   NARROW — REWRITTEN 2026-09-04 ON A CLIENT RULING, AND ON THREE MEASURED
+   NUMBERS. THE PARAGRAPH THIS REPLACES IS QUOTED IN FULL BELOW, BECAUSE IT
+   WAS RIGHT ABOUT THE KIT AND WRONG ABOUT THE PRODUCT.
+
+   WHAT IT SAID: "`SHELL.md`: 'Drops the rail entirely — no hamburger is drawn
+   anywhere in the kit. Drops controls, never counts.' The rail column is
+   absent below `md`, not collapsed and not behind a button." And, of the
+   aside: "the aside column and BOTH edge handles are absent below `md` … THE
+   ASSISTANT IS NOT LOST BY THIS: ch19 gives it a floating, non-modal form
+   that needs no column at all, and that form is what a phone gets."
+
+   WHAT WAS ACTUALLY ON A PHONE. Measured in a browser at 380 x 800, on the
+   shell this file draws, with the rail and the aside both passed:
+
+       rail column          hidden
+       rail handle          hidden
+       aside column         hidden
+       aside handle         hidden
+       reachable nav items  0
+
+   Zero. Not a reduced set — nothing. The floating ch19 launcher the old
+   paragraph relied on lives in the APPLICATION (`agent-host.tsx`), not in
+   this kit, so a phone reached neither a destination nor the assistant, on
+   every screen in both doors. And at 834 — an iPad, the most ordinary
+   tablet width there is — the rail (195) and the aside (371) both docked and
+   left the content card 249px wide.
+
+   THE CLIENT'S RULING, 2026-09-04, VERBATIM, BOTH SENTENCES: *"now i want you
+   to self manage preparing the app for other devices sizes / ipad and
+   phone"*, and *"i want that the navigatuin menu is with the navbar sections
+   first, and the submenu with the pages."* The second sentence is not a
+   preference about a menu, it is the menu's STRUCTURE, and it is the
+   requirement.
+
+   SO, AT EACH WIDTH, AND EVERY LINE OF THIS IS ENFORCED HERE RATHER THAN IN
+   A ROUTE:
+
+   · BELOW `md` — THE RAIL COLUMN IS STILL ABSENT. That half of `SHELL.md`
+     never moved and could not: 380 minus a 208 column is 172px of card. What
+     changed is that its absence is no longer the end of the sentence. A
+     glyph-only menu control stands on the ground above the trail, `md:hidden`,
+     and opens the rail's own register as SECTIONS, then the chosen section's
+     PAGES. The whole argument for why this narrows "no hamburger" rather
+     than deleting it — and why it is a drill-down and not one flat scroll —
+     is at `NavSheet`, with the client's sentence beside it.
+   · BELOW `lg` — THE ASIDE STOPS DOCKING AND STARTS OVERLAYING. One mount,
+     one tree, `max-lg:absolute`; the card keeps the full width between the
+     gutters at every width under 1024, and the assistant is reachable at all
+     of them through the handle it already had. The three mechanisms
+     considered, and why the other two lose, are at the dock itself.
+   · "DROPS CONTROLS, NEVER COUNTS" IS UNTOUCHED. The band's trailing cluster
+     and the footer still drop at `sm`; every figure, count and identity chip
+     still draws at 380.
+   · NOTHING ELSE ABOUT THE SHELL CHANGES: the ground, the card and the body
+     are all still drawn, because the paper law has to hold at 380 as well as
+     at 1440.
+
+   AND `SHELL.md` NOW DISAGREES WITH THIS FILE IN ONE SENTENCE. That is
+   deliberate and it is logged rather than quietly reconciled: a client ruling
+   beats the specification, the same way the mango-spine default (2026-08-24)
+   already beats 26.02's own captions. The sentence in question is "no
+   hamburger is drawn anywhere in the kit"; it holds at every width that can
+   seat a rail, and this file draws one below the width that cannot.
 
    "DROPS CONTROLS, NEVER COUNTS" IS THE BAND'S RULE TOO, AND IT MOVED HERE
    WITH THE BAND. Both retired templates enforced it and both defaulted it
@@ -725,18 +790,18 @@
    a record that needs its footer there passes `narrowFooter`; both are props
    rather than hard rules because 26.04 and 27.39 are one specimen each.
 
-   AND THE ASIDE IS DROPPED THE SAME WAY, WHICH IS A DECISION AND NOT AN
-   OVERSIGHT. A 380-wide phone cannot carry a permanent 208 column and a
-   permanent assistant column beside a readable card; something has to go, and
-   the kit has already ruled what a narrow screen does with a region it cannot
-   seat — it drops it, and it does not grow a drawer, because a drawer is a
-   hamburger by another name. THE ASSISTANT IS NOT LOST BY THIS: ch19 gives it
-   a floating, non-modal form that needs no column at all ("No scrim, no blur,
-   no page shift, no focus trap"), and that form is what a phone gets. So the
-   aside column and BOTH edge handles are absent below `md`, and the card
-   keeps the ground's gutter on all four sides at every width. Logged as the
-   narrow answer for `aside`; if the client wants a sheet there instead, that
-   is a route's `Sheet` and not this file's column.
+   AND THE ASIDE IS *NOT* DROPPED ANY MORE — RETIRED 2026-09-04. The
+   paragraph that stood here argued that a 380-wide phone cannot carry a
+   permanent 208 column and a permanent assistant column beside a readable
+   card, that something has to go, and that ch19's floating launcher is what
+   a phone gets instead. THE FIRST TWO CLAUSES ARE STILL TRUE AND THE
+   CONCLUSION WAS STILL WRONG, because the floating launcher it handed the
+   phone to is drawn by the APPLICATION and not by this kit — so what a phone
+   actually got was nothing. The correction is above, under NARROW: the
+   column stops DOCKING below `lg` rather than stops EXISTING, so it is never
+   beside the card and never gone. The card keeps the ground's gutter on all
+   four sides at every width, which is the one thing that paragraph got right
+   and this change preserves.
 
    NO RADIUS ON THE GROUND, AND THAT IS STILL THE CLIENT'S SCREENSHOTS
    The artifact wraps every assembled screen in `border-radius: 24px;
@@ -786,17 +851,27 @@ import { Badge } from "../../components/badge/badge";
 import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
 import { CursorGlow } from "../../components/cursor-glow/cursor-glow";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "../../components/sheet/sheet";
 import { Title } from "../../components/title/title";
 import { Text } from "../../components/typography/typography";
 import {
+  CaretLeft,
   CaretLineLeft,
   CaretLineRight,
+  CaretRight,
+  List,
   PencilSimple,
   Plus,
   Sparkle,
 } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
-import { Rail } from "./rail";
+import { Rail, RAIL_PLACEHOLDER_GROUPS, type RailGroup, type RailItem } from "./rail";
 import { StatStrip, type StatStripFigure } from "./stat-strip";
 import { SHAPE_HEADING_SIZE, type ScreenDensity, type ShapeState } from "../states/states";
 
@@ -880,8 +955,16 @@ export interface ScreenShellProps
    * more — since 2026-09-02 the spine is the GROUND and the rail lies flat on
    * it, which is what `rail.tsx`'s own state 1 always claimed it did.
    *
-   * Dropped entirely below the narrow breakpoint. Pass it anyway: the shell
-   * decides, not the call site, so no route can ship a hamburger.
+   * THE COLUMN is dropped entirely below the narrow breakpoint. Pass it
+   * anyway: the shell decides, not the call site, so no route can ship a
+   * hamburger at a width that could have held a rail.
+   *
+   * BELOW `md` THE SHELL DRAWS A MENU CONTROL INSTEAD, since 2026-09-04, and
+   * it is built from `navGroups` rather than from this node — sections first,
+   * then that section's pages, on the client's own instruction. Pass
+   * `navGroups` alongside this whenever you pass your own node; without it
+   * the menu falls back to showing this node flat, which works and is worse.
+   * See `navGroups` and the file header's NARROW section.
    *
    * DEFAULTS TO `<Rail />` — the kit's own placeholder register — so a screen
    * that passes nothing still has navigation in it. `null` draws none, which
@@ -924,9 +1007,14 @@ export interface ScreenShellProps
    * same composition with a different header". The shell places the column;
    * the conversation inside it is the application's.
    *
-   * DROPPED BELOW THE NARROW BREAKPOINT, exactly as the rail is, and the
-   * assistant's floating form is what a phone gets instead. See the file
-   * header's NARROW section for the whole argument.
+   * IT STOPS DOCKING BELOW `lg` AND OVERLAYS THE CARD INSTEAD — changed
+   * 2026-09-04, and it replaces "dropped below the narrow breakpoint, and
+   * the assistant's floating form is what a phone gets instead", which was
+   * wrong twice: the floating form is the application's and not this kit's,
+   * so a phone got no assistant at all, and a docked column at 834 left the
+   * card 249px wide. The node is mounted ONCE at every width; only whether
+   * it takes layout space changes. See the file header's NARROW section and
+   * the dock itself for the mechanism and the two rejected alternatives.
    */
   aside?: React.ReactNode;
   /** Accessible name for the assistant's column. */
@@ -944,6 +1032,84 @@ export interface ScreenShellProps
   /** The aside handle's two accessible names. */
   asideOpenLabel?: string;
   asideCloseLabel?: string;
+
+  /* ---- THE NARROW NAVIGATION — SECTIONS FIRST, THEN THAT SECTION'S PAGES.
+     CLIENT, 2026-09-04, AND IT REVERSES A STANDING KIT LAW. ------------- */
+
+  /**
+   * THE RAIL'S REGISTER AS **DATA**, so the shell can re-present it as the
+   * narrow menu the client asked for. This is the prop that fixes a phone
+   * having no navigation at all; see the file header's NARROW section for
+   * the whole ruling and for what it overturns.
+   *
+   * IT IS DATA AND NOT A NODE, AND THAT IS THE SAME ARGUMENT `figures`
+   * ALREADY MAKES ONE SCREEN DOWN. The law about the narrow menu's SHAPE —
+   * sections first, then the chosen section's pages — is the shell's, not a
+   * route's. The client's sentence is a structure: *"i want that the
+   * navigatuin menu is with the navbar sections first, and the submenu with
+   * the pages."* A slot taking a finished menu would have made that a
+   * request forty routes each answer differently, which is the exact failure
+   * the `rail` default was added to prevent ("that sentence stayed true for
+   * a day and cost forty screens their navigation"). Passed here, once, as
+   * the groups the rail already holds.
+   *
+   * THE THREE CASES, AND NONE OF THEM IS "NO NAVIGATION":
+   *
+   *  · GIVEN — the sections-then-pages menu is built from it. This is what a
+   *    real application passes, and it is the same array it hands its own
+   *    `<Rail groups={…}>`, so the two can never disagree about what the
+   *    navigation IS. They are one register read twice.
+   *  · OMITTED, AND THE SHELL BUILT THE RAIL ITSELF (`rail` undefined) —
+   *    falls back to `RAIL_PLACEHOLDER_GROUPS`, the kit's own register, which
+   *    is exactly what the rail beside it is drawing. The specimen therefore
+   *    demonstrates the ARRANGEMENT on every one of the ~44 screens that
+   *    thread `rail` through from a prop nobody supplies, with no route
+   *    edited. Same reasoning that put the `<Rail />` default here.
+   *  · OMITTED, AND THE CALL SITE SUPPLIED ITS OWN `rail` NODE — the shell
+   *    has no register to read, so the menu shows THE RAIL NODE ITSELF,
+   *    flat. That is a degraded answer and it is deliberately not `null`:
+   *    a flat list of every destination is worse than sections-then-pages
+   *    and better than a phone with nothing. The cost is stated rather than
+   *    hidden — the node is mounted twice below `md`, once inside the
+   *    display-none dock and once in the sheet — which is survivable for a
+   *    nav (a `display:none` subtree is out of the accessibility tree, so
+   *    there is one landmark, not two) and is the reason this is the
+   *    fallback and not the design. A call site that reaches it should pass
+   *    `navGroups`.
+   */
+  navGroups?: readonly RailGroup[];
+  /**
+   * Which entry the narrow menu lights, and it is separate from the rail's
+   * own `current` for the reason every other rail fact is separate: `rail`
+   * is an opaque node and this file does not reach inside it. An application
+   * passes the same id to both.
+   *
+   * Omitted, nothing is lit — which is honest rather than convenient. The
+   * shell's own default rail lights `Rail`'s internal placeholder entry and
+   * that id is not exported; guessing at it here would be this file
+   * asserting a fact about another file's private constant.
+   */
+  navCurrent?: string;
+  /**
+   * Activation, for entries carrying no handler of their own — the same
+   * signature `Rail.onSelect` takes, so one application handler serves both
+   * presentations of one register. An entry's own `onSelect` still wins, and
+   * an entry with an `href` is a real `<a>` either way.
+   */
+  onNavSelect?: (id: string) => void;
+  /**
+   * The accessible name of the control that OPENS the narrow menu. It is
+   * glyph-only — the kit's create rule reasoning applied to a second
+   * glyph-only control — so this string is not decoration, it is the only
+   * name the control has.
+   */
+  navMenuLabel?: string;
+  /**
+   * The word on the control that goes back from a section's pages to the
+   * list of sections. A noun phrase, not "Back": a reader who opened one
+   * section needs to know what returning gets them.
+   */
+  navBackLabel?: string;
 
   /**
    * THE SPINE — 26.02's per-member Settings · Appearance choice, now
@@ -1690,6 +1856,483 @@ function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandle
   );
 }
 
+/* ----------------------------------------------------------------------------
+   THE NARROW NAVIGATION — SECTIONS FIRST, THEN THE CHOSEN SECTION'S PAGES.
+   CLIENT-ORDERED 2026-09-04, AND IT OVERTURNS A LAW THIS FILE USED TO STATE
+   IN THREE PLACES.
+
+   WHAT WAS TRUE UNTIL TODAY, AND WHY IT IS NOT ANY MORE
+   `SHELL.md`, quoted verbatim in this file's header since the rebuild:
+   "Drops the rail entirely — no hamburger is drawn anywhere in the kit."
+   That sentence was obeyed exactly, and MEASURED IN A BROWSER at 380 x 800
+   it produced this: rail hidden, rail handle hidden, aside hidden, aside
+   handle hidden, `0` reachable navigation controls in the whole document.
+   Not "fewer controls" — none. A phone could not move between screens and
+   could not reach the assistant, on every screen in both doors.
+
+   THE CLIENT HAS RULED THE OTHER WAY, AND HER SENTENCE IS A STRUCTURE RATHER
+   THAN A PERMISSION. 2026-09-04, verbatim: *"now i want you to self manage
+   preparing the app for other devices sizes / ipad and phone"*, and then,
+   in the same breath, exactly what the menu is to be: *"i want that the
+   navigatuin menu is with the navbar sections first, and the submenu with
+   the pages."*
+
+   SO THE "NO HAMBURGER" LAW IS NOT SIMPLY DELETED — IT IS NARROWED, AND THE
+   NARROWING IS THE POINT. What that law was protecting against is a rail
+   folded into a button ON A WIDTH THAT COULD HAVE HELD THE RAIL: a hamburger
+   at 1440 hides navigation that had somewhere to stand, which is the failure
+   `SHELL.md` names. Below `md` there is no such width — 380 minus a 208
+   column is 172px of card — so the choice at that width was never
+   "rail or hamburger", it was "menu or nothing", and this file spent a
+   fortnight shipping nothing. THE LAW STILL BINDS AT EVERY WIDTH THAT CAN
+   SEAT A RAIL: this trigger is `md:hidden` and there is no prop that can
+   draw it wider. Desktop and tablet are untouched.
+
+   AND IT IS NOT A FLAT LIST, WHICH IS THE HALF OF THE CLIENT'S SENTENCE MOST
+   EASILY LOST. The obvious build — drop the rail's whole register into a
+   drawer — was written first and rejected: the kit's own placeholder rail is
+   two groups of four-and-three, a real workspace's is more, and a phone
+   scrolling one undifferentiated column of every destination is precisely
+   the "one long scroll" the client's wording rules out. SECTIONS ARE THE
+   FIRST SCREEN. A section's pages are the second. `RailGroup.heading` is
+   already the word for the first and `RailGroup.items` already the second,
+   so nothing here is coined and nothing is a second source of truth: this is
+   the rail's own register, re-presented.
+
+   WHY IT IS A `Sheet` AND NOT A PANEL THIS FILE DRAWS
+   Because every hard part is already solved there and solved once. `Sheet`
+   is the kit's Radix-backed drawer: it carries `.motion-sheet` and
+   `.motion-scrim` from `foundations/motion/motion.css` (law 6.1 — a
+   component never writes its own duration or curve, and this file may not
+   edit that layer), it traps focus, it closes on Escape and on the scrim, it
+   portals out of the shell's own stacking contexts, and it renders NOTHING
+   at all while closed — so "anything hidden must be genuinely unreachable"
+   is true by construction rather than by an `inert` this file would have to
+   maintain. A hand-drawn drawer would have re-derived five behaviours and
+   got one of them wrong.
+
+   `side="left"` IS THE READING-START EDGE, NOT PHYSICALLY LEFT — `Sheet`'s
+   own header says so and positions it with `start-0`. The menu comes from
+   the same edge the rail it replaces stands on, in both directions of text.
+
+   THE TWO LEVELS SWAP; THEY DO NOT SLIDE. `.motion-panel-in` is the class,
+   and motion.css's own words are the argument: it is for "a route that only
+   swaps a panel inside a persistent shell … because the thing that moved is
+   small". §8 in that file rejects horizontal panel travel outright ("sliding
+   panels horizontally to imply a carousel is a lie about the information
+   architecture"), and sections-to-pages is a drill-down, not a filmstrip.
+   `.motion-row-enter` per row was tried and dropped for the reason §7 states
+   itself: twenty rows each rising is a wave, and a wave is parallax in
+   disguise. ONE class, on the level that changed, keyed so it re-runs.
+   -------------------------------------------------------------------------- */
+
+/**
+ * A row in the narrow menu — a section on the first level, a page on the
+ * second, the back control above them both. ONE SHAPE FOR ALL THREE, because
+ * they are one list the reader is walking, and three shapes would read as
+ * three unrelated controls stacked on each other.
+ *
+ * `--control-height-input` (44) AND NOT THE RAIL'S `--control-height-button`
+ * (40), AND THAT IS THE ONE PLACE THIS DELIBERATELY DIVERGES FROM THE RAIL.
+ * The kit's own name for that token is "the touch row" (`button.tsx`,
+ * `size="lg"`), and this surface EXISTS ONLY BELOW `md` — it is the one
+ * control in the shell that is never operated by a mouse. Spending the touch
+ * rung here is reading the ladder the kit already ships, not inventing a
+ * phone number: WCAG 2.5.5's target minimum is the reason that rung exists
+ * and this is the one place in the file that can actually honour it.
+ *
+ * THE TONES ARE THE PANEL'S, NOT THE SPINE'S, AND THAT IS NOT AN OVERSIGHT.
+ * The rail's rows read `--spine-ink` / `--spine-active-fill` because a rail
+ * lies flat on the ground and the ground is the spine. This drawer is a
+ * PORTALLED PANEL: `SheetContent` paints `bg-popover`, which is not on any
+ * spine, so a `--spine-*` value in here would resolve against `:root` and
+ * paint a rail's colours on a surface that is not a rail. `--surface-quiet`
+ * / `--surface-selected` / `--ink-*` are the panel ladder, which is what
+ * every other row on a panel in this kit already spends.
+ */
+const NAV_ROW = cn(
+  "flex w-full min-w-0 items-center gap-[var(--space-3)]",
+  "h-[var(--control-height-input)] rounded-pill px-[var(--space-3)]",
+  "border-0 bg-transparent text-start text-sm no-underline select-none",
+  /* MOTION IS ATTACHED, NEVER RESTATED — `.motion-row-hover` is motion.css
+     §7's fill-only row transition, which is exactly and only what happens
+     here. No duration and no curve is written in this file. */
+  "motion-row-hover",
+  "[&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0",
+);
+
+/**
+ * The ordinary row: body ink, one gentle step of fill on hover.
+ *
+ * THE STEP IS MEASURED AGAINST THE SURFACE THIS ROW ACTUALLY STANDS ON, AND
+ * THAT IS WHY IT IS NOT `--surface-quiet`. `SheetContent` paints `--popover`
+ * (#FFFEF9 light, #26241F dark); `--surface-panel` is exactly one defined
+ * step off it in both palettes, which is the same relationship `sheet.tsx`'s
+ * own close chip spends between `--surface-panel` and `--surface-quiet` one
+ * rung further down the ladder. Hover takes that first step and SELECTION
+ * takes the second, so the two states are never the same colour — which is
+ * what they were when this was written the obvious way; see `NAV_ROW_ACTIVE`.
+ */
+const NAV_ROW_IDLE = cn("cursor-pointer text-foreground hover:bg-surface-panel");
+
+/**
+ * The page the reader is on: MEDIUM weight, plus the second step of fill.
+ *
+ * WEIGHT IS THE PART THE RULING ASKS FOR — client ruling D5 = C, "the quiet
+ * tier is made by weight and size, not by colour", read the same way the
+ * rail's own lit row reads it, which is weight AND a fill rather than weight
+ * alone.
+ *
+ * AND THE FILL IS `--surface-quiet` BECAUSE `--surface-selected` IS INVISIBLE
+ * HERE, WHICH WAS MEASURED RATHER THAN GUESSED. `--surface-selected` resolves
+ * to `#FFFEF9` in light — byte-identical to `--popover`, the fill this drawer
+ * is painted in — so the lit row was a 1.000 against its own panel and the
+ * only thing marking the reader's location was the weight. That token is
+ * named for selection ON A LIST STANDING ON A PAGE, not on a popover; on this
+ * surface it says nothing. `--surface-quiet` (#E2DDD4 light, #3A3833 dark) is
+ * the rung that reads, and it stays a separate step from hover rather than
+ * colliding with it.
+ *
+ * MEASURED IN BOTH PALETTES, AND ONE HONEST WRINKLE IS RECORDED RATHER THAN
+ * SMOOTHED OVER: against the popover (#FFFEF9 light, #26241F dark) the hover
+ * step goes darker in both (#F7F2EB, #1C1B18), while the selected step goes
+ * darker in light and LIGHTER in dark (#3A3833). The two are always distinct
+ * from the panel and from each other, which is what the states need; they are
+ * not always on the same side of it, because these are the ladder's own rungs
+ * and the ladder is not symmetrical about a popover. Naming a colour here to
+ * make the direction agree would be worse than the asymmetry.
+ */
+const NAV_ROW_ACTIVE = cn(
+  "cursor-pointer bg-surface-quiet font-[var(--font-weight-medium)] text-foreground",
+);
+
+/**
+ * 27.7, and it is the same sentence `RailItem.disabled` quotes: "Blocked
+ * items stay visible in disabled ink rather than disappearing, so the
+ * workspace doesn't look different to different people." Disabled ink, no
+ * hover rule at all — so no two equal-specificity `hover:` rules are ever in
+ * one class list and the outcome never depends on emission order, which is
+ * `RailRow`'s own reason for resolving its skins in JS.
+ */
+const NAV_ROW_BLOCKED = cn("cursor-default text-ink-disabled");
+
+interface NavSheetProps {
+  /**
+   * The register, sections first. When this is `undefined` the shell has no
+   * data to re-present and hands `fallback` instead — see `navGroups`.
+   */
+  groups?: readonly RailGroup[];
+  /** The rail node itself, shown flat when there is no register. */
+  fallback?: React.ReactNode;
+  /** The lit entry's id, or nothing. */
+  current?: string;
+  /** Activation for entries with no handler of their own. */
+  onSelect?: (id: string) => void;
+  /** The drawer's own heading — the same word the rail's landmark carries. */
+  title: string;
+  /** The way back up from a section's pages. */
+  backLabel: string;
+  /**
+   * The accessible name of the control that opens the drawer. It is the
+   * control's ONLY name — the button is a glyph — so it is a required string
+   * rather than an optional one.
+   */
+  triggerLabel: string;
+}
+
+function NavSheet({
+  groups,
+  fallback,
+  current,
+  onSelect,
+  title,
+  backLabel,
+  triggerLabel,
+}: NavSheetProps) {
+  /* THE OPEN STATE LIVES HERE AND THE SHELL DOES NOT HOLD IT, unlike the rail
+     and the aside collapses one level up. Those two carry an escape hatch
+     because 26.02 says they "persist per user" and persistence is the
+     application's; a menu is not a preference, it is a gesture in progress,
+     and a shell that let a route seed it open would let a route ship a screen
+     whose first frame is a drawer over the content. Nothing outside this
+     component has any use for the value. */
+  const [open, setOpen] = React.useState(false);
+  /* WHICH SECTION IS OPEN, AND `null` IS THE FIRST LEVEL. Held here rather
+     than in the shell because it is not a fact about the screen — it is
+     where the reader currently is inside one menu, and nothing outside this
+     drawer has any use for it.
+
+     IT RESETS WHEN THE DRAWER CLOSES, and that is a decision. A menu
+     reopening three levels deep into whichever section was last poked is a
+     menu that has an opinion about where you were going; the client asked
+     for sections first, and "first" has to still be true the second time. */
+  const [section, setSection] = React.useState<string | null>(null);
+
+  const openSection = groups?.find((g) => g.id === section) ?? null;
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setSection(null);
+    setOpen(next);
+  };
+
+  /* ACTIVATING A PAGE CLOSES THE MENU. A drawer that stayed open over the
+     screen it just navigated to would be covering the answer to the reader's
+     own request; every other overlay in this kit dismisses on commit. */
+  const activate = (item: RailItem) => {
+    (item.onSelect ?? onSelect)?.(item.id);
+    handleOpenChange(false);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      {/* THE TRIGGER IS A REAL `SheetTrigger`, AND THAT IS A KEYBOARD FIX
+          RATHER THAN A TIDINESS ONE. It was written first as a plain
+          `<Button onClick={() => setOpen(true)}>` standing outside the
+          `Sheet`, which LOOKED identical and MEASURED broken: Radix restores
+          focus on close to `triggerRef.current`, that ref is only populated
+          by `DialogTrigger`, and without one it is `null` — so choosing a
+          destination dropped focus onto `<body>` and a keyboard reader
+          started again from the top of the document. Measured in
+          `verify/shell-narrow` both ways before the change; after it, focus
+          lands back on this button.
+
+          `asChild` SO THE KIT'S `Button` IS THE CONTROL, not a second
+          button-shaped thing beside it — Radix's `Slot` merges the trigger's
+          behaviour, its ref and its `aria-expanded` / `aria-haspopup` onto
+          the element this file already draws. There is no `aria-expanded`
+          written here for the same reason: Radix owns the state, so it owns
+          the announcement, and a hand-written one would be a second copy
+          that can disagree.
+
+          `variant="secondary"` — A PAPER SQUARE, NEVER MANGO, AND THAT IS
+          RULING 26 RATHER THAN TASTE. A screen gets one mango. Between `sm`
+          and `md` the band's mango IS drawn (the trailing cluster returns at
+          `sm`) while the rail is still absent, so a mango menu button would
+          be two brand fills on one screen at a real width. Secondary
+          re-resolves to `--spine-chip-fill` on the ground — see THE PAPER LAW
+          — so the square reads on all three spines without naming a colour.
+
+          `size="icon"` AND AN `aria-label`, WHICH IS 26.01's GLYPH RULE
+          APPLIED HONESTLY: the kit's argument for a glyph-only control is
+          that the glyph is unambiguous and the word is noise, and a menu
+          glyph is the most conventional mark on the web. The label is
+          therefore the control's ONLY name, which is why it arrives as a prop
+          with a default rather than as a string in this markup — the
+          application translates everything. */}
+      <SheetTrigger asChild>
+        <Button
+          data-slot="screen-shell-nav-trigger"
+          variant="secondary"
+          size="icon"
+          aria-label={triggerLabel}
+        >
+          <List aria-hidden="true" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent
+        side="left"
+        /* A DATA ATTRIBUTE OF ITS OWN RATHER THAN A `data-slot` OVERRIDE,
+           AND THAT IS A BUG THIS FILE ALREADY SHIPPED ONCE AND CAUGHT.
+           `SheetContent` writes `data-slot="sheet-content"` and then spreads
+           `{...props}`, so a `data-slot` passed here SHADOWS the kit's own
+           and every selector, harness and stylesheet that looks for a sheet
+           by its slot stops seeing this one. Measured: a probe querying
+           `[data-slot="sheet-content"]` found nothing while the drawer was
+           plainly open. So the shell's marker is a separate attribute and
+           the component's own contract is left intact. */
+        data-shell-nav-sheet=""
+        /* EXPLICITLY UNDESCRIBED. Radix warns in development when a dialog
+           has no description, and the fix it documents is this exact value —
+           not a paragraph of prose invented to silence it. A menu of
+           destinations describes itself; a sentence under the heading would
+           be a string every locale has to translate for no reader's benefit. */
+        aria-describedby={undefined}
+      >
+        <SheetHeader>
+          {/* THE HEADING IS THE RAIL'S OWN LANDMARK NAME, not a second word.
+              `railLabel` already says what this region is ("Sections" by
+              default) and it is already translated; a drawer that called
+              itself something else would be two names for one thing. */}
+          <SheetTitle>{openSection ? openSection.heading : title}</SheetTitle>
+        </SheetHeader>
+
+        {/* THE ONE UNSLOTTED CHILD, DELIBERATELY. `SheetContent` gives every
+            direct child that is not one of its own `sheet-*` parts the
+            drawer body treatment — `flex-1`, `min-h-0`, `overflow-y-auto`
+            and `--space-6` of inset — through a descendant selector rather
+            than an exported `SheetBody`. So there is exactly one of these,
+            and it needs no padding, no height and no scroller of its own.
+
+            `key` IS WHAT MAKES THE MOTION RUN. `.motion-panel-in` is an
+            ANIMATION, and an animation only plays when the element mounts;
+            re-keying on the level is what mounts a new one on each step of
+            the drill-down instead of mutating one that never re-enters. */}
+        <div
+          key={openSection ? openSection.id : "sections"}
+          data-slot="screen-shell-nav-level"
+          data-level={openSection ? "pages" : "sections"}
+          className="motion-panel-in flex flex-col gap-[var(--space-1)]"
+        >
+          {groups === undefined ? (
+            /* NO REGISTER: the rail node, flat. Stated at `navGroups` as the
+               degraded case it is. */
+            fallback
+          ) : openSection === null ? (
+            /* ── LEVEL ONE — THE SECTIONS. `<nav>` because this list IS
+                 navigation and a drawer is portalled out of the shell's own
+                 landmarks, so nothing else in the tree names it. Labelled
+                 with the same word the heading shows. */
+            <nav aria-label={title} className="flex flex-col gap-[var(--space-1)]">
+              {groups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  data-slot="screen-shell-nav-section"
+                  /* NO `aria-expanded`, AND IT WAS THERE FOR A DAY. A
+                     section is not a disclosure: pressing it REPLACES this
+                     list with that section's pages rather than revealing
+                     anything beneath itself, so the attribute could only
+                     ever read `false` — this branch does not render once a
+                     section is open — and a control permanently announced as
+                     "collapsed" that never becomes expanded is a worse
+                     description than none. It is a drill-down row: its
+                     accessible name is the section, the caret is decoration,
+                     and the drawer's own heading changes to the section's
+                     name the moment it is pressed, which is what tells a
+                     screen reader where it now is. */
+                  onClick={() => {
+                    setSection(group.id);
+                  }}
+                  className={cn(NAV_ROW, NAV_ROW_IDLE)}
+                >
+                  <span className="min-w-0 flex-1 truncate">{group.heading}</span>
+                  {/* THE CARET POINTS THE WAY THE READER IS ABOUT TO TRAVEL,
+                      and `CaretRight` is a LOGICAL direction in this kit's
+                      icon set only by convention, so it is `aria-hidden` and
+                      carries no meaning a screen reader needs — the control's
+                      name is the section, and `aria-expanded` is the state. */}
+                  <CaretRight aria-hidden="true" />
+                </button>
+              ))}
+            </nav>
+          ) : (
+            /* ── LEVEL TWO — THAT SECTION'S PAGES, WITH THE WAY BACK ABOVE
+                 THEM. The back control is OUTSIDE the `<nav>`: it moves the
+                 reader inside this menu, it is not a destination in the
+                 product, and a navigation landmark that contained it would
+                 announce it as one. */
+            <>
+              <button
+                type="button"
+                data-slot="screen-shell-nav-back"
+                onClick={() => {
+                  setSection(null);
+                }}
+                className={cn(NAV_ROW, NAV_ROW_IDLE, "text-ink-secondary")}
+              >
+                <CaretLeft aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{backLabel}</span>
+              </button>
+              <nav
+                aria-label={openSection.heading}
+                className="flex flex-col gap-[var(--space-1)]"
+              >
+                {openSection.items.map((item) => {
+                  const blocked = item.disabled === true;
+                  const active = item.id === current;
+
+                  /* THE THREE SKINS ARE EXCLUSIVE AND RESOLVED IN JS, which
+                     is `RailRow`'s own pattern and is here for `RailRow`'s
+                     own reason: two of them carry a `hover:` rule and the
+                     third carries none, so no two rules of equal specificity
+                     are ever in the class list together. */
+                  const skin = cn(
+                    NAV_ROW,
+                    blocked ? NAV_ROW_BLOCKED : active ? NAV_ROW_ACTIVE : NAV_ROW_IDLE,
+                  );
+
+                  const body = (
+                    <>
+                      {/* THE GLYPH NAMES NOTHING THE LABEL DOES NOT ALREADY
+                          SAY — `aria-hidden`, exactly as the rail's is. The
+                          slot is only drawn when the entry has one; there is
+                          no column of empty boxes to keep open here, because
+                          a submenu of one section is short enough that a
+                          ragged leading edge is not a comb. */}
+                      {item.icon !== undefined ? (
+                        <span
+                          aria-hidden="true"
+                          className="flex size-[var(--icon-button)] shrink-0 items-center justify-center"
+                        >
+                          {item.icon}
+                        </span>
+                      ) : null}
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.count !== undefined ? (
+                        <span
+                          className={cn(
+                            "shrink-0 text-caption tabular-nums",
+                            active ? "text-inherit" : "text-ink-tertiary",
+                          )}
+                        >
+                          {item.count}
+                        </span>
+                      ) : null}
+                    </>
+                  );
+
+                  const shared = {
+                    "data-slot": "screen-shell-nav-item",
+                    "data-active": active ? "" : undefined,
+                    "aria-current": active ? ("page" as const) : undefined,
+                    className: skin,
+                  };
+
+                  /* A REAL `<a>` WHEN THERE IS AN `href`, so the browser's own
+                     affordances — open in a new tab, copy the address, the
+                     status bar — keep working on a phone exactly as they do
+                     in the rail. A BLOCKED entry is a `<button disabled>`
+                     whatever it points at: a disabled link is not a thing
+                     HTML has, and a link the reader may not follow that is
+                     still followable is a permission bug. */
+                  return item.href !== undefined && !blocked ? (
+                    <a
+                      key={item.id}
+                      {...shared}
+                      href={item.href}
+                      onClick={() => {
+                        activate(item);
+                      }}
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <button
+                      key={item.id}
+                      {...shared}
+                      type="button"
+                      disabled={blocked}
+                      onClick={
+                        blocked
+                          ? undefined
+                          : () => {
+                              activate(item);
+                            }
+                      }
+                    >
+                      {body}
+                    </button>
+                  );
+                })}
+              </nav>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 /**
  * The ground, the two flat columns, and the one card that floats.
  *
@@ -1749,15 +2392,26 @@ function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandle
  *                      "THE EDGE HANDLES" for the full six), which is what
  *                      the shadow exists for.
  *
- * THREE BREAKPOINTS
- *  mobile  — no rail, no aside, no handles; no title-row controls and no
- *            mango; no footer. The breadcrumb and the card stack on the
- *            ground, and the card keeps the gutter on all four sides. Every
- *            figure, every count and every identity chip stays: "drops
- *            controls, never counts".
- *  tablet  — both columns arrive at `md` and the shell is in its wide form;
- *            the band's controls and the footer come back at `sm`.
- *  desktop — the same form; only the body's inset steps up at `lg`.
+ * THREE BREAKPOINTS — REWRITTEN 2026-09-04. Two of the three were wrong on a
+ * real device and the numbers are in the file header's NARROW section.
+ *  mobile  — NO RAIL COLUMN, but navigation is REACHABLE: a glyph-only menu
+ *            control stands on the ground above the breadcrumb (`md:hidden`)
+ *            and opens the sections-then-pages drawer. The assistant is
+ *            reachable too — its column OVERLAYS the card rather than
+ *            docking beside it, so the card keeps the full width between the
+ *            gutters and the round handle is the way in. No title-row
+ *            controls and no mango; no footer. Every figure, every count and
+ *            every identity chip stays: "drops controls, never counts".
+ *  tablet   — the RAIL docks at `md` and the menu control disappears with
+ *            it, because a width that can seat a rail must not fold one into
+ *            a button. The ASIDE still overlays here: at 834 a docked
+ *            assistant beside a docked rail left the card 249px wide, which
+ *            is not a narrow card, it is a broken one. Both columns are only
+ *            ever side by side from `lg`. The band's controls and the footer
+ *            come back at `sm`.
+ *  desktop  — the two-column form, unchanged in every measured particular:
+ *            the aside returns to the flow at `lg`, the body's inset steps
+ *            up at `lg`, and nothing else in this file moved.
  */
 const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
   (
@@ -1776,6 +2430,11 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       onAsideOpenChange,
       asideOpenLabel = "Open the assistant",
       asideCloseLabel = "Close the assistant",
+      navGroups,
+      navCurrent,
+      onNavSelect,
+      navMenuLabel = "Open the menu",
+      navBackLabel = "All sections",
       spine = "mango",
       ambient,
       breadcrumb,
@@ -1847,6 +2506,33 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
        `railCollapsed`. */
     const railNode =
       rail === undefined ? <Rail spine={spine} collapsed={isRailCollapsed} /> : rail;
+
+    /* THE NARROW MENU'S REGISTER, RESOLVED THE SAME WAY AND FOR THE SAME
+       REASON THE RAIL NODE ABOVE IS. Three cases, all three spelled out at
+       `navGroups`; the only thing decided here is the ORDER they are tried
+       in, and it is: what the call site said, then what the shell itself
+       drew, then nothing.
+
+       `rail === undefined` IS THE TEST, NOT `railNode`. The question this
+       line asks is "did the SHELL build the rail?", because only then does
+       the shell know what is in it — `RAIL_PLACEHOLDER_GROUPS` is literally
+       the register the `<Rail />` two lines up is drawing, so the menu and
+       the rail show the same thing on the ~44 screens that pass nothing. A
+       call site's own node could be anything, and `railNode` cannot tell the
+       two apart once the default has been substituted in. */
+    const menuGroups =
+      navGroups ?? (rail === undefined ? RAIL_PLACEHOLDER_GROUPS : undefined);
+
+    /* NO RAIL AT ALL MEANS NO MENU AT ALL. `rail={null}` is the documented
+       opt-out for a screen outside the navbar; growing it a phone menu would
+       put navigation on the one screen that asked for none.
+
+       TRUTHINESS, NOT `!== null`, SO THIS AND THE RAIL DOCK CAN NEVER
+       DISAGREE. The dock below is written `{railNode ? … : null}`; a call
+       site passing `false` (or any other falsy node) would otherwise get no
+       rail on desktop and a menu on a phone, which is one screen with two
+       different answers to "is there navigation here?". */
+    const hasNarrowNav = Boolean(railNode);
 
     /* An omitted `aside` is the two-column shell, unchanged. `null` says the
        same thing, so both are read the same way and no call site has to
@@ -2133,9 +2819,76 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col py-[var(--shell-gutter)]",
             railNode ? "ps-[var(--shell-gutter)] md:ps-0" : "ps-[var(--shell-gutter)]",
-            hasAside ? "pe-[var(--shell-gutter)] md:pe-0" : "pe-[var(--shell-gutter)]",
+            /* `lg:` AND NOT `md:` ON THE TRAILING SIDE SINCE 2026-09-04, AND
+               THE TWO SIDES ARE ASYMMETRIC ON PURPOSE. The rule has not
+               changed — "the inline gutters are paid by whoever is there to
+               pay them" — only who is there: the rail dock is in the flow
+               from `md`, so it still pays that side from `md`; the aside
+               dock is OUT of the flow until `lg` (it overlays, see the dock
+               itself), so between `md` and `lg` there is nobody on this side
+               and this column pays it, exactly as it does on a phone. Get
+               this wrong and the card runs to the window's edge on an iPad
+               with the assistant shut. */
+            hasAside ? "pe-[var(--shell-gutter)] lg:pe-0" : "pe-[var(--shell-gutter)]",
           )}
         >
+          {/* THE MENU — THE PHONE'S WHOLE NAVIGATION, AND THE ONLY THING IN
+              THIS FILE THAT LOOKS LIKE A HAMBURGER. Client-ordered
+              2026-09-04; the law it narrows, and why "narrows" rather than
+              "deletes", is argued in full at `NavSheet` above, along with the
+              trigger's own variant, size and label rules.
+
+              WHY IT STANDS HERE, ON THE GROUND, ABOVE THE BREADCRUMB. It is
+              CHROME — it is the rail, at a width the rail cannot stand at —
+              and every other piece of chrome in this shell (the rail, the
+              trail, both handles) lies on the spine rather than inside the
+              card. Putting it in the header band instead was tried and
+              rejected twice over: the band is INSIDE the card and scrolls out
+              of reach on a long screen at exactly the width where reaching
+              matters, and the band's trailing cluster is already the one
+              place ruling 26 lets a mango stand, so a second control there
+              would sit beside the screen's one mango and read as a peer of it.
+
+              IT IS A SEPARATE SIBLING AND NOT A WRAPPER AROUND THE TRAIL. The
+              breadcrumb's own block below states, at length, that its wrapper
+              may take no block-end padding and open no stacking context,
+              because the folder tabs' overlap and their z-order both depend
+              on it. So this row pays its own `--space-3` beneath itself and
+              touches nothing of the trail's.
+
+              `md:hidden` IS THE WHOLE GATE, AND IT IS ON THE WRAPPER SO IT
+              CATCHES THE DRAWER'S TRIGGER TOO. Above `md` the rail is docked,
+              this row is `display: none`, and a `display: none` button is not
+              merely invisible — it is out of the tab order and out of the
+              accessibility tree, which is what "genuinely unreachable" means.
+              Measured: at 1440 and at 834 the trigger takes no focus.
+
+              THE DRAWER ITSELF PORTALS OUT OF THIS TREE, so `md:hidden` does
+              not reach it — and it does not need to. Radix mounts no overlay
+              and no content until the trigger is pressed, and the trigger
+              cannot be pressed above `md`, so above `md` there is nothing in
+              the document to hide. A reader who opens the menu on a phone and
+              then rotates to a tablet keeps a working drawer rather than
+              having it vanish mid-gesture, which is what a second `md:hidden`
+              around the content would have caused. */}
+          {hasNarrowNav ? (
+            <div
+              data-slot="screen-shell-nav-bar"
+              data-level="ground"
+              className="flex min-w-0 shrink-0 items-center pb-[var(--space-3)] md:hidden"
+            >
+              <NavSheet
+                groups={menuGroups}
+                fallback={railNode}
+                current={navCurrent}
+                onSelect={onNavSelect}
+                title={railLabel}
+                backLabel={navBackLabel}
+                triggerLabel={navMenuLabel}
+              />
+            </div>
+          ) : null}
+
           {/* THE BREADCRUMB — on the ground, aligned to the card's leading
               edge because it is the card's own sibling in this column and
               takes no inset of its own. NAVIGATION TEXT AND NOTHING ELSE:
@@ -2321,7 +3074,81 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                  the body's top level with the card's (47.33). A top padding
                  here double-counts that. Measured both ways before settling
                  on `pb-`. */
-              "relative hidden flex-none pb-[var(--shell-gutter)] ps-[var(--shell-gutter)] md:flex",
+              "relative flex flex-none pb-[var(--shell-gutter)] ps-[var(--shell-gutter)]",
+
+              /* ── IT OVERLAYS BELOW `lg`, AND IT IS DRAWN AT EVERY WIDTH.
+                 TWO CHANGES, 2026-09-04, AND BOTH ARE MEASUREMENTS RATHER
+                 THAN OPINIONS.
+
+                 WHAT THIS BLOCK USED TO SAY: `hidden … md:flex`. Two things
+                 followed from it and both were wrong on a real device.
+
+                 1 · AT 380 THE ASSISTANT WAS UNREACHABLE. The paragraph the
+                     file header used to carry — "ch19 gives it a floating,
+                     non-modal form that needs no column at all, and that
+                     form is what a phone gets" — described a launcher that
+                     lives in the APPLICATION (`agent-host.tsx`), not in this
+                     kit. Every screen this shell draws therefore shipped a
+                     phone with no assistant and no way to ask for one, which
+                     is the same class of bug as the missing rail beside it.
+                 2 · AT 834 IT DOCKED, AND THE CARD DIED. Measured on an iPad
+                     viewport with both columns in the flow: rail 195 + aside
+                     371 + gutters left the content card 249px wide. That is
+                     not a narrow card, it is a broken one, and it happens at
+                     the single most common tablet width there is.
+
+                 THE MECHANISM, AND WHY THIS ONE AND NOT THE OTHER TWO.
+
+                 · DEFAULT-CLOSED WAS REJECTED because it is not a guarantee.
+                   `defaultAsideOpen` already defaults false; the 249px card
+                   above was produced by a call site passing `asideOpen`, and
+                   a rule an application can opt out of by accident is not a
+                   rule. The card's width must not depend on anyone's props.
+                 · A `Sheet` FOR THE ASSISTANT WAS REJECTED because the
+                   conversation is a `React.ReactNode` this file was handed
+                   ONCE. Rendering it in a drawer below `lg` and in a column
+                   above it means either two mounts of a live conversation —
+                   two scroll positions, two drafts, two streams — or a JS
+                   media query deciding which tree exists, which is a
+                   hydration mismatch waiting on the first server render.
+                   The narrow NAV can be a sheet precisely because it is
+                   built from DATA and holds nothing; the assistant cannot.
+                 · SO: ONE MOUNT, ONE TREE, AND THE DOCK STEPS OUT OF THE
+                   FLOW. `max-lg:absolute` is the whole mechanism. The column
+                   is the same element with the same children at every width;
+                   all that changes is whether it takes layout space from the
+                   card or paints over it. No JS, no media query in
+                   TypeScript, nothing to hydrate, and — because the classes
+                   are `max-lg:`-prefixed rather than a `lg:` reset of an
+                   overlay default — the cascade at `lg` and above resolves
+                   to the identical `position: relative` in-flow flex item
+                   this dock has always been. That last point is the reason
+                   for the `max-` direction: desktop is not restored, it is
+                   never left.
+
+                 `inset-y-0` IS BLOCK-AXIS AND CARRIES NO SIDE. The file's
+                 "no physical side is named anywhere" rule is about the INLINE
+                 axis, which is what mirrors; `end-0` keeps this dock on the
+                 reading-end edge in both directions, exactly as the in-flow
+                 order does above `lg`.
+
+                 `z-[3]` PUTS IT OVER THE CARD AND NOWHERE NEAR THE GLOW. The
+                 card is `relative z-[2]` (see `CARD`), the breadcrumb's tabs
+                 sit at 1 and 3 around it, and `CursorGlow` is negative. 3 is
+                 one step over the card, inside the SCREEN's own `isolate`,
+                 so nothing outside this shell is reordered.
+
+                 `pointer-events-none` ON THE DOCK, `auto` ON WHAT IS PAINTED.
+                 Shut, this box is still an `--shell-gutter`-wide strip lying
+                 over the card's trailing edge; without this it would swallow
+                 taps on whatever is under it — a table's last column, a row's
+                 overflow control — for no visible reason, which is the worst
+                 kind of bug to be handed. The column and the handle take the
+                 events back. Above `lg` the dock is in the flow and overlaps
+                 nothing, so it keeps events, and this whole line is absent
+                 from the cascade there. */
+              "max-lg:pointer-events-none max-lg:absolute max-lg:inset-y-0 max-lg:end-0 max-lg:z-[3]",
+
               isAsideOpen && "pe-[var(--shell-gutter)]",
             )}
           >
@@ -2370,26 +3197,48 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                  wrapper a flex container hands the stretch back down, and
                  `min-h-0` is what lets the column's own `overflow-y-auto`
                  scroll instead of pushing the box taller. */
-              className="motion-column-collapse flex min-h-0 flex-none"
+              className={cn(
+                "motion-column-collapse pointer-events-auto flex min-h-0 flex-none",
+                /* THE OPEN WIDTH IS DECLARED HERE, ONCE, and read by the
+                   motion layer through `--motion-column-size` — see that rule
+                   for why it cannot derive the width itself inside a flex
+                   row. It is the same expression the column below spells as
+                   `w-`/`max-w-`, which is the one duplication this approach
+                   costs: Tailwind's arbitrary values cannot be read back out
+                   as a custom property. Kept adjacent and measured together
+                   in a harness so the two cannot drift silently.
+                   IT MOVED OUT OF A `style={{}}` ATTRIBUTE ON 2026-09-04 for
+                   one reason: it now has to differ by breakpoint, and an
+                   inline style cannot carry a media query. The `lg:` line is
+                   `min(23.75rem, 40vw)` unchanged — the same 356.25px the
+                   inline value resolved to — so nothing above `lg` moved.
+                   BELOW `lg` THE CAP IS THE VIEWPORT, NOT 40% OF IT, and that
+                   is the whole difference. 40vw of a 380px phone is 152px: a
+                   conversation in a 152px column is not a narrow assistant,
+                   it is an unusable one, and the 40% cap only ever existed to
+                   stop a docked column eating a WIDE card, which is a problem
+                   that does not exist once the column stopped docking. So the
+                   overlay takes the width it can have — the viewport less the
+                   ground's own gutter on each side — and stops at 23.75rem,
+                   which is still ch19's one stated assistant measure. */
+                "[--motion-column-size:min(23.75rem,calc(100vw-var(--shell-gutter)*2))]",
+                "lg:[--motion-column-size:min(23.75rem,40vw)]",
+              )}
               data-state={isAsideOpen ? "open" : "closed"}
               inert={!isAsideOpen}
-              /* THE OPEN WIDTH IS DECLARED HERE, ONCE, and read by the motion
-                 layer through `--motion-column-size` — see that rule for why
-                 it cannot derive the width itself inside a flex row. It is
-                 the same `min(23.75rem, 40vw)` the column below spells as
-                 `w-[23.75rem] max-w-[40vw]`, which is the one duplication
-                 this approach costs: Tailwind's arbitrary values cannot be
-                 read back out as a custom property. Kept adjacent and
-                 measured together in verify/shell-chat so the two cannot
-                 drift silently. */
-              style={{ "--motion-column-size": "min(23.75rem, 40vw)" } as React.CSSProperties}
             >
               <div
                 data-slot="screen-shell-aside"
                 data-level="aside"
                 role="complementary"
                 aria-label={asideLabel}
-                className="flex w-[23.75rem] min-h-0 max-w-[40vw] flex-none flex-col overflow-y-auto"
+                className={cn(
+                  "flex w-[23.75rem] min-h-0 flex-none flex-col overflow-y-auto",
+                  /* THE TWIN OF THE CUSTOM PROPERTY ABOVE. Same two values,
+                     same two breakpoints; they are written next to each other
+                     so a change to one is an obvious omission in the other. */
+                  "max-w-[calc(100vw-var(--shell-gutter)*2)] lg:max-w-[40vw]",
+                )}
               >
                 {/* `role="complementary"` IS THE FIX, NOT DECORATION. A `<div>`
                     computes to the `generic` role no matter what `aria-label`
@@ -2502,11 +3351,18 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                  end, the same inset the content column pays, which is what
                  makes it read as sitting in the page's corner rather than
                  stuck to its side. */
-              placement={
+              /* `pointer-events-auto` TAKES THE EVENTS BACK from the dock's
+                 own `max-lg:pointer-events-none` (argued there). It is
+                 unconditional rather than `max-lg:`-scoped because it is a
+                 no-op above `lg` — the dock keeps events there and this
+                 element already inherits them — and one class that is always
+                 true beats two that have to agree. */
+              placement={cn(
+                "pointer-events-auto",
                 isAsideOpen
                   ? "top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
-                  : "top-[var(--shell-gutter)] end-[var(--shell-gutter)]"
-              }
+                  : "top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+              )}
             />
           </div>
         ) : null}

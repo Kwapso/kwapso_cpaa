@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.45",
-  "sha": "f8bf5ca40c5b2f1fac764a7fca5bafa5794b94dd",
+  "tag": "v1.2.46",
+  "sha": "ea8b8ec9aac05607328bbea81e5e37d293f40134",
   "syncedAt": "2026-09-04"
  },
- "generatedAt": "2026-09-04T12:21:24.841Z",
+ "generatedAt": "2026-09-04T12:58:20.722Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -14,7 +14,7 @@
   "cvaSites": 49,
   "variantGroups": 75,
   "variantOptions": 244,
-  "typedEnumProps": 40,
+  "typedEnumProps": 41,
   "typedBooleanProps": 305,
   "compositions": 47,
   "icons": 1512,
@@ -3842,6 +3842,16 @@
        "optional": true,
        "kind": "boolean",
        "note": "ANNOUNCE-ONLY. Wires `aria-expanded` on the \"+ filter\" trigger; it does NOT open or close anything and this file renders no panel of its own. THE CONSUMING APP OWNS THE OPEN/CLOSED STATE, ON PURPOSE, NOT BY OVERSIGHT. `showAdd`'s picker used to be this component's to draw, and the app pulled that state out so the pill and its panel could merge into one container — a client ruling — leaving `onAddFilter` as a bare \"something happened\" callback with nowhere for the state to come back in. Without this prop the trigger had a state (open or closed, held by the app) with no way to say so, which is a closed-loop toggle that never announces its own loop closing: `aria-expanded` MUST reflect the true state of the thing it controls, and there was no true state on this side of the boundary to read. OPTIONAL, AND IT DOES NOT TOUCH RENDERING. Omitted, `aria-expanded` is not written at all — not `\"false\"`, absent — so a call site that has not wired this yet gets a button byte-identical to today's. This is the same shape `onAddFilter` itself already uses: a prop that only changes what is announced, layered onto a slot an app may or may not have adopted yet."
+      },
+      {
+       "name": "chips",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "wrap",
+        "line"
+       ],
+       "note": "THE SHAPE OF THE CHIP ROW. Added 2026-09-04 for the one-row toolbar. `\"wrap\"` (the default, and byte-identical to every call site that does not pass this) is the bar's own long-standing behaviour: a one-line horizontal scroller below `sm`, a wrapping row from `sm` up. That is right for a bar standing on its own above a list, where the row may take as many lines as it needs and the page simply gets taller. `\"line\"` keeps the one-line scroller at EVERY width. It exists because a bar dropped into `CollectionFrame`'s toolbar is not standing on its own: it is one slot in a row the client has ruled must stay a single row (\"i want that toolbar is a single row\"), and a wrapping chip block is the single largest reason that row grew to four and five lines — measured at 472px of intrinsic width for three chips plus the add slot and clear, on a 699px toolbar at 834. A slot that can wrap inside a row that cannot is a contradiction, and this is the side of it the bar can settle. WHY A PROP AND NOT A CHANGE OF DEFAULT. `FilterBar` is also drawn by `filter-builder`, `archive`, `search-results` and `no-results`, none of which sit inside a one-row toolbar and all of which want the wrapping row they have today. Flipping the default would have narrowed four screens to fix one, so the toolbar asks for what the toolbar needs and nothing else moves. `collection-screen.tsx` is the only caller that passes `\"line\"`. WHAT IS NOT LOST. A scrolled row hides nothing from the keyboard: every chip and its remove control stay in the tab order, and the browser scrolls a focused chip into view on its own. Nothing here sets `overflow` on the vertical axis by hand — see the row's own note."
       },
       {
        "name": "loading",

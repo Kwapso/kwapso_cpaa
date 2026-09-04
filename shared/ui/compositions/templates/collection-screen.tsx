@@ -649,6 +649,26 @@ function CollectionScreen<TRow>({
         onClear={onFiltersClear}
         clearLabel={filtersClearLabel}
         label={filtersLabel}
+        /* ONE LINE, AT EVERY WIDTH — 2026-09-04, and the only place in the
+           system that asks for it. The client's ruling is that the collection
+           toolbar is a single row; `FilterBar`'s own default lets its chip row
+           WRAP from `sm` up, and a slot that grows downwards inside a row
+           makes the row grow downwards. Measured before the change, on
+           `CollectionFrame`'s own specimens: three chips plus the add slot and
+           clear came to 472px of intrinsic width against a 699px toolbar at
+           834, which is what turned the typical toolbar into two rows on an
+           iPad and four on a phone.
+
+           `"line"` is `FilterBar`'s existing mobile shape — the one-line
+           horizontal scroller its header reasons out at length — simply held
+           at every width instead of released at `sm`. Nothing is hidden and
+           nothing is renamed: every chip and every remove control stays
+           visible by a swipe and in the tab order.
+
+           The default is untouched, so `filter-builder`, `archive`,
+           `search-results` and `no-results` — none of which sits in a one-row
+           toolbar — keep the wrapping row they have today. */
+        chips="line"
       >
         {filterControls}
       </FilterBar>
@@ -672,9 +692,16 @@ function CollectionScreen<TRow>({
       <ViewSwitch views={views} value={view} onValueChange={onViewChange} label={viewLabel} />
     );
 
+  /* `flex-nowrap`, 2026-09-04. The sort chip and the view pill are two
+     controls that read as one group, and this span is `shrink-0` inside the
+     toolbar's lane, so it has its intrinsic width and nothing here would wrap
+     in practice. It says so explicitly anyway: a wrap here is the toolbar
+     growing a second row from the inside, which is the one thing the client's
+     ruling of 2026-09-04 forbids, and a class that could allow it is a class
+     the next reader has to prove harmless. */
   const switcher =
     sortOptions === undefined && viewNode === null && viewSwitch === undefined ? undefined : (
-      <span className="flex flex-wrap items-center gap-3">
+      <span className="flex flex-nowrap items-center gap-3">
         {sortOptions === undefined ? null : (
           <SortControl
             options={sortOptions}

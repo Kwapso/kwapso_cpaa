@@ -528,6 +528,38 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
   /** The bar's accessible name. Translatable. */
   label?: string;
   /**
+   * THE SHAPE OF THE CHIP ROW. Added 2026-09-04 for the one-row toolbar.
+   *
+   * `"wrap"` (the default, and byte-identical to every call site that does
+   * not pass this) is the bar's own long-standing behaviour: a one-line
+   * horizontal scroller below `sm`, a wrapping row from `sm` up. That is
+   * right for a bar standing on its own above a list, where the row may take
+   * as many lines as it needs and the page simply gets taller.
+   *
+   * `"line"` keeps the one-line scroller at EVERY width. It exists because a
+   * bar dropped into `CollectionFrame`'s toolbar is not standing on its own:
+   * it is one slot in a row the client has ruled must stay a single row
+   * ("i want that toolbar is a single row"), and a wrapping chip block is the
+   * single largest reason that row grew to four and five lines — measured at
+   * 472px of intrinsic width for three chips plus the add slot and clear, on
+   * a 699px toolbar at 834. A slot that can wrap inside a row that cannot is
+   * a contradiction, and this is the side of it the bar can settle.
+   *
+   * WHY A PROP AND NOT A CHANGE OF DEFAULT. `FilterBar` is also drawn by
+   * `filter-builder`, `archive`, `search-results` and `no-results`, none of
+   * which sit inside a one-row toolbar and all of which want the wrapping
+   * row they have today. Flipping the default would have narrowed four
+   * screens to fix one, so the toolbar asks for what the toolbar needs and
+   * nothing else moves. `collection-screen.tsx` is the only caller that
+   * passes `"line"`.
+   *
+   * WHAT IS NOT LOST. A scrolled row hides nothing from the keyboard: every
+   * chip and its remove control stay in the tab order, and the browser
+   * scrolls a focused chip into view on its own. Nothing here sets
+   * `overflow` on the vertical axis by hand — see the row's own note.
+   */
+  chips?: "wrap" | "line";
+  /**
    * Busy. The chips are not drawn: a set of active facets that has not
    * arrived is not an empty set, and drawing "no filters" while they load
    * would tell the reader something false about the list below.
@@ -577,6 +609,10 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
  *            composition that wants a facet rail builds one and puts these
  *            facets in it.
  *
+ *  `chips="line"` holds the mobile shape at all three, and is what a bar
+ *  standing inside `CollectionFrame`'s single-row toolbar is passed. It is
+ *  the only thing in this file that any breakpoint answer depends on.
+ *
  * RTL — safe. Chips run in DOM order in a flex row, the remove control sits at
  * the INLINE end via `pe-*` and DOM order, and the scroller scrolls the
  * inline axis, which the browser already mirrors.
@@ -597,6 +633,7 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
       formatRemoveLabel,
       label = "Filters",
       loading = false,
+      chips: chipShape = "wrap",
       children,
       ...props
     },
@@ -639,11 +676,18 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
         {hasRow ? (
           <div
             data-slot="filter-bar-chips"
+            data-chips={chipShape}
             className={cn(
               "flex items-center gap-2",
               // MOBILE: one line, scrolled. From `sm` up: wrapped. See header.
               "flex-nowrap overflow-x-auto",
-              "sm:flex-wrap sm:overflow-x-visible",
+              /* `chips="line"` is the same one-line scroller, held at every
+                 width instead of released at `sm`. It is expressed by simply
+                 NOT writing the `sm:` release, rather than by a second pair of
+                 utilities fighting the first at the same specificity — see
+                 PATTERN §4 on exclusive states resolved before the class list,
+                 never stacked inside it. */
+              chipShape === "wrap" && "sm:flex-wrap sm:overflow-x-visible",
             )}
           >
             {chips.map((chip) => {
