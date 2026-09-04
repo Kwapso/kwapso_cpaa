@@ -53,3 +53,44 @@ the page prints the kit tag, sha and generation time it was built from.
 - `styles.css` — the kit's own stylesheet lines, as the front doors import
   them, minus the app's overrides.
 - `catalogue.json` — the derived catalogue (committed).
+
+## What the chrome needed, and what the kit could supply
+
+The builder's own chrome (not the canvas — the palette, the panel, the
+toolbar, the frame) is drawn from kit parts, on the owner's remark of
+4 September 2026 that the first cut "does not look like the screen builder
+was designed by the Kwapso UI/UX". It was wearing the kit's tokens and none
+of its parts. It now is the kit's parts, and the exercise was the most honest
+test of the kit there is: can 116 components furnish a three-pane tool? The
+answer is "almost", and the almost is this list — worth more to Aurora than
+the reskin.
+
+**Supplied by the kit, and used as delivered**
+
+| The tool needed | The kit part |
+|---|---|
+| a three-region frame: a parts column, a body, an options column | `compositions/templates/screen-shell` — its rail, body card and assistant column, relabelled "Parts" and "Options"; density, widths, handles and the ground are the shell's |
+| the header line naming the kit tag, sync date and catalogue date | the shell's `eyebrow`, with `title` and `meta` for the name and the GitHub note |
+| a search box | `search-input` |
+| the list of parts | `list` (`variant="rows"`), the option count on each row's second line |
+| a toolbar: name field, width switch, theme switch, load/save | `field` + `input`, `toggle-group`, `mode-toggle`, `button` with Phosphor icons |
+| an empty canvas | `collection-frame`'s `CollectionRegister` |
+| a part's options | `field` + `select`, `choice` + `checkbox`, `separator variant="section"` per export, `badge` for "not wired" |
+| long kit notes without a wall of text | `clamp` |
+| "no options" and the sandbox warning | `alert` (default and `warning`) |
+| the placed part's handle strip | `badge` for the name, three icon `button`s |
+| a part that throws | `alert variant="destructive"` |
+| the load notice | `alert variant="info"` |
+
+**Not in the kit — recorded, not faked**
+
+| The tool needed | What the kit lacks | Used instead |
+|---|---|---|
+| a workbench composition (palette / canvas / inspector) | every composition is a product screen; none is a tool. `screen-shell` fits because its assistant column is generic, but its rail is named and sized for a navbar (13rem), so long part names truncate and the search box is what compensates | the shell, relabelled |
+| a rail that holds something other than navigation when collapsed | the icon register belongs to `rail`; a palette has none | the palette publishes `data-rail-collapsed` (the shell reads that to narrow the column) and draws nothing until the handle reopens it |
+| a draggable list row | `list` rows are the kit's own buttons and take no per-row DOM props | a kit `button` in the row's `action` slot is the drag handle; the row's click still adds |
+| a colour picker for the sandbox background | no colour input in the kit, by design — the palette is closed | the browser's `<input type="color">`, inside the warning `alert` |
+| a floating strip over a selected element, and a selection outline | no "selected region" chrome; the kit selects records, not regions | one positioned wrapper `<div>` per placed part, with the kit's own `outline` colour tokens |
+| a monospace register for a class string or a file path | no code component; `article-body` styles `<code>` only inside prose | a bare `<code>` inside `hint` / `text` |
+| a file-open button | `button` has no `asChild` and cannot wrap a file input | a kit `button` whose click forwards to a hidden `<input type="file">` |
+| a viewport for the preview | not a kit concern | an `<iframe>` (see `builder/frame.tsx`: the kit's breakpoints answer to a viewport, so a phone frame has to BE one). Radix overlays portal to the outer document, so overlay samples render closed with a note |

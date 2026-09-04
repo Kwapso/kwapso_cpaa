@@ -1,12 +1,18 @@
 import { Component, type ErrorInfo, type ReactNode, useEffect, useRef } from "react"
 
+import { Alert, AlertDescription, AlertTitle } from "../../../shared/ui/components/alert/alert"
+import { Badge } from "../../../shared/ui/components/badge/badge"
+import { Button } from "../../../shared/ui/components/button/button"
+import { Text } from "../../../shared/ui/components/typography/typography"
+import { ArrowDown, ArrowUp, X } from "../../../shared/ui/foundations/icons"
 import type { PartProps, Sample } from "../samples/index"
 import type { PlacedPart } from "./types"
 
 /* ONE PLACED PART ON THE CANVAS: the sample rendered with the chosen values,
- * inside a wrapper the builder owns (select, move, remove). The wrapper is the
- * tool's chrome and is deliberately plain — it is not a kit part and does not
- * pretend to be one.
+ * inside a wrapper the builder owns (select, move, remove). The handle strip
+ * is kit parts — a `Badge` for the name and three icon `Button`s — floated
+ * over the part's top-right corner by a wrapper of this file's own, which is
+ * the one thing here the kit does not supply (see the README's gap list).
  *
  * WIRING IS OBSERVED, NOT DECLARED. A sample spreads `p.of("Button")` onto the
  * export the options belong to; if it never asks for an export, the panel's
@@ -43,11 +49,16 @@ export function Slot({
       return placed.values[exportName] ?? {}
     },
   }
-  const body = sample ? sample.render(p) : <p className="text-sm text-ink-tertiary">No dummy data written for this part.</p>
+  const body = sample ? sample.render(p) : <Text tone="tertiary">No dummy data written for this part.</Text>
   const wiredKey = [...asked.current].sort().join(",")
   useEffect(() => {
     onWired(wiredKey ? wiredKey.split(",") : [])
   }, [wiredKey, onWired])
+
+  const stop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    fn()
+  }
 
   return (
     <div
@@ -57,24 +68,23 @@ export function Slot({
         e.dataTransfer.setData("text/kit-move", placed.id)
         e.dataTransfer.effectAllowed = "move"
       }}
-      onClick={(e) => {
-        e.stopPropagation()
-        onSelect()
-      }}
+      onClick={stop(onSelect)}
       style={{ background: placed.sandbox.background }}
-      className={`group relative ${selected ? "outline-2 outline-offset-2 outline-primary" : "hover:outline-1 hover:outline-offset-2 hover:outline-border"}`}
+      className={`group relative rounded-[var(--radius)] ${selected ? "outline-2 outline-offset-4 outline-primary" : "hover:outline-1 hover:outline-offset-4 hover:outline-border"}`}
     >
-      <div className={`absolute -top-3 right-2 z-10 flex items-center gap-1 rounded-pill border border-border bg-card px-2 py-0.5 text-[11px] text-ink-secondary shadow-sm ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}>
-        <span className="font-mono">{placed.part}</span>
-        <button type="button" title="Move up" disabled={index === 0} onClick={(e) => (e.stopPropagation(), onMove(-1))} className="px-1 disabled:opacity-30">
-          ↑
-        </button>
-        <button type="button" title="Move down" disabled={index === count - 1} onClick={(e) => (e.stopPropagation(), onMove(1))} className="px-1 disabled:opacity-30">
-          ↓
-        </button>
-        <button type="button" title="Remove" onClick={(e) => (e.stopPropagation(), onRemove())} className="px-1 text-destructive">
-          ×
-        </button>
+      <div className={`absolute -top-[var(--space-4)] right-[var(--space-3)] z-10 flex items-center gap-[var(--space-1)] ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}>
+        <Badge variant="inverse" size="pill">
+          {placed.part}
+        </Badge>
+        <Button variant="secondary" size="sm" aria-label="Move up" title="Move up" disabled={index === 0} onClick={stop(() => onMove(-1))}>
+          <ArrowUp />
+        </Button>
+        <Button variant="secondary" size="sm" aria-label="Move down" title="Move down" disabled={index === count - 1} onClick={stop(() => onMove(1))}>
+          <ArrowDown />
+        </Button>
+        <Button variant="destructive" size="sm" aria-label="Remove" title="Remove" onClick={stop(onRemove)}>
+          <X />
+        </Button>
       </div>
       <PartBoundary key={JSON.stringify(placed.values)}>{body}</PartBoundary>
     </div>
@@ -90,9 +100,12 @@ class PartBoundary extends Component<{ children: ReactNode }, { error: string | 
   render() {
     if (this.state.error)
       return (
-        <p className="rounded-[var(--radius)] border border-destructive p-3 font-mono text-xs text-destructive">
-          This part threw with these values: {this.state.error}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>This part threw with these values</AlertTitle>
+          <AlertDescription>
+            <code>{this.state.error}</code>
+          </AlertDescription>
+        </Alert>
       )
     return this.props.children
   }
