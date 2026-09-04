@@ -2895,6 +2895,54 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  it("aside-collapse: the assistant minimises rather than vanishing, and is inert when shut (R51)", () => {
+    const shell = stripComments(
+      readFileSync(join(ROOT, "shared/ui/compositions/templates/screen-shell.tsx"), "utf8")
+    )
+    const motion = readFileSync(join(ROOT, "shared/ui/foundations/motion/motion.css"), "utf8")
+
+    // i · THE COLUMN STAYS MOUNTED. An `isAsideOpen ? … : null` around the
+    // aside itself is the shape that leaves an exit transition nothing to play
+    // on — it is what this law's own first implementation had to undo.
+    expect(
+      /isAsideOpen\s*\?\s*[(<]/.test(shell),
+      "R51 — nothing in the aside dock may be JSX-gated on `isAsideOpen` (`isAsideOpen ? (` / `? <`): gating the column OR the wrapper that collapses it unmounts the subtree on the flip and leaves the exit transition nothing to play on. Every legitimate use of `isAsideOpen` here picks a VALUE (`? \"open\" : \"shut\"`, `? asideCloseLabel`), never a subtree"
+    ).toBe(false)
+
+    // ii · THE WRAPPER CARRIES ALL FOUR. Any one missing is a real defect:
+    // no class = no collapse, no data-state = it never flips, no inert = a
+    // keyboard tabs into an invisible panel, no size var = it cannot animate
+    // (see clause iii for why it cannot derive the width itself).
+    const wrapAt = shell.indexOf("motion-column-collapse")
+    expect(wrapAt, "R51 — screen-shell must wrap the aside in `.motion-column-collapse`").toBeGreaterThan(-1)
+    const wrapper = shell.slice(wrapAt, wrapAt + 700)
+    for (const [needle, why] of [
+      ['data-state={isAsideOpen ? "open" : "closed"}', "a `data-state` bound to `isAsideOpen`"],
+      ["inert={!isAsideOpen}", "`inert={!isAsideOpen}` — a collapsed column is still in the tab order and the a11y tree without it"],
+      ["--motion-column-size", "a `--motion-column-size` giving the motion layer the open width"],
+    ] as const) {
+      expect(
+        wrapper.includes(needle),
+        `R51 — the .motion-column-collapse wrapper must carry ${why}`
+      ).toBe(true)
+    }
+
+    // iii · THE SHAPE THAT SILENTLY DOES NOTHING. `0fr` inside a flex item is
+    // floored at the item's own base size, so the column stays full width and
+    // merely turns transparent — it type-checks, lints and reads correctly.
+    const ruleAt = motion.indexOf(".motion-column-collapse {")
+    expect(ruleAt, "R51 — motion.css must define `.motion-column-collapse`").toBeGreaterThan(-1)
+    const rule = motion.slice(ruleAt, motion.indexOf("}", ruleAt))
+    expect(
+      /grid-template-columns|\bfr\b/.test(rule),
+      "R51 — `.motion-column-collapse` must not size itself with grid-template-columns/fr: the wrapper is a flex item, so a `0fr` track is floored at its own base size and the column keeps its full width while only fading"
+    ).toBe(false)
+    expect(
+      rule.includes("inline-size"),
+      "R51 — `.motion-column-collapse` must transition `inline-size` against the caller's `--motion-column-size`"
+    ).toBe(true)
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "declared-readers", // R42: workers/content/test/source-readers.test.ts
@@ -2947,6 +2995,7 @@ describe("RULES — the laws of the base", () => {
       "toolbar-shows-search", // R48: the BASE_RECIPES + <ToolbarRow> censuses below
       "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
+      "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
