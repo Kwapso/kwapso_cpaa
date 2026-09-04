@@ -32,7 +32,7 @@ export function PreviewFrame({
 }: {
   width: number
   scale: number
-  theme: Theme
+  theme: Theme | null
   css: string
   children: ReactNode
   onDrop: (intent: DropIntent) => void
@@ -89,7 +89,11 @@ export function PreviewFrame({
   }, [css])
 
   useEffect(() => {
-    root?.ownerDocument.documentElement.setAttribute("data-theme", theme)
+    const html = root?.ownerDocument.documentElement
+    if (!html) return
+    // null = "system": no attribute, and tokens.css's own media query decides.
+    if (theme) html.setAttribute("data-theme", theme)
+    else html.removeAttribute("data-theme")
   }, [root, theme])
 
   return (
