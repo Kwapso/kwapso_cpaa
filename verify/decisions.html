@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="ascii">
-<title>SHAPE_HEADING_SIZE &mdash; open decision</title>
+<title>SHAPE_HEADING_SIZE &mdash; settled, 3 Sep 2026</title>
 <style>
   :root {
     --background:      #FFFEF9;
@@ -233,6 +233,32 @@
   <div class="top">
     <div>
       <h1 class="page-title">SHAPE_HEADING_SIZE: what should a title's OWN size be?</h1>
+      <div class="flag">
+        <strong>SETTLED &mdash; 3 September 2026. Nothing on this page ships.</strong>
+        The owner declined all three increases: the system app's page title and record
+        heading stay at <code>h2</code> (32px), and the client portal stays at
+        <code>h3</code> (24px). The reason is not a preference about size, it is that
+        <em>this is already somebody's own choice</em> &mdash; the scale setting
+        (compact / comfortable / large, <code>shared/scale.ts</code>) moves the root font
+        size for the whole app, and because every size in the theme is <code>rem</code>, a
+        title grows with it. Picking 44 here would be choosing for a person who can already
+        choose. In the owner's words: &ldquo;there's no need to increase the sizes anyway,
+        because this setting has an option to make it small, comfortable, or large.&rdquo;
+        <br><br>
+        <strong>That reasoning has a precondition, and it can rot.</strong> It holds only
+        while headings are <code>rem</code>. A heading hand-set in <code>px</code> would sit
+        still while every step of the scale control moved around it &mdash; the setting would
+        look broken on exactly the text somebody reached for it to fix. The full argument,
+        including that precondition, is recorded in <code>shared/scale.ts</code>, which is the
+        file a reader will actually open.
+        <br><br>
+        <strong>What this does NOT settle</strong>, so nobody reads more into it than was
+        decided: the kit's <code>Title</code> still stops at 32 with no 44 rung, while
+        <code>Headline</code> draws 44 and 56 and is wired to nothing. That mismatch stays
+        open upstream. The ruling is that we are not spending the app's headings to fix it &mdash;
+        not that it is fixed. The comparison below is kept in full, unedited, because a
+        decision whose options were deleted cannot be re-examined.
+      </div>
       <p class="lede">
         The client's reference PDF names three roles: <code>display-m</code> (56px) =
         &ldquo;Page title&rdquo;, <code>h1</code> (44px) = &ldquo;Record heading&rdquo;,
