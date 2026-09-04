@@ -1555,6 +1555,34 @@ export const INGEST_KINDS: IngestKind[] = [
       return members.map((m) => {
         const full = [m.first_name, m.last_name].filter(Boolean).join(" ").trim()
         const name = full || m.email
+        // A NEGATIVE RESULT, RECORDED SO IT IS NOT RE-TRIED BLIND.
+        //
+        // The owner read one answer's evidence and found "Alaap K", "Alaap
+        // Kanchwala" and "Alaap Kanchwala" cited as three separate sources, and
+        // reasonably read that as one person indexed three times. IT IS NOT:
+        // measured on staging 4 Sep 2026, they are three different logins
+        // (alaap@swiftstruck.com, alaap+client@kwapso.com,
+        // alaap+client2@kwapso.com), and this kind has been keyed on the USER ID
+        // since it shipped — `originRowId: m.id`, below. There is no duplicate
+        // to collapse. What there is is three citations a reader cannot tell
+        // apart, which for a citation is close to having no title at all.
+        //
+        // THE OBVIOUS FIX MAKES THE BASE WORSE, and it was built and backed out
+        // rather than argued about. Titling a person `Full Name (email)` puts
+        // the EMAIL DOMAIN into `indexableText`, which is `title + body` — so
+        // every colleague at a client's domain gains that client's name in their
+        // own searchable text. Measured immediately: "what is currently
+        // happening with the Bergman dispatch rollout?" started answering out of
+        // Luis and Marta, two contacts at bergman.example whose only claim on
+        // the question was the words after their @. That trades a legibility
+        // annoyance for a retrieval fault, which is the wrong direction.
+        //
+        // WHERE IT BELONGS INSTEAD, when somebody picks this up: the CITATION,
+        // not the source. The ambiguity only exists when two cited sources share
+        // a title in one answer, and that is knowable at the moment the evidence
+        // is assembled — R23's `knowledgeAnswer` seam, which already decides
+        // what a citation carries. It needs a field on `KnowledgeCitation`, so
+        // it is a change to the answer contract and not a line in this reader.
         const role = roleName.get(m.role_id) ?? null
         const p = profileOf.get(m.id)
         const certs = certsOf.get(m.id) ?? []

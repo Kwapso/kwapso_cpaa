@@ -73,6 +73,30 @@ import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shap
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { InAppLink } from "@/components/in-app-link"
 
+/** WHAT A CITATION IS CALLED — and never nothing.
+ *
+ * A citation a reader cannot identify is not a citation. The pill has said this
+ * since it was written, because the kit's ruling requires both halves of
+ * `collection - record` and an empty one would render a dangling separator; the
+ * DISCLOSURE below it did not, and rendered `{citation.title}` raw. On an empty
+ * title that is an anchor with no text in it: a link a sighted reader cannot
+ * see, a link a screen reader announces as its URL, and — on the one answer the
+ * owner reported — a source in his evidence list that simply had no name.
+ *
+ * A source always has a KIND, because the sweep wrote it, so the kind is the
+ * fallback. It is a poor name and it is a name; the alternative was a blank.
+ *
+ * ONE FUNCTION, used by both halves, for the reason R23 gives about the answer
+ * itself: two places deciding the same thing is two places to fix it, and the
+ * one that gets missed is the one nobody is looking at.
+ */
+function citationTitle(
+  c: Pick<KnowledgeCitation, "title" | "kind">,
+  t: (english: string) => string
+): string {
+  return c.title?.trim() || t(KNOWLEDGE_KIND[c.kind] ?? c.kind)
+}
+
 /**
  * ONE TURN'S CITATIONS, IN THE KIT'S RULED SHAPE.
  *
@@ -94,7 +118,7 @@ export function citationPills(
   return evidence.citations.map((c) => ({
     id: c.sourceId,
     collection: t(KNOWLEDGE_KIND[c.kind] ?? c.kind),
-    record: c.title || t(KNOWLEDGE_KIND[c.kind] ?? c.kind),
+    record: citationTitle(c, t),
     // External only, and only through the seam: a source URL arrives from Google
     // or from somebody typing. See gap 1 above for why there is no in-app href.
     href: safeHref(c.url) ?? undefined,
@@ -163,7 +187,10 @@ export function TurnSources({ evidence, teamId }: { evidence: TurnEvidence; team
                     href={`/t/${teamId}/knowledge/${citation.sourceId}`}
                     className="hover:text-primary underline underline-offset-2"
                   >
-                    {citation.title}
+                    {/* NEVER EMPTY - see `citationTitle`. This was a bare
+                        `{citation.title}`, and a source with no title rendered
+                        an anchor with nothing inside it. */}
+                    {citationTitle(citation, t)}
                   </InAppLink>
                   <span className="text-muted-foreground text-xs">
                     {" · "}

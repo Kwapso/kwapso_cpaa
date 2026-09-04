@@ -919,7 +919,18 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // v3: the SENTENCE, not the fact — "a client contact for Test client" rather
   // than "a person at a client of ours FOR Test client, client". Only visible on
   // a live row, which is where it was found, minutes after v2 shipped.
-  person: { version: 3, digest: "243b2b0621259f0d" },
+  // RE-PINNED AT 3 on 4 Sep 2026 — the fourth time this has been a false alarm,
+  // and worth saying why precisely. `Full Name (email)` as the title was built,
+  // measured and BACKED OUT: `indexableText` is `title + body`, so an address
+  // puts its DOMAIN into every colleague-at-a-client's searchable text, and
+  // "what is currently happening with the Bergman dispatch rollout?" promptly
+  // answered out of two contacts at bergman.example. The reader's CODE is now
+  // byte-identical to v3 (`git diff` shows no non-comment line); what it gained
+  // is the note recording that negative result. `stripComments` blanks a
+  // comment's text and KEEPS its newline, so a long note still moves the hash —
+  // which is why the version stays at 3, nothing is re-indexed, and only the
+  // digest is re-pinned.
+  person: { version: 3, digest: "011e338664d69945" },
   dropdown: { version: 1, digest: "ce030ed2555c6595" },
   portal_login: { version: 1, digest: "d759a60ff2f459f0" },
 }
