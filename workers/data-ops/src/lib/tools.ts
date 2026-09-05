@@ -27,8 +27,8 @@ import { forwardToDoor } from "@shared/workers/http"
 import { requestId } from "@shared/workers/trace"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
-import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
-import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
+import { B, checkArgTypes, enumOf, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { googleServiceOfPath } from "@shared/knowledge-chips"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { alwaysConfirms, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
@@ -129,7 +129,9 @@ const AGENT_ONLY: AgentTool[] = [
         ? { binding: entry.binding, path: entry.path }
         : { binding: "TENANCY" as const, path: "/api/tenancy/accounts/active" }
     },
-    schema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+    // `record` is an ENUM, not a bare string — see the MCP twin. Both surfaces
+    // or neither (R43): the fall-through was symmetric, so the refusal is too.
+    schema: obj({ record: enumOf(RECORD_TOGGLE_NAMES), id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
     buildBody: (i) => {
       const entry = recordToggle(str(i, "record"))
       // The door reads ONE id field and this sends that one. `roleId` is exposed
@@ -871,6 +873,9 @@ export async function executeTool(
     method: tool.method,
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
+    // THE ASSISTANT IS ACTING, as the person who asked it (origin.ts). Same
+    // person, same door, same rights — and now a distinguishable row.
+    origin: "assistant",
     query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
     body: tool.buildBody ? tool.buildBody(input) : {},
     // The agent's act-as-user hop was the ONE cross-worker call with no

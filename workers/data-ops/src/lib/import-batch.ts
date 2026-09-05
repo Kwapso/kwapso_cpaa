@@ -168,6 +168,7 @@ async function buildResolvedMap(
     method: "GET",
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
+    origin: "import",
     timeoutMs: 30_000,
   })
   if (!res.ok) return map

@@ -316,6 +316,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     method: "GET",
     cookie,
     traceId: requestId(request),
+    origin: "assistant",
     query: `?id=${encodeURIComponent(id)}`,
     timeoutMs: 30_000,
   })
@@ -360,6 +361,9 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
     method: "POST",
     cookie,
     traceId: requestId(request),
+    // The translation is the assistant rewriting a ticket on somebody's behalf,
+    // through the ordinary update door — so the row says `assistant`.
+    origin: "assistant",
     timeoutMs: 30_000,
     body: {
       id,

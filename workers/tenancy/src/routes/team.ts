@@ -1,6 +1,7 @@
 // Team + session routes: onboarding bootstrap, the active context, the team
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
+import { readOrigin } from "@shared/workers/origin"
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
@@ -47,13 +48,13 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
 
   let teams = await listMyTeams(env, user.id)
   if (teams.length === 0) {
-    const accepted = await acceptPendingInvites(env, actor)
+    const accepted = await acceptPendingInvites(env, actor, readOrigin(request))
     // With creation closed, an invitation is the ONLY way in. Someone who signs
     // in without one gets no team rather than a private world of their own —
     // the onboarding screen then tells them to ask for an invite, which is the
     // true answer instead of a team nobody meant them to have.
     if (accepted === 0 && !TEAM_CREATION_CLOSED) {
-      await createTeam(env, actor, `${user.firstName ?? "My"}'s team`, user.imageUrl)
+      await createTeam(env, actor, `${user.firstName ?? "My"}'s team`, user.imageUrl, readOrigin(request))
     }
     teams = await listMyTeams(env, user.id)
   }
@@ -107,7 +108,14 @@ async function refuseClientOnTeams<T extends { id: string }>(
   // theirs to see from this origin), and a caller every team refuses gets the
   // same 403 a pure client always got. Kwapso runs one team, so the common
   // case is exactly one fence read, as before.
-  const cfg = d1Config(env)
+  //
+  // READ-ONLY, so the origin is stated as `unknown` rather than guessed: this
+  // config resolves account fences and writes no activity at all, and the two
+  // callers below hand it a user id rather than a request, so there is no header
+  // here to read one off. If anything on this path ever WRITES history, thread
+  // `readOrigin(request)` in from the handler first — an honest `unknown` is
+  // fine on a config that writes nothing and is a hole on one that does.
+  const cfg = d1Config(env, "unknown")
   const kept: T[] = []
   let refusals = 0
   for (const t of teams) {
@@ -161,7 +169,8 @@ export async function myTeams(request: Request, env: Env): Promise<Response> {
  * private one. The copy is gone; this reads the seam beside the fence. */
 
 async function agencyContext(env: Env, userId: string) {
-  const cfg = d1Config(env)
+  // Read-only, like the fence helper above, and `unknown` for the same reason.
+  const cfg = d1Config(env, "unknown")
   const ctx = await getActiveContext(env, cfg, userId)
   // Resolved from the ANSWER, never from the stored pointer — getActiveContext
   // self-heals a stale current team, and a guard built from the un-healed value
@@ -243,7 +252,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
       `You've created ${cap} teams, which is the limit on this account. Ask an admin if you need more.`
     )
 
-  await createTeam(env, toActor(user), name, null)
+  await createTeam(env, toActor(user), name, null, readOrigin(request))
   return json(await agencyContext(env, user.id))
 }
 

@@ -222,7 +222,7 @@ describe("acceptInvite / listReceivedInvites against a real SQLite database", ()
     const db = setup()
     addInvite(db, { id: "inv1" })
     const env = { DB: makeD1(db), REALTIME: {} } as never
-    expect(await acceptInvite(env, invitee, "inv1")).toBe("T1")
+    expect(await acceptInvite(env, invitee, "inv1", "app")).toBe("T1")
     expect(members(db)).toBe(1)
     expect((db.prepare("SELECT status s FROM invite_index WHERE id='inv1'").get() as { s: string }).s).toBe("accepted")
     expect((db.prepare("SELECT current_team_id c FROM users WHERE id='U'").get() as { c: string }).c).toBe("T1")
@@ -232,7 +232,7 @@ describe("acceptInvite / listReceivedInvites against a real SQLite database", ()
     const db = setup()
     addInvite(db, { id: "inv2", email: "someone-else@x.com" })
     const env = { DB: makeD1(db), REALTIME: {} } as never
-    expect(await acceptInvite(env, invitee, "inv2")).toBeNull()
+    expect(await acceptInvite(env, invitee, "inv2", "app")).toBeNull()
     expect(members(db)).toBe(0)
     expect((db.prepare("SELECT status s FROM invite_index WHERE id='inv2'").get() as { s: string }).s).toBe("pending")
   })
@@ -241,7 +241,7 @@ describe("acceptInvite / listReceivedInvites against a real SQLite database", ()
     const db = setup()
     addInvite(db, { id: "inv3", expires: "2000-01-01" })
     const env = { DB: makeD1(db), REALTIME: {} } as never
-    expect(await acceptInvite(env, invitee, "inv3")).toBeNull()
+    expect(await acceptInvite(env, invitee, "inv3", "app")).toBeNull()
     expect(members(db)).toBe(0)
   })
 
@@ -249,8 +249,8 @@ describe("acceptInvite / listReceivedInvites against a real SQLite database", ()
     const db = setup()
     addInvite(db, { id: "inv4" })
     const env = { DB: makeD1(db), REALTIME: {} } as never
-    expect(await acceptInvite(env, invitee, "inv4")).toBe("T1")
-    expect(await acceptInvite(env, invitee, "inv4")).toBeNull() // already accepted
+    expect(await acceptInvite(env, invitee, "inv4", "app")).toBe("T1")
+    expect(await acceptInvite(env, invitee, "inv4", "app")).toBeNull() // already accepted
     expect(members(db)).toBe(1) // not two
   })
 
@@ -262,7 +262,7 @@ describe("acceptInvite / listReceivedInvites against a real SQLite database", ()
     ).run()
     addInvite(db, { id: "inv5" }) // role 'ROLE'
     const env = { DB: makeD1(db), REALTIME: {} } as never
-    expect(await acceptInvite(env, invitee, "inv5")).toBe("T1")
+    expect(await acceptInvite(env, invitee, "inv5", "app")).toBe("T1")
     const row = db
       .prepare("SELECT role_id r, deactivated_at d FROM team_members WHERE team_id='T1' AND user_id='U'")
       .get() as { r: string; d: string | null }

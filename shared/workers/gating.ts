@@ -10,6 +10,7 @@ import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { LIST_HARD_CAP } from "./limits"
 import { fail } from "./http"
+import { readOrigin, type ActivityOrigin } from "./origin"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
 import { beginD1Timing, noteTeam } from "./timing"
 import { requestId, traceHeaders } from "./trace"
@@ -128,8 +129,16 @@ export function nativeTeamDatabases(env: GatingEnv): Record<string, D1Database> 
  * where this deployment holds a binding for them and over the Cloudflare REST
  * door where it does not (see `natives` in d1-rest.ts). Throws
  * cloud_key_missing if the REST token isn't set yet — still required, because
- * the fall-through path and every database-management call go through it. */
-export function d1ConfigFrom(env: GatingEnv): D1Rest {
+ * the fall-through path and every database-management call go through it.
+ *
+ * `origin` is REQUIRED, and that is the point: every activity row written
+ * through this config carries it, so a config built without deciding which
+ * surface it serves is a config that writes history nobody can attribute. A
+ * caller who may omit it is a caller who will — the same argument `getActivity`
+ * makes for its own fence, held here by the compiler rather than by a comment.
+ * A config assembled OUTSIDE a request — a cron sweep, the morning digest —
+ * says `automation`, which is the truth: nobody clicked. */
+export function d1ConfigFrom(env: GatingEnv, origin: ActivityOrigin): D1Rest {
   if (!env.CF_D1_TOKEN)
     throw new Error(
       "cloud_key_missing: the Cloudflare D1 token isn't set yet, so team databases can't be reached."
@@ -144,6 +153,9 @@ export function d1ConfigFrom(env: GatingEnv): D1Rest {
     // request — so the activity writer gets a durable store for free, at every
     // one of its call sites, without a fifth argument anybody can forget.
     core: env.DB,
+    // WHICH FRONT DOOR THIS IS (origin.ts). Same reasoning as `core` above and
+    // the same seam: the config is already everywhere the activity writer is.
+    origin,
     // Where a NEW team's database is born. See d1CreateDatabase: measured on
     // staging, a database that landed in APAC while its workers sat in WEUR
     // cost about 150ms a trip, which a native binding does not fix — a binding
@@ -266,7 +278,16 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // because this is the one function every team-scoped door passes through
   // exactly once — the same property that makes it the honest place for the
   // per-caller ceiling above makes it the honest place to start the clock.
-  const cfg: D1Rest = { ...d1ConfigFrom(env), stats: beginD1Timing(request) }
+  // …and the SURFACE rides on it from here too (origin.ts). Read off the header
+  // the two gateways stamp and the two act-as-user executors carry, in the one
+  // function every team-scoped door passes through exactly once — the same
+  // property the three paragraphs above already lean on. Nothing gates on it; it
+  // is a label on history, and a header we do not recognise reads as `unknown`
+  // rather than turning a working request into a 400.
+  const cfg: D1Rest = {
+    ...d1ConfigFrom(env, readOrigin(request)),
+    stats: beginD1Timing(request),
+  }
   const guard = await requireMember(env, user.id, user.currentTeamId)
   // WHO WAS ASKING, for the central catch. error_logs has carried team_id and
   // user_id columns since core 0019 and 0 of 200 live rows held either,

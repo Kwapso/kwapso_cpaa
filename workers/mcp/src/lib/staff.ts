@@ -47,6 +47,10 @@ export async function requireStaff(env: Env, cookie: string, traceId: string): P
     method: "GET",
     cookie,
     traceId,
+    // AN OUTSIDE TOOL IS ASKING (origin.ts). This particular call writes
+    // nothing, but the surface is stated at every hop rather than at the ones
+    // that happen to write today — that is what keeps it true tomorrow.
+    origin: "mcp",
     // One identity read; if tenancy cannot answer inside the ordinary door
     // deadline the refusal below fires anyway — better a clean 502 than a hang
     // on the one check every tool call waits behind.

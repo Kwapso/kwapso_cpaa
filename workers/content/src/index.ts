@@ -706,7 +706,9 @@ export default {
           roleId: "system",
           databaseId: team.database_id,
         }
-        const results = await sweepAll(env, d1ConfigFrom(env), guard)
+        // THE APP ON ITS OWN. Nobody clicked this — the sweep runs on a cron
+        // under a system actor, so every activity row it writes says so.
+        const results = await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
         if (indexed > 0) await publishChange(env, team.id, "knowledge")
 
@@ -719,7 +721,7 @@ export default {
         // writes can happen twice.
         const auto = await googleAutopilot(
           env,
-          d1ConfigFrom(env),
+          d1ConfigFrom(env, "automation"),
           { id: team.id, databaseId: team.database_id },
           new Date(controller.scheduledTime)
         )
@@ -800,7 +802,7 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
   // MONDAY decides whether the weekly half rides along. getUTCDay() is 1 on
   // Monday; the digest is a UTC job, like the cron that fires it.
   const isMonday = now.getUTCDay() === 1
-  const cfg = d1ConfigFrom(env)
+  const cfg = d1ConfigFrom(env, "automation")
 
   for (const team of teams) {
     try {

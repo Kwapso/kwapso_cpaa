@@ -41,6 +41,7 @@ import {
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 import { requestId, stampTrace } from "@shared/workers/trace"
+import { stampOrigin } from "@shared/workers/origin"
 
 /** The workers a portal door may be forwarded to. */
 type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"
@@ -245,7 +246,11 @@ export default {
     // same reason as the agency door — a client's failing click crosses just as
     // many workers, and "which hop broke" is the same question. The label on the
     // `error_logs` row differs; the thread joining the rows does not.
-    const traced = stampTrace(request, requestId(request))
+    // The client door names its SURFACE too, from the same seam and for the same
+    // reason — a change a contact makes in the portal and the same change made
+    // by the agency in the app were byte-identical rows until this line. Set,
+    // never merged, so a client's browser cannot claim to be anything else.
+    const traced = stampOrigin(stampTrace(request, requestId(request)), "portal")
     try {
       return await handle(traced, env)
     } catch (e) {

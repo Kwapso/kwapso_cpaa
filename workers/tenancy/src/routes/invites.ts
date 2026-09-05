@@ -1,6 +1,7 @@
 // Invite routes: list the team's invites, invite by email + role, revoke a
 // pending invite. Guards + the branded email live in lib/invites.
 
+import { readOrigin } from "@shared/workers/origin"
 import { fail, json } from "@shared/workers/http"
 import { publishChange } from "@shared/workers/realtime"
 import {
@@ -89,7 +90,7 @@ export async function postAcceptInvitation(request: Request, env: Env): Promise<
     return fail(409, "onboarding_incomplete", "Finish onboarding first.")
   const body = (await request.json().catch(() => ({}))) as { inviteId?: string }
   if (typeof body.inviteId !== "string") return fail(400, "invalid_input", "inviteId is required.")
-  const joinedTeamId = await acceptInvite(env, toActor(user), body.inviteId)
+  const joinedTeamId = await acceptInvite(env, toActor(user), body.inviteId, readOrigin(request))
   if (!joinedTeamId)
     return fail(404, "invite_unavailable", "That invitation is no longer available.")
   return json({

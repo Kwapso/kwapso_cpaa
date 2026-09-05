@@ -134,6 +134,10 @@ export async function writeRow(
     method: "POST",
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
+    // THE IMPORT IS WRITING, through the target's own gated create door — its
+    // own surface, not the assistant's, because "who typed this row" and "which
+    // file did it arrive in" are different questions.
+    origin: "import",
     body,
     timeoutMs: 30_000,
   })

@@ -23,13 +23,18 @@ import {
 } from "@shared/workers/image"
 import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import { d1ConfigFrom } from "@shared/workers/gating"
+import type { ActivityOrigin } from "@shared/workers/origin"
 import type { Env } from "../env"
 import { GuardError } from "./permissions"
 import { buildTeamSeed, TEAM_MIGRATIONS, type Actor } from "../team-schema"
 import { INVITE_SWEEP_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
-export function d1Config(env: Env): D1Rest {
-  return d1ConfigFrom(env)
+/** Tenancy's own habitual wrapper round the shared data-door config. `origin`
+ * is passed straight through and is REQUIRED for the reason `d1ConfigFrom` gives
+ * — every activity row written through the returned config carries it, so the
+ * surface is decided where the config is built and never guessed at the write. */
+export function d1Config(env: Env, origin: ActivityOrigin): D1Rest {
+  return d1ConfigFrom(env, origin)
 }
 
 /** Apply ONE migration to a team database and stamp it in _migrations. */
@@ -64,11 +69,12 @@ async function stampInviteAccepted(
   env: Env,
   teamId: string,
   inviteRowId: string | null,
-  acceptedAt: string
+  acceptedAt: string,
+  origin: ActivityOrigin
 ): Promise<void> {
   if (!inviteRowId) return
   try {
-    const cfg = d1Config(env)
+    const cfg = d1Config(env, origin)
     const row = await env.DB.prepare("SELECT database_id FROM teams WHERE id = ?")
       .bind(teamId)
       .first<{ database_id: string | null }>()
@@ -103,13 +109,18 @@ async function stampInviteAccepted(
  * wrote nothing. Best-effort like the stamp above (joining must never fail on
  * its own history line), and in the ACCEPTER's name, because they are the one
  * who acted. */
-async function logMemberJoined(env: Env, teamId: string, actor: Actor): Promise<void> {
+async function logMemberJoined(
+  env: Env,
+  teamId: string,
+  actor: Actor,
+  origin: ActivityOrigin
+): Promise<void> {
   try {
     const row = await env.DB.prepare("SELECT database_id FROM teams WHERE id = ?")
       .bind(teamId)
       .first<{ database_id: string | null }>()
     if (!row?.database_id) return
-    await logActivity(d1Config(env), row.database_id, actor, {
+    await logActivity(d1Config(env, origin), row.database_id, actor, {
       type: "Member joined",
       description: `${actor.name} accepted their invitation and joined the team`,
       // "users", like every member entry in lib/members.ts — R18 resolves this
@@ -143,9 +154,10 @@ export async function createTeam(
   env: Env,
   actor: Actor,
   name: string,
-  logoUrl: string | null
+  logoUrl: string | null,
+  origin: ActivityOrigin
 ): Promise<{ teamId: string }> {
-  const cfg = d1Config(env)
+  const cfg = d1Config(env, origin)
   const teamId = ulid()
   const now = new Date().toISOString()
 
@@ -312,7 +324,8 @@ export async function updateTeamDetails(
  */
 export async function acceptPendingInvites(
   env: Env,
-  actor: Actor
+  actor: Actor,
+  origin: ActivityOrigin
 ): Promise<number> {
   const now = new Date().toISOString()
   // BOUNDED SWEEP: this list is keyed on an EMAIL ADDRESS, and anyone may invite
@@ -357,11 +370,11 @@ export async function acceptPendingInvites(
     )
       .bind(ulid(), invite.team_id, actor.id, invite.role_id, now, actor.id, actor.email, actor.name)
       .run()
-    await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now)
+    await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now, origin)
     // The history line rides the SWEEP too. This is the COMMON join path —
     // under TEAM_CREATION_CLOSED every new person arrives through here — and
     // the round-two review found only the explicit accept door writing it.
-    await logMemberJoined(env, invite.team_id, actor)
+    await logMemberJoined(env, invite.team_id, actor, origin)
     invites.push(invite)
   }
 
@@ -444,7 +457,8 @@ export async function listReceivedInvites(
 export async function acceptInvite(
   env: Env,
   actor: Actor,
-  inviteId: string
+  inviteId: string,
+  origin: ActivityOrigin
 ): Promise<string | null> {
   const now = new Date().toISOString()
   // Validate the invite is theirs (email), still pending, unexpired, to a live
@@ -487,8 +501,8 @@ export async function acceptInvite(
     .bind(invite.team_id, now, actor.id)
     .run()
 
-  await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now)
-  await logMemberJoined(env, invite.team_id, actor)
+  await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now, origin)
+  await logMemberJoined(env, invite.team_id, actor, origin)
 
   // Row-level: the joiner becomes a member (added) and the invite flips to
   // 'accepted' in place — carry both ids so open lists patch just those rows.

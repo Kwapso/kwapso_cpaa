@@ -16,8 +16,8 @@
 
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
-import { B, checkArgTypes, N, obj, S, str } from "@shared/workers/tool-args"
-import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
+import { B, checkArgTypes, enumOf, N, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
 import type { Env } from "../env"
@@ -381,7 +381,12 @@ const RECORD_ACTIVE_GENERIC: McpTool = {
     "access-widening for SOME record kinds, never for others: confirm with a person before calling " +
     "this unless you already know the kind you are calling it for is one of the ones that runs straight " +
     "through.",
-  inputSchema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+  // `record` is an ENUM, not a bare string: an unrecognised kind used to
+  // type-check fine and fall through to the CANONICAL door below, so a ticket id
+  // sent with record:"ticket" reached the ACCOUNTS archive door. checkArgTypes
+  // refuses it now, before any routing decision, and the model is handed the
+  // list rather than having to read it out of the prose above.
+  inputSchema: obj({ record: enumOf(RECORD_TOGGLE_NAMES), id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
   binding: "TENANCY",
   method: "POST",
   path: "/api/tenancy/accounts/active",
@@ -463,6 +468,10 @@ export async function forwardTool(
       method: tool.method,
       cookie,
       traceId,
+      // THE MACHINE SURFACE SAYS SO (origin.ts). Every write a personal access
+      // token makes lands on the same doors as a click and used to leave the
+      // same row; from here the row names the token's surface.
+      origin: "mcp",
       query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
       body: tool.buildBody ? tool.buildBody(input) : {},
       timeoutMs,

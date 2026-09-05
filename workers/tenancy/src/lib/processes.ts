@@ -20,7 +20,7 @@
 // the same one clause the accounts list uses, and an app's account is written once
 // at creation and never edited (there is no move-app door — see the migration).
 
-import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { logActivity, writeActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -2395,7 +2395,29 @@ export async function deleteStep(
      ${where([fence.sql, "process_id = ?", "step_key = ?"])}`,
     [...fence.params, before.process_id, before.step_key]
   )
-  await logActivity(cfg, guard.databaseId, actor, {
+  // THE ONE HARD DELETE IN THE APP, AND THE ONE PLACE THE SWALLOWING LOGGER IS
+  // WRONG. Everywhere else `logActivity` is right by contract: it describes a
+  // side effect of a change that already succeeded, the row it changed is still
+  // there, and losing the line costs a sentence nobody can recover but nothing
+  // anybody needs. Here the row is GONE. This line is the only remaining record
+  // that the step ever existed, what it was called, and who removed it — so a
+  // swallowed failure takes the step and its history together, which is the
+  // worst thing an audit trail can do. `writeActivity` throws, exactly as it
+  // does for a user-authored note, and for the same reason: writing the row IS
+  // the point, so a failure has to be a real error rather than a 200 that tells
+  // somebody the trail is complete when it is not.
+  //
+  // WHY IT IS STILL WRITTEN AFTER THE DELETE and not before it. Before would
+  // read better against a rubric and be worse in fact: the statement above
+  // re-checks all three refusals in the same breath as the write, so a
+  // concurrent change makes it move ZERO rows — and a log written first would
+  // then state a deletion that never happened. A trail that says something
+  // happened when it did not is a worse failure than one missing a line, and it
+  // is unfixable, because the table is append-only. The two writes cannot be one
+  // (they are two REST statements; ARCHITECTURE.md's locked D1 decision), so the
+  // order is a choice between a possible LIE and a possible GAP, and this app
+  // takes the gap — now a loud, recorded one instead of a silent one.
+  await writeActivity(cfg, guard.databaseId, actor, {
     type: "Step deleted",
     description: `${actor.name} deleted the step "${before.name}" — added by mistake, never part of an agreed version`,
     relatedTable: "process_steps",

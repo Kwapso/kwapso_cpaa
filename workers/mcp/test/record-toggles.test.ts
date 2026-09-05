@@ -26,6 +26,7 @@
 import { describe, expect, it } from "vitest"
 
 import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
+import { checkArgTypes } from "@shared/workers/tool-args"
 import { alwaysConfirms, TOOL_GATES } from "@shared/workers/tool-gates"
 import { getTool, requiresConfirm } from "../../data-ops/src/lib/tools"
 import { ROUTES as TENANCY_ROUTES } from "../../tenancy/src/index"
@@ -92,7 +93,22 @@ describe("every door is REACHABLE — run the router, do not read the list", () 
       ).toContain(`POST ${entry.path}`)
     })
 
-  it("an unrecognised record falls back to the canonical door rather than composing one", () => {
+  it("an unrecognised record is REFUSED at the boundary, before anything routes", () => {
+    // The fall-through below is the floor, and it used to be the whole defence:
+    // `record: "ticket"` with a ticket's id type-checked fine and was forwarded
+    // to the ACCOUNTS archive door, so the caller was told an account does not
+    // exist about an account they never named — and the same call carrying a
+    // valid ACCOUNT id would have archived that account, having been asked to
+    // archive something else. `record` is an enum now, so `checkArgTypes`
+    // answers first, with a 400 that names the twenty-one kinds.
+    for (const nonsense of ["", "ticket", "__proto__", "constructor", "internal_rate_card", "../../admin"])
+      expect(
+        () => checkArgTypes(tool().schema as Record<string, unknown>, { record: nonsense, id: "x", active: true }),
+        `"${nonsense}" must be refused, not routed`
+      ).toThrow(/must be one of/)
+  })
+
+  it("…and the canonical-door fall-through stays as the floor beneath that refusal", () => {
     for (const nonsense of ["", "__proto__", "constructor", "internal_rate_card", "../../admin"]) {
       const dest = tool().route!({ record: nonsense, id: "x", active: true })
       expect(dest.path, `"${nonsense}" must not build a path`).toBe("/api/tenancy/accounts/active")
@@ -234,12 +250,25 @@ describe("the GENERIC form is on MCP too, beside the 21 named ones, and it is re
       expect(Object.keys(table), `${entry.binding} must serve POST ${entry.path}`).toContain(`POST ${entry.path}`)
     })
 
-  it("an unrecognised record falls back to the canonical door, same as the agent's copy", () => {
-    for (const nonsense of ["", "__proto__", "constructor", "internal_rate_card"]) {
+  it("an unrecognised record is refused here too — both surfaces or neither (R43)", () => {
+    // The fall-through was symmetric across the two machine surfaces, so the
+    // refusal is symmetric as well. A tool that guards on one surface and not the
+    // other is the gap R43 exists for.
+    for (const nonsense of ["", "ticket", "__proto__", "constructor", "internal_rate_card"]) {
+      expect(() =>
+        checkArgTypes(generic().inputSchema as Record<string, unknown>, { record: nonsense, id: "x", active: true })
+      ).toThrow(/must be one of/)
       const dest = generic().route!({ record: nonsense, id: "x", active: true })
       expect(dest.path).toBe("/api/tenancy/accounts/active")
       expect(dest.binding).toBe("TENANCY")
     }
+  })
+
+  it("the enum both surfaces declare IS the allow-list, derived and not retyped", () => {
+    const kinds = (spec: Record<string, unknown>) =>
+      ((spec.properties as Record<string, { enum?: string[] }>).record.enum ?? []).slice().sort()
+    expect(kinds(tool().schema as Record<string, unknown>)).toEqual(Object.keys(RECORD_TOGGLES).sort())
+    expect(kinds(generic().inputSchema as Record<string, unknown>)).toEqual(Object.keys(RECORD_TOGGLES).sort())
   })
 
   for (const [record, entry] of Object.entries(RECORD_TOGGLES))
