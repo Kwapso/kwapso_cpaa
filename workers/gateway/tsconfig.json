@@ -7,6 +7,11 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    // The lifecycle suite IMPORTS scripts/r2-lifecycle.mjs rather than re-typing
+    // its derivations, so that the bucket list a test checks is literally the one
+    // the script applies. `allowJs` lets tsc read that file; `checkJs` stays off,
+    // so the scripts folder is not suddenly type-checked by this workspace.
+    "allowJs": true,
     "isolatedModules": true,
     "types": ["@cloudflare/workers-types"],
     // `@shared/*` names what a worker imports instead of counting directory

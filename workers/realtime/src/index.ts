@@ -26,6 +26,7 @@ import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@s
 import { readOrigin } from "@shared/workers/origin"
 import {
   INTEREST_STALE_MS,
+  REALTIME_SHARD_WATCH_SOCKETS,
   REALTIME_SHARDS,
   type ShardInterest,
   shardFor,
@@ -33,7 +34,7 @@ import {
   teamShardName,
 } from "@shared/workers/realtime"
 import { fail, json } from "@shared/workers/http"
-import { recordWorkerError } from "@shared/workers/error-log"
+import { logError, recordWorkerError } from "@shared/workers/error-log"
 import { requestId, traceHeaders } from "@shared/workers/trace"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
@@ -214,7 +215,14 @@ export class TeamChannel extends DurableObject<Env> {
       // listeners don't — a ping nobody can check is a ping nobody fenced.
     }
     const now = Date.now()
+    // COUNTED WHILE THE LOOP IS ALREADY RUNNING. Two integers, incremented inside
+    // a walk that happens anyway — the whole cost of the only measurement anybody
+    // has of what subscription scoping removes from a broadcast, and of how close
+    // one shard is to its own ceiling. See the watch below.
+    let considered = 0
+    let sent = 0
     for (const ws of this.ctx.getWebSockets()) {
+      considered++
       try {
         const listener = ws.deserializeAttachment() as Listener | null
         // THE DEADLINE, CHECKED BEFORE THE FENCE. Out of time — or carrying no
@@ -233,10 +241,65 @@ export class TeamChannel extends DurableObject<Env> {
         if (listener.subs && event?.resource && !listener.subs.includes(event.resource)) continue
         if (listener.scope && !(event && mayHearChange(listener.scope, event))) continue
         ws.send(message)
+        sent++
       } catch {
         // Dead socket — the runtime drops it on close; nothing to do here.
       }
     }
+    if (considered >= REALTIME_SHARD_WATCH_SOCKETS) this.warnCrowded(considered, sent, now)
+  }
+
+  /** When this shard last said it was crowded. In memory, on the instance — the
+   * object holding the sockets is the object that would have to notice, so there
+   * is nowhere better to keep it, and an eviction costs at most one extra row.
+   * `logError`'s own hourly ceiling is the real bound. */
+  private lastCrowdedWarning = 0
+
+  /** ONE SHARD IS FILLING UP, AND SOMEBODY IS TOLD.
+   *
+   * A Durable Object is single-threaded and a broadcast is a serial loop over its
+   * sockets, so past a few thousand every publish on that team queues behind the
+   * one before it. Nothing in this system said anything as a team approached that
+   * — the first symptom is "the app feels slow", pointing at nothing, on the one
+   * team big enough to matter. `REALTIME_SHARDS` was a comment about a ceiling
+   * with no instrument beneath it.
+   *
+   * THE ROW CARRIES THE MEASUREMENT, NOT JUST THE ALARM. `sent` beside
+   * `considered` is how much subscription scoping actually removes from a
+   * broadcast on a real tenant — the number the shard-count arithmetic depends on
+   * and that has never been observed. A shard at 3,000 sockets sending to 40 of
+   * them is healthy and wants a bigger `REALTIME_SHARDS` eventually; one sending
+   * to 2,900 is doing the work the interest registry was built to avoid, and that
+   * is a different conversation.
+   *
+   * Hourly per shard, fire-and-forget, and it can never fail the ping: this whole
+   * object exists to deliver a message that is already allowed to be lost. */
+  private warnCrowded(considered: number, sent: number, now: number): void {
+    if (now - this.lastCrowdedWarning < 60 * 60 * 1000) return
+    this.lastCrowdedWarning = now
+    let teamId: string | undefined
+    let shard: number | undefined
+    for (const ws of this.ctx.getWebSockets()) {
+      const l = ws.deserializeAttachment() as Listener | null
+      if (l?.team) {
+        teamId = l.team
+        shard = typeof l.shard === "number" ? l.shard : undefined
+        break
+      }
+    }
+    const line = `realtime: shard ${shard ?? "?"} of team ${teamId ?? "?"} is holding ${considered} sockets (watch line ${REALTIME_SHARD_WATCH_SOCKETS}); this ping went to ${sent} of them`
+    console.error(line)
+    void logError(this.env.DB, {
+      source: "realtime",
+      place: `TeamChannel shard ${shard ?? "?"}`,
+      message:
+        `${line}. A Durable Object is single-threaded and a broadcast is a serial loop, so past a few ` +
+        `thousand sockets every publish on this team queues behind the last. Raising REALTIME_SHARDS ` +
+        `re-shards every listener (shardFor is a modulo of it), so it wants a maintenance window — ` +
+        `DURABLE-OBJECTS.md. The sent/considered ratio here is the only measurement of what ` +
+        `subscription scoping removes on a real tenant.`,
+      teamId,
+    }).catch(() => {})
   }
 
   /** WHAT THIS SHARD CURRENTLY CARES ABOUT, computed from its live sockets.

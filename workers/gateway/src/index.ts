@@ -71,7 +71,7 @@ type Env = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     // THE NAME IS GIVEN HERE, at the door, once — this is the only place on the
     // agency side that knows a request has begun. Everything below forwards it,
     // and every worker behind it re-reads the same id instead of minting its
@@ -85,14 +85,18 @@ export default {
     // before any worker behind this reads it.
     const traced = stampOrigin(stampTrace(request, requestId(request)), "app")
     try {
-      return await handle(traced, env)
+      return await handle(traced, env, ctx)
     } catch (e) {
       return recordGatewayCrash(traced, env.AUTH, "gateway", env.INTERNAL_KEY, e)
     }
   },
 } satisfies ExportedHandler<Env>
 
-async function handle(request: Request, env: Env): Promise<Response> {
+/** `ctx` is threaded down for ONE reason: the media doors write the object
+ * they just served into the colo's cache, and that write rides the request's
+ * own lifetime rather than delaying the answer. Optional, so a test that calls
+ * the door with two arguments still exercises exactly the path it always did. */
+async function handle(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
 
     // CROSS-SITE WRITES DIE HERE, in front of every forward below — the session
@@ -129,6 +133,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // only hands it the header.
     const range = request.headers.get("Range")
 
+    // THE COLO'S OWN COPY OF AN UPLOADED FILE. `Cache-Control: …immutable` has
+    // been on these responses from the start and reached one browser each: a
+    // Worker-BUILT response does not enter Cloudflare's cache unless it is put
+    // there. Passed as a pair — the request to key on, and this request's own
+    // lifetime to finish the write in — and absent when the runtime hands us no
+    // `ctx`, in which case serveMedia simply does what it always did.
+    const edge = ctx ? { request, waitUntil: (w: Promise<unknown>) => ctx.waitUntil(w) } : undefined
+
     // ── Uploaded media: a CAPABILITY URL, on purpose ───────────────────────
     // No session, no membership check — a recorded, deliberate decision whose
     // reasoning (and the fork warning that goes with it) lives on serveMedia in
@@ -142,7 +154,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // be read. Same serving shape as /media/* below; just a different bucket,
     // matched first since it's a more specific prefix.
     if (pathname.startsWith("/media/learning/") && isRead(request.method))
-      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range, request.method)
+      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range, request.method, edge)
 
     // The agency's own files — brand assets, staff photos, certificate PDFs.
     // Its own bucket, matched before the generic prefix for the same reason the
@@ -154,12 +166,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // nowhere to be redeemed — which is the same shape as the API refusal one
     // layer up, said in routing instead of in a gate.
     if (pathname.startsWith("/media/internal/") && isRead(request.method))
-      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/", range, request.method)
+      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/", range, request.method, edge)
 
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
     if (pathname.startsWith("/media/") && isRead(request.method))
-      return serveMedia(env.MEDIA, pathname, "/media/", range, request.method)
+      return serveMedia(env.MEDIA, pathname, "/media/", range, request.method, edge)
 
     // Deep-link tree: /t/<teamId>/<module>/<id>/… is ONE client-resolved screen.
     // Static export emits a single shell (t.html), so serve it for ANY /t/* depth

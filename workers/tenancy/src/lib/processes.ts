@@ -21,6 +21,7 @@
 // at creation and never edited (there is no move-app door — see the migration).
 
 import { logActivity, writeActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -699,7 +700,7 @@ export async function updateApp(
     solution?: string | null
     keyActors?: string | null
   }
-): Promise<void> {
+): Promise<{ supersededUrls: (string | null)[] }> {
   const before = await appOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
@@ -755,6 +756,11 @@ export async function updateApp(
     relatedTable: "apps",
     relatedRowId: id,
   })
+  // The old picture, when this write stopped pointing at it. Handed back to the
+  // door rather than deleted here, for the reason updateAccount states at length:
+  // the key was minted at the door and the owners list must be read beside the
+  // mint, or the two drift and the reclaim silently deletes nothing.
+  return { supersededUrls: [supersededMedia(before.logoUrl, keep(input.logoUrl, before.logoUrl))] }
 }
 
 /** Archive / restore an app (never delete — its processes, versions and the

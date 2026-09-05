@@ -16,6 +16,7 @@
 // The split is stated for a human in RESILIENCE.md § "Who owns a fact"; this is
 // the half that fails the build.
 
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { describe, expect, it } from "vitest"
@@ -88,6 +89,118 @@ describe("who owns the users table", () => {
     expect(
       offenders,
       "only auth (identity) and tenancy (the current-team pointer) may write `users`."
+    ).toEqual([])
+  })
+})
+
+// ── AND THE CENSUS ITSELF, WHICH WAS THE HALF NOBODY CHECKED ────────────────
+//
+// The suite above pins ONE of the four splits RESILIENCE.md documents, and the
+// document ends with a remember-to: "If you add a second writer to a table, add a
+// row above." In a repo whose whole philosophy is that a rule with no check is
+// not a law, that sentence was the law. A tenancy handler that started writing a
+// content-owned column, or a fifth shared table nobody listed, ships green — and
+// the failure mode is the one the document opens by describing: two components
+// with an authoritative opinion about one fact, the loser of the race silent, and
+// no log that explains it afterwards.
+//
+// So the SET is derived and compared with the document, both ways. A new shared
+// writer turns the build red until somebody writes down the split; a documented
+// row whose table stopped being shared turns it red too, so the list can only
+// shrink honestly rather than becoming a record of what used to be true.
+describe("every shared-write table is written down", () => {
+  /** THE MIGRATION RUNNER IS NOT A RUNTIME WRITER, and it is the reason a
+   * mechanical probe reports thirty shared tables where there are four.
+   * `team-schema.ts` is `TEAM_MIGRATIONS` — the DDL and seed SQL that rolls every
+   * team database forward. Tenancy owning that IS its job (RESILIENCE.md says so
+   * in the paragraph under the table), and a `CREATE TABLE` is not an opinion
+   * about a row. One file, named once, rather than a pattern that would also
+   * excuse a real handler. */
+  const MIGRATION_RUNNER = "workers/tenancy/src/team-schema.ts"
+
+  /** Which component a file belongs to. `shared/workers/` is its own answer
+   * rather than being attributed to whoever imports it: `logError` is a SEAM, and
+   * RESILIENCE.md names it as `error_logs`' owner in exactly those words. */
+  const componentOf = (rel: string) => (rel.startsWith("shared/") ? "shared" : rel.split("/")[1])
+
+  /** Every table any production file WRITES, by component.
+   *
+   * `\bDELETE` carries a word boundary for a reason worth keeping: without it,
+   * `SELECT can_read, can_delete FROM role_permissions` — the gating seam's own
+   * rights read — parses as a DELETE, and the census reports a fifth shared table
+   * that does not exist. A census's false POSITIVE is as damaging as its false
+   * negative here: it teaches the next reader to distrust the list. */
+  function writesByComponent(): Map<string, Set<string>> {
+    const owners = new Map<string, Set<string>>()
+    for (const f of sourceFiles([join(ROOT, "workers"), join(ROOT, "shared", "workers")], {
+      extensions: [".ts"],
+      skipTests: true,
+      relativeTo: ROOT,
+    })) {
+      // `skipTests` only drops `*.test.ts`; a suite's own FIXTURES (a SQLite
+      // double, a fake index, a deferred helper) are ordinary .ts files that
+      // build whatever tables they like, and three of them were enough to report
+      // `activity`, `agent_credits` and `help` as shared writes that do not
+      // exist. The subject here is production code, so a test FOLDER is out
+      // whatever a file inside it is called.
+      if (f.rel === MIGRATION_RUNNER || /(^|\/)tests?\//.test(f.rel)) continue
+      const text = stripComments(f.source)
+      const tables = new Set<string>()
+      for (const m of text.matchAll(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+([A-Za-z_]\w*)/gi))
+        tables.add(m[1].toLowerCase())
+      for (const m of text.matchAll(/UPDATE\s+([A-Za-z_]\w*)\s+SET/gi)) tables.add(m[1].toLowerCase())
+      for (const m of text.matchAll(/\bDELETE\s+FROM\s+([A-Za-z_]\w*)/gi)) tables.add(m[1].toLowerCase())
+      for (const t of tables) owners.set(t, (owners.get(t) ?? new Set()).add(componentOf(f.rel)))
+    }
+    return owners
+  }
+
+  /** The table names in RESILIENCE.md § "Who owns a fact" — the document IS the
+   * registry, so there is no second list to keep in step with it. */
+  function documented(): string[] {
+    const doc = readFileSync(join(ROOT, "RESILIENCE.md"), "utf8")
+    const section = doc.slice(doc.indexOf("## 2 · Who owns a fact"), doc.indexOf("## 3 ·"))
+    return [...section.matchAll(/^\|\s*`([a-z_]+)`/gim)].map((m) => m[1])
+  }
+
+  it("the census can see a shared write where there definitely is one", () => {
+    // THE CANARY. An empty result is the dangerous one, and this whole test is a
+    // set comparison — two empty sets are equal. `users` is written by auth and by
+    // tenancy today and is pinned by the suite above, so if the walker or the
+    // patterns stop finding it, nothing below means anything.
+    const owners = writesByComponent()
+    expect(owners.get("users"), "the walker must be finding real writes").toBeTruthy()
+    expect([...(owners.get("users") ?? [])].sort()).toEqual(["auth", "tenancy"])
+    expect(owners.size, "and it must be seeing the whole estate, not one file").toBeGreaterThan(40)
+    expect(documented().length, "and RESILIENCE.md's table must be parseable").toBeGreaterThan(2)
+  })
+
+  it("no table has two writers that RESILIENCE.md does not name", () => {
+    const shared = [...writesByComponent()]
+      .filter(([, components]) => components.size > 1)
+      .map(([table]) => table)
+      .sort()
+    const undocumented = shared.filter((t) => !documented().includes(t))
+    expect(
+      undocumented,
+      "these tables are written by more than one component and no row in RESILIENCE.md § " +
+        "'Who owns a fact' says how the split works. Two components with an opinion about " +
+        "one fact will eventually disagree, and no log explains it — write the split down " +
+        "(or route the write through its owner)."
+    ).toEqual([])
+  })
+
+  it("…and no row names a table that stopped being shared", () => {
+    // The other direction, so the list can only shrink honestly. A row left
+    // standing after a writer moved away is a document describing a system that
+    // no longer exists, which is how a reader learns to skim it.
+    const shared = new Set(
+      [...writesByComponent()].filter(([, c]) => c.size > 1).map(([t]) => t)
+    )
+    const stale = documented().filter((t) => !shared.has(t))
+    expect(
+      stale,
+      "RESILIENCE.md § 'Who owns a fact' lists these as written by two components and they no longer are — delete the row"
     ).toEqual([])
   })
 })

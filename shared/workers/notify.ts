@@ -11,10 +11,20 @@
 import type { D1Database, Fetcher } from "@cloudflare/workers-types"
 
 import { brandedEmail, type BrandedEmail } from "./email-template"
+import { logError, type CoreDb } from "./error-log"
 
 /** What a worker needs to send: the auth binding, the origin its links point at,
  * and the shared secret guarding the internal door. */
-export type MailEnv = { AUTH: Fetcher; PUBLIC_APP_URL?: string; INTERNAL_KEY?: string }
+export type MailEnv = {
+  AUTH: Fetcher
+  PUBLIC_APP_URL?: string
+  INTERNAL_KEY?: string
+  /** The core database, so a mail that did not go out leaves a row. Optional and
+   * on the ENV rather than in the signature, for the reason `RealtimeEnv` gives:
+   * every caller already passes `env`, so nothing at a call site has to remember
+   * anything, and a worker without a database behaves exactly as before. */
+  DB?: CoreDb
+}
 
 /** Send one branded email through the auth worker. `origin` overrides
  * `env.PUBLIC_APP_URL` — the invite path falls back to the request's own origin so
@@ -43,12 +53,34 @@ export async function sendBrandedEmail(
       signal: AbortSignal.timeout(15_000),
     } as unknown as Parameters<typeof env.AUTH.fetch>[1]
     const res = await env.AUTH.fetch("https://auth/internal/send-email", init)
-    if (!res.ok) console.error("email send failed:", subject, res.status)
+    if (!res.ok) await note(env, to, subject, `the send door answered ${res.status}`)
     return res.ok
   } catch (e) {
-    console.error("email send failed:", subject, e)
+    await note(env, to, subject, e instanceof Error ? e.message : String(e))
     return false
   }
+}
+
+/** RECORD THE MAIL THAT DID NOT GO OUT.
+ *
+ * Best-effort is a promise about the ACTION — the role already changed, the reply
+ * already saved, the alarm row is already written — and it was quietly extended
+ * into a promise about the RECORD: a failed send produced one console line with
+ * no recipient, no team and no request id, so "did the invite reach her?" was not
+ * answerable from either surface an hour later. The invite path is the sharpest
+ * case, because a person is sitting waiting for a link.
+ *
+ * The recipient is deliberately NOT put in the message body: `error_logs` is read
+ * by developers and an address is somebody's personal data, so the row says WHICH
+ * DOOR and WHAT SUBJECT, which is what a diagnosis actually needs. */
+async function note(env: MailEnv, to: string, subject: string, why: string): Promise<void> {
+  console.error("email send failed:", subject, why)
+  if (env.DB)
+    await logError(env.DB, {
+      source: "email-send",
+      place: subject.slice(0, 200),
+      message: `an email was not sent (recipient domain ${to.split("@")[1] ?? "unknown"}): ${why}`,
+    })
 }
 
 /** The team's name for an email's subject line, from the global core database.

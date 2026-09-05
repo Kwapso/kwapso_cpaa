@@ -90,8 +90,14 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
   }
 }
 
-/** The central-catch one-liner: console (for live tails) + the table (for history).
- * `e` is whatever was thrown; `place` is "<METHOD> <pathname>".
+/** The central-catch recorder. `e` is whatever was thrown; `place` is
+ * "<METHOD> <pathname>".
+ *
+ * IT WRITES THE ROW AND NOT THE CONSOLE LINE, and this comment used to claim
+ * both ("console (for live tails) + the table (for history)"). The console half
+ * lives at each worker's own catch, where the prefix names the worker, and it
+ * carries the same request id this row does — the two stores are only one store
+ * if they can be filtered by the same key.
  *
  * `requestId` is what makes the console line and the row FILTERABLE together —
  * pass the id off the request (`requestId(request)`) so this worker's row joins

@@ -81,7 +81,14 @@ export default {
       // unauthenticated sign-in door writes a row to the GLOBAL core database
       // per request. The two changes only make sense together.
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("auth worker error:", e)
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`auth worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
       // Record the crash in the central error log (core DB) — best-effort, and
       // now literally "never blocks the response": it rides `waitUntil`, so the
       // 500 goes out while the row is written and the row is still guaranteed to

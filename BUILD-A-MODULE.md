@@ -746,3 +746,101 @@ second before they were lifted):
 - **A typed field a form collects** — `optionalDate` / `safeExternalLink`
   (`workers/content/src/lib/internal-fields.ts`). A date is a real calendar day or
   a clean 400; a link is http/https/mailto or it is dropped.
+
+---
+
+## Every other law, and where a new module meets it
+
+**Why this section exists.** The checklists above were written when the base had
+twenty-two laws and they name the ones a module's *plumbing* trips over. There
+are fifty-one, and the ones added since are exactly the ones that bite a NEW
+module hardest — every form label you write is a sentence the translation
+catalogue does not have; adding a key to `TEAM_MODULES` offers four permission
+boxes and R36 asks which of them decide anything; a collection screen owes a
+toolbar, a search box and an empty state before anybody has typed a row into it.
+Somebody following this document end to end got a red build and debugged it one
+law at a time.
+
+So this list is the rest of them, in the order a build meets them, and
+`web/test/golden-path-laws.test.ts` asserts that **every** id in
+`shared/rules/registry.ts` is named somewhere in this file. A law added tomorrow
+turns the build red until the golden path names it — the list cannot fall behind
+again, which is the only property that matters here.
+
+**Before the first line of code**
+
+- **R20 `validated-bodies`** — every body field and every query param sits where
+  something is CHECKING it, positionally. A truthiness guard is not a type check.
+- **R10 `gating-seam`** — every non-GET route opens with `requireRight` (or a
+  reviewed identity gate). No ungated door ships, on either surface.
+- **R21 `client-reachable-doors`** — a door on the agency's own material refuses a
+  client login AT THE DOOR. Enumerate by what a Client-role caller can REACH.
+- **R24 `internal-money-never-in-portal`** — if your module touches what our own
+  hour costs, it goes through `workers/tenancy/src/lib/internal-money.ts` and
+  nowhere near `web-portal/`.
+
+**The worker**
+
+- **R11 `fetch-timeout`** — any call to an outside service carries an
+  `AbortSignal.timeout`. R12 `cron-records` — a scheduled handler records its
+  failures; a swallowed one is a job nobody knows stopped.
+- **R42 `declared-readers`** — a door that reads a FILE into the knowledge base
+  asks the one reader table; it never picks its own.
+- **R23 `cited-answers`** / **R26 `vector-fence`** — an answer from the knowledge
+  base comes through `knowledgeAnswer` with its sources, and its search is
+  namespaced by team with the words read back out of the team's own database.
+- **R40 `reachable-bytes`** — a stored file is claimed in `STORED_FILES` and
+  rendered by a real screen through `href` / `src` / `picture`. **R41
+  `picked-files-are-sent`** — a create dialog's call site RETURNS the new id, or
+  the file the person picked is dropped in silence.
+- **R30 `linked-emails`** — an email that names a record carries a button to it,
+  at the recipient's own front door.
+
+**The screens**
+
+- **R29 `one-page-width`** — the shell owns the page width; a screen never sets
+  its own. **R31 `two-radii`** — `rounded-[var(--radius)]` or `rounded-pill`, and
+  no third box radius. **R32 `closed-palette`** — every colour through a token,
+  never a Tailwind ramp and never a hex.
+- **R39 `kit-supplies-the-ui`** — the control, the glyph and the toast come from
+  `shared/ui/` and from no other package. **R45 `composition-coverage`** / **R46
+  `component-coverage`** — a kit part is adopted for real or exempted with a
+  reason.
+- **R35 `records-carry-their-face`** — a record shown anywhere carries its own
+  face. **R38 `details-ask-the-door`** — a detail screen reads its record BY ID,
+  never by finding it in the loaded page.
+- **R37 `in-app-anchors`** — an in-app destination is an `<InAppLink>`; a bare
+  `<a href="/t/…">` throws the shell away.
+- **R48 `toolbar-shows-search`**, **R49 `toolbar-content-gap`**, **R50
+  `empty-toolbar`** — a collection screen gets the toolbar with its search box,
+  the gap below it is the row's own margin, and on an EMPTY collection the row
+  draws nothing at all, create button included. **R51 `aside-collapse`** — a
+  panel that minimises collapses; it is never unmounted on the state that
+  animates it.
+- **R25 `savings-caption`** — a screen that shows a saving renders
+  `SAVINGS_CAPTION` word for word.
+
+**The words** (the ones that catch every new module, every time)
+
+- **R28 `catalogued-strings`** — every user-visible English sentence is in
+  `shared/i18n-strings.json`, in exactly the languages `LANGUAGES` declares. Run
+  `npm run lang` (`node scripts/i18n-extract.mjs` then `scripts/i18n-prune.mjs`)
+  **before you commit** — both deploy scripts refuse on a stale catalogue.
+- **R33 `wrapped-strings`** — the place the sentence is SAID asks for its
+  translation: `t("…")` at the position, or a field config rendered through
+  `shared/web/field.tsx`. **R44 `translation-ceiling`** — a catalogued string is
+  answered in every language, up to a ceiling that only falls.
+- **R34 `glossary-in-copy`** — the glossary's word, never a synonym for it.
+
+**The machine surfaces**
+
+- **R27 `described-contracts`** — every backticked identifier in a tool
+  description names something real. **R43 `agent-mcp-tool-parity`** — a tool added
+  to one machine surface is added to the other or has a named reason.
+- **R36 `offered-rights`** — every switch your module offers on the permission
+  matrix decides something, and every right your doors ASK for is offered.
+  `shared/team-modules.ts` records `screens` as the module that shipped four
+  inert boxes.
+- **R47 `assistant-coverage`** — a module a person can see, the assistant can
+  answer about: a knowledge kind, a gated read tool, or a reasoned line saying
+  why its material is not in the corpus.

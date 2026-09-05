@@ -225,3 +225,104 @@ describe("uploaded media is seekable and resumable", () => {
     }
   })
 })
+
+// THE HEADER WAS ALWAYS RIGHT AND NOBODY WAS LISTENING.
+//
+// `Cache-Control: public, max-age=31536000, immutable` has been on every media
+// response since the door was written, and it reached exactly one browser at a
+// time: a response a Worker BUILDS does not enter Cloudflare's cache unless the
+// worker puts it there. So the fiftieth person to open a team's logo paid the
+// same R2 read as the first, and the second viewer of a 25 MB attachment paid
+// for 25 MB of worker CPU. The fix is one `cache.put` — and the two cases it must
+// NOT take are the ones that would be wrong rather than merely slow.
+describe("the colo keeps a copy, and only of a whole object", () => {
+  /** A stand-in for `caches.default`, recording what it was asked to store. */
+  function edgeStore() {
+    const puts: Request[] = []
+    let stored: Response | null = null
+    return {
+      puts,
+      install() {
+        ;(globalThis as { caches?: unknown }).caches = {
+          default: {
+            match: async () => (stored ? stored.clone() : undefined),
+            put: async (key: Request, res: Response) => {
+              puts.push(key)
+              stored = res
+            },
+          },
+        }
+      },
+      uninstall() {
+        delete (globalThis as { caches?: unknown }).caches
+      },
+    }
+  }
+
+  const waited: Promise<unknown>[] = []
+  const edgeOf = (url: string) => ({
+    request: new Request(url),
+    waitUntil: (w: Promise<unknown>) => {
+      waited.push(w)
+    },
+  })
+
+  it("stores a whole-object read, and answers the next one from the store", async () => {
+    const store = edgeStore()
+    store.install()
+    try {
+      const b = bucket()
+      const url = `https://app.example/media/${KEY}`
+      const first = await serveMedia(b, `/media/${KEY}`, "/media/", null, "GET", edgeOf(url))
+      expect(first.status).toBe(200)
+      await Promise.all(waited)
+      expect(store.puts, "the object the viewer just paid for is kept").toHaveLength(1)
+
+      const second = await serveMedia(b, `/media/${KEY}`, "/media/", null, "GET", edgeOf(url))
+      expect(second.status).toBe(200)
+      expect(
+        b.asked,
+        "the second viewer must not cost a second R2 read — that is the whole point"
+      ).toHaveLength(1)
+    } finally {
+      store.uninstall()
+    }
+  })
+
+  it("NEVER stores a partial answer", async () => {
+    // The dangerous one. A 206 is an answer to ONE client's `Range`, and the
+    // cache is keyed on the plain URL — so storing it would hand the next person
+    // a slice of the file as though it were the file, which is exactly the
+    // undetectable failure this whole suite exists for.
+    const store = edgeStore()
+    store.install()
+    try {
+      const b = bucket()
+      const res = await serveMedia(
+        b,
+        `/media/${KEY}`,
+        "/media/",
+        "bytes=0-99",
+        "GET",
+        edgeOf(`https://app.example/media/${KEY}`)
+      )
+      expect(res.status).toBe(206)
+      await Promise.all(waited)
+      expect(store.puts, "a slice is not the file").toHaveLength(0)
+    } finally {
+      store.uninstall()
+    }
+  })
+
+  it("works exactly as before when there is no cache to use", async () => {
+    // No `caches` global (this is vitest, and the web workspaces compile this
+    // file too), and no `edge` argument from a caller that never passed one. A
+    // media door must never fail because a cache was unavailable.
+    const b = bucket()
+    expect((await serveMedia(b, `/media/${KEY}`, "/media/")).status).toBe(200)
+    expect(
+      (await serveMedia(b, `/media/${KEY}`, "/media/", null, "GET", edgeOf(`https://x/media/${KEY}`)))
+        .status
+    ).toBe(200)
+  })
+})

@@ -238,6 +238,22 @@ exactly this reason and says `UNPROVEN` rather than `moved`. Roll it out with
 
 **WARNING, before any usage pull or cleanup that lists D1 databases:** kwapso's per-team databases share the Cloudflare account with another product (rest-o) that uses the SAME `team-<ulid>` naming, one of them live production. Derive the list of kwapso's databases from the core `teams.database_id` column — the way `backup.mjs` and `reset-all.mjs` already do — never from a name-prefix filter, which excludes kwapso's own shards and includes somebody else's.
 
+**AND IT IS THE ONLY DOOR D1 READ REPLICATION CAN COME THROUGH (checked live
+5 Sep 2026).** Cloudflare's read replication raises read throughput for a busy
+database, and its Sessions API "is only available via the D1 Worker Binding and
+not yet available via the REST API". Production configures **zero** `TEAM_DB_<n>`
+pairs today, so 100% of production team traffic takes the REST door and the one
+lever the platform offers against a large tenant's read load is structurally
+unreachable. Staging has a pair on content, data-ops and tenancy — which is the
+wrong way round twice over: the environment that does not need the throughput is
+the only one that could have it, and every latency figure measured on staging is
+measured on a path production does not use (~1 ms against the REST door's ~400).
+
+Wiring a pair is the prerequisite, not the fix; adopting the Sessions API
+(`withSession`, threading the bookmark) is a further change in `d1Query`. Both are
+worth knowing about BEFORE a tenant is slow, because the first one needs a deploy
+and the second needs the first.
+
 **The native-binding fast path is wired per team, by hand.** Every worker reaches team databases over the D1 REST door by default; a deployment that HOLDS a binding for a particular database uses it directly instead (single-digit-ms instead of an API round trip — `natives` in `shared/workers/d1-rest.ts`). The wiring is a paired declaration in the worker's `wrangler.jsonc`: a `d1_databases` binding named `TEAM_DB_<n>` plus a var `TEAM_DB_<n>_ID` carrying that database's id — `nativeTeamDatabases` in `shared/workers/gating.ts` matches the pairs up and `d1Query` picks the direct path whenever the id is in the map. When a tenant grows past REST-door comfort, add the pair (top-level AND under `env.staging`, envs don't inherit) and redeploy; nothing else changes, and removing the pair falls the worker back to the REST door with no code change.
 
 ## Secrets (set once per env, never in git)
@@ -480,11 +496,66 @@ an owner's decision.
 
 | watch | where it comes from | the number | what to do when it trips |
 |---|---|---|---|
-| a database at 80% of 10 GB | `db_alerts` (nightly) | `ALERT_THRESHOLD_BYTES` | run the module mover for that team's biggest module; ~2 GB of headroom left |
+| a database at 80% of 10 GB | `db_alerts` (nightly) | `ALERT_THRESHOLD_BYTES` | **the mover is switched off** (`SPLIT_READS_WIRED`, and the door answers 503 — see below). Until it is wired: archive, or move the TEAM to a new database. ~2 GB of headroom left |
+| **the whole ACCOUNT at 80% of D1's 1 TB** | `db_alerts` (nightly), under the row named `ALL D1 STORAGE ON THIS CLOUDFLARE ACCOUNT` | `ACCOUNT_ALERT_THRESHOLD_BYTES` | **do NOT run the mover** — its first step creates a database and spends the very thing that is running out. At the ceiling D1 refuses new writes AND new databases across every tenant at once. Archive or delete data; ask whether the other two products on this shared account can reclaim theirs; or move to a second Cloudflare account |
+| a cron lapping | `error_logs` (`cron/<job> (lap length)`), once per LAP, plus the `console.warn` | `CRON_TEAM_CAP` = 200 teams | see the row below — this is the same watch, now recorded rather than only logged |
 | the size scan going blind | a `console.error` from `d1ListDatabases` | `D1_LIST_PAGE_CAP × 100` = 10,000 databases | the platform allows 50,000, raise the page cap before the estate passes 10,000, or the scan silently stops covering the rest |
 | a cron lapping | a `console.warn` from `teamSlice` naming `window N/M` | `CRON_TEAM_CAP` = 200 teams | past one window a team is visited every M ticks: 15 min × M for the sweep, **M DAYS** for the morning digest. Two or three windows is late; more than that wants a work queue, not a bigger cap |
 | a retention sweep not catching up | `error_logs`, recorded not just logged (R12) | `RETENTION_DELETE_CAP × RETENTION_PASSES_PER_TICK` = 200,000 rows/table/night | the shared core database is taking rows faster than a night can clear them, raise the passes, or shorten the window |
-| the mover failing to drain | a thrown `move_drain_incomplete` naming the table | `MOVE_DRAIN_PASSES` | **urgent**: routing has already flipped, so reads are merged and those rows are duplicates. Empty the named table in the OLD database before the module is read again |
+| the mover failing to drain | a thrown `move_drain_incomplete` naming the table | `MOVE_DRAIN_PASSES` | cannot happen today (the door refuses the mover). When it can: **urgent** — routing has already flipped, so reads are merged and those rows are duplicates. Empty the named table in the OLD database before the module is read again |
+
+### The module mover is switched off, and what to do instead
+
+`POST /api/tenancy/admin/move-module` answers **503 `module_move_unavailable`**
+and touches nothing. The mover copies a module's tables to a new database, flips
+the routing row and DRAINS the old home — and nothing in the app reads
+`team_module_databases`, so the drain would empty the database every screen is
+still querying while the door reported success. `SPLIT_READS_WIRED` in
+`workers/tenancy/src/lib/sharding.ts` carries the whole argument, and
+`merged-read-guard.test.ts` derives the flag from whether the read path has any
+production callers, so it cannot be left set the wrong way.
+
+**Until it is wired, a full team database has two honest remedies:** archive (the
+retention sweeps, or an owner's decision about old rows), or give that TEAM a new
+database and repoint `teams.database_id` — the restore path in RESILIENCE.md is
+the same procedure. Wiring the mover properly needs the read path to consult the
+routing table AND a merged read that can page, sort and count; `d1QueryAcross`
+refuses all three across more than one database on purpose.
+
+### The account's D1 storage, and why the mover is the wrong answer to it
+
+D1 caps TOTAL storage per account at **1 TB** (checked live 5 Sep 2026), and this
+account is shared with two other products, so their bytes fill our ceiling. The
+nightly check now sums the WHOLE listing — counted, never named — and writes it to
+`db_growth` and `db_alerts` under one sentinel row, so `daysUntilFull` answers for
+the account exactly as it does for a database. `GET /api/tenancy/admin/db-sizes`
+returns `accountBytes`, `ourBytes` and `accountComplete` beside the per-database
+figures.
+
+`accountComplete: false` means the database listing was truncated, so the total is
+a LOWER BOUND — that case is recorded to `error_logs` rather than logged, because
+the reassuring branch is the one nobody re-reads.
+
+### R2 lifecycle rules
+
+```bash
+cf-exec node scripts/r2-lifecycle.mjs staging --dry-run    # what it would set
+cf-exec node scripts/r2-lifecycle.mjs production           # apply
+cf-exec node scripts/r2-lifecycle.mjs production --infrequent
+```
+
+Idempotent (`lifecycle set` replaces the rule set), reads and writes no object,
+and covers every bucket the wrangler configs declare plus the unbound Glide
+archive — derived, and `workers/gateway/test/r2-lifecycle.test.ts` re-derives both
+halves off disk so the list cannot drift.
+
+**It never expires an object by age, and it never will.** A team logo uploaded two
+years ago is live; an object's age says nothing about whether a row still points
+at it. Garbage here is identified by REFERENCE — `reclaimMedia` at the door that
+superseded it — so the rules are the two that cannot remove a byte anything points
+at: abort incomplete multipart uploads after 7 days (always), and an OPT-IN
+transition to Infrequent Access after 90 days (`--infrequent`; a cost decision,
+with a retrieval fee, so it is the owner's call and not a developer's).
 
 **And the trend, beside the position.** `GET /api/tenancy/admin/db-sizes` now also
 returns `filling`: every watched database with its size and `daysUntilFull`, soonest

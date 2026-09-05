@@ -19,7 +19,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import type { ScopeStamp } from "@shared/workers/account-scope"
-import { REALTIME_SHARDS, teamShardName } from "@shared/workers/realtime"
+import { REALTIME_SHARD_WATCH_SOCKETS, REALTIME_SHARDS, teamShardName } from "@shared/workers/realtime"
 import { TEXT_LIMITS } from "@shared/workers/validate"
 import worker, { LISTENER_MAX_AGE_MS, TeamChannel } from "../src/index"
 
@@ -709,5 +709,83 @@ describe("the upgrade carries the subscription onto the socket", () => {
     const huge = Array.from({ length: 200 }, (_, i) => `r${i}`).join(",")
     const held = await join({ "x-listener-subs": huge })
     expect(Object.hasOwn(held, "subs")).toBe(false)
+  })
+})
+
+// ── THE SHARD'S OWN CEILING, AND THE MEASUREMENT NOBODY HAD ─────────────────
+//
+// `REALTIME_SHARDS = 4` carries a comment stating a ceiling ("~12–20k concurrent
+// listeners per team… clears the yardstick's 25,000 only once combined with
+// subscription scoping") and, until 5 Sep 2026, nothing beneath it. A Durable
+// Object is single-threaded and a broadcast is a serial loop, so past a few
+// thousand sockets every publish on that team queues behind the last — and the
+// first symptom of that is "the app feels slow", on the one team big enough to
+// matter, pointing at nothing.
+//
+// So the loop counts, and the row it writes carries both numbers: how many
+// sockets the shard is holding, and how many of them the ping actually went to.
+// The second is the only observation anybody has of what subscription scoping
+// removes on a real tenant, which is the number the whole shard-count arithmetic
+// rests on.
+describe("a crowded shard says so, and says how crowded", () => {
+  /** A channel whose env records what `logError` was handed. */
+  function watched(sockets: FakeSocket[]) {
+    const rows: unknown[][] = []
+    const env = {
+      DB: {
+        prepare: () => ({
+          bind: (...params: unknown[]) => {
+            rows.push(params)
+            return { run: async () => ({}) }
+          },
+        }),
+      },
+    }
+    const ctx = { acceptWebSocket: () => {}, getWebSockets: () => sockets }
+    return { rows, channel: new TeamChannel(ctx as never, env as never) }
+  }
+
+  /** `n` sockets, all subscribed to something the ping is NOT about — so the
+   * shard is crowded and the broadcast sends to nobody, which is the healthy
+   * shape and the one the ratio has to be able to describe. */
+  const crowd = (n: number) =>
+    Array.from({ length: n }, () => subscriber(["something_else"]))
+
+  it("says nothing while the shard is comfortable", async () => {
+    // THE CANARY for the assertion below: the same code path, an ordinary
+    // channel, and no row. Without it a watch that fired unconditionally would
+    // pass the crowded test.
+    const { rows, channel: ch } = watched([listener(), listener()])
+    ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
+    await Promise.resolve()
+    expect(rows, "two listeners is not a crowd").toHaveLength(0)
+  })
+
+  it("records the shard's size AND how many the ping reached", async () => {
+    const sockets = crowd(REALTIME_SHARD_WATCH_SOCKETS)
+    const { rows, channel: ch } = watched(sockets)
+    ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(rows, "a shard at the watch line must be reported").toHaveLength(1)
+    // `logError` binds (id, at, source, place, message, …) — the message is where
+    // the two numbers are, and both have to be in it or the row is an alarm
+    // without a measurement.
+    const message = String(rows[0][4])
+    expect(message).toContain(`holding ${REALTIME_SHARD_WATCH_SOCKETS} sockets`)
+    expect(message, "the scoping measurement is the point").toContain("went to 0 of them")
+  })
+
+  it("reports once an hour, not once a ping", async () => {
+    // A busy team publishes constantly. A row per ping would spend `logError`'s
+    // whole hourly budget on this one shard and starve every other worker's
+    // crash report — the exact failure MAX_ERROR_LOGS_PER_HOUR is bucketed to
+    // prevent, arriving from inside.
+    const { rows, channel: ch } = watched(crowd(REALTIME_SHARD_WATCH_SOCKETS))
+    for (let i = 0; i < 5; i++) ch.broadcast(JSON.stringify({ resource: "members", id: `M${i}` }))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(rows).toHaveLength(1)
   })
 })
