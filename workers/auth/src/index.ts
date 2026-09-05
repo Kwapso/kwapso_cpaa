@@ -12,6 +12,7 @@
 //   POST /api/auth/logout                                -> forget me
 //   GET  /api/auth/health                                -> is this worker alive?
 
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { GuardError } from "@shared/workers/gating"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -95,7 +96,8 @@ export default {
         case "POST /api/auth/logout":
           return await logout(request, env)
         case "GET /api/auth/health":
-          return json({ ok: true })
+          // What this worker cannot work without, answered by NAME (config-health.ts).
+          return json(healthBody("auth", env, ["DB", "RESEND_API_KEY", "INTERNAL_KEY"]))
         // Internal: other workers send branded emails THROUGH auth (it owns the
         // Resend key). NOT under /api/ — the gateway never routes it publicly;
         // only a service binding (env.AUTH.fetch) can reach it.

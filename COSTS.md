@@ -303,6 +303,7 @@ an error row when it cannot catch up: `ERROR_LOG_RETENTION_DAYS = 90`,
 | **nightly ops digest** | new + spiking error signatures, and teams at 80% of their AI allowance with no credits behind it, to the same `ALERT_TO` | `workers/tenancy/src/lib/ops-alert.ts` |
 | **`scripts/ai-spend.mjs`** | on demand, read-only, in money | this repo |
 | **`scripts/measure-preamble.mjs`** | on demand, no model call, with a canary that refuses to print a number it cannot stand behind | this repo |
+| **`GET /api/<worker>/health`** | on demand, on all six private workers: whether the worker is missing configuration it cannot work without, by NAME and never by value | `shared/workers/config-health.ts` |
 
 **Two gaps, both deliberate and both the owner's to close.**
 

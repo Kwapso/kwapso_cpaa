@@ -23,6 +23,7 @@
 // see it), the same reviewed class as auth's session rows. Tool calls themselves
 // mutate nothing here — the REAL doors they forward to publish their own pings.
 
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { GuardError, whoAmI } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
@@ -194,7 +195,8 @@ export default {
         case "POST /api/mcp/tokens/revoke":
           return await postRevoke(request, env)
         case "GET /api/mcp/health":
-          return json({ ok: true })
+          // What this worker cannot work without, answered by NAME (config-health.ts).
+          return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
         default:
           return fail(404, "not_found", "No such MCP action.")
       }

@@ -108,6 +108,14 @@
 //                                             database's retention sweep
 
 import { brand } from "@shared/brand"
+import { configReport, healthBody } from "@shared/workers/config-health"
+
+/** WHAT TENANCY CANNOT WORK WITHOUT, named once so the health answer and the
+ * nightly self-check ask the identical question. `CF_D1_TOKEN` is on it for a
+ * reason: it being refused is 1,848 of the 5,086 rows in the live error store,
+ * every one of them somebody's failed request rather than a check nobody had to
+ * be inconvenienced to run. */
+const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
 import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { recordWorkerError } from "@shared/workers/error-log"
@@ -440,7 +448,9 @@ export default {
     const route = `${request.method} ${pathname}`
 
     try {
-      if (route === "GET /api/tenancy/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/tenancy/health")
+        return json(healthBody("tenancy", env, TENANCY_REQUIRED))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such tenancy action.")
       // Measured on the way out (timing.ts): the browser's network panel reads
@@ -546,6 +556,24 @@ export default {
       console.error("nightly size check failed:", e)
       await recordWorkerError(env.DB, "tenancy", "cron/size-check", e)
     }
+    // BEFORE ANY OF IT: IS THIS WORKER EVEN CONFIGURED? A missing secret has
+    // never been detected until somebody's request failed on it, which on
+    // staging is 1,848 rows of `cloud_key_rejected` — and a cron has no
+    // somebody. Reported by NAME, never by value (config-health.ts), and
+    // RECORDED rather than logged, because "the nightly jobs stopped a fortnight
+    // ago because ALERT_TO was cleared" must not be a thing only the console
+    // knew. It runs last so a broken config cannot cost the estate its sweep.
+    const config = configReport(env, TENANCY_REQUIRED)
+    if (!config.ok)
+      await recordWorkerError(
+        env.DB,
+        "tenancy",
+        "cron/config",
+        new Error(
+          `this worker is missing required configuration and its unattended work is degraded or dead: ${config.missing.join(", ")}. Set it with a wrangler secret (a secret) or in wrangler.jsonc (a var), then redeploy.`
+        )
+      )
+
     // THE THIRD JOB, AND THE ONE THAT READS WHAT THE OTHER TWO WROTE. Its own
     // try, like the two above and for the same reason: a digest that cannot be
     // assembled must not cost the estate its sweep or its size alarm.

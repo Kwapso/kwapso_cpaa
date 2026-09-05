@@ -17,6 +17,7 @@
 //   GET  /api/data-ops/health
 
 import { brand } from "@shared/brand"
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { identityFor, GuardError } from "@shared/workers/gating"
@@ -107,7 +108,9 @@ export default {
     const route = `${request.method} ${pathname}`
 
     try {
-      if (route === "GET /api/data-ops/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/data-ops/health")
+        return json(healthBody("data-ops", env, ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"]))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such data-ops action.")
       // Measured on the way out — see timing.ts.

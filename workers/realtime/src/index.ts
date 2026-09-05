@@ -20,6 +20,7 @@
 import { DurableObject } from "cloudflare:workers"
 
 import type { SessionUser } from "@shared/types"
+import { healthBody } from "@shared/workers/config-health"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
 import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
 import {
@@ -536,7 +537,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return json({ ok: true })
     }
 
-    if (url.pathname === "/api/realtime/health") return json({ ok: true })
+    // What this worker cannot work without, answered by NAME (config-health.ts).
+    if (url.pathname === "/api/realtime/health")
+      return json(healthBody("realtime", env, ["DB", "AUTH", "TEAM_CHANNEL", "INTERNAL_KEY"]))
 
     // Public: a browser joins a live channel (WebSocket only). Two scopes:
     //   ?user=<id>  — your OWN identity channel (account events + sign-out),
