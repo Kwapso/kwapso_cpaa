@@ -61,6 +61,7 @@ import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { ANY_FILE_TYPE, mediaKey, ownedMediaKey, reclaimMedia, storedContentType } from "@shared/workers/image"
+import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countDeliverables,
@@ -135,7 +136,13 @@ export async function postUpdateDeliverable(request: Request, env: Env): Promise
   // distinction lib/deliverables.ts draws between superseded and retired.
   await reclaimMedia(
     env.INTERNAL_MEDIA,
-    wrote.supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "deliverables")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/internal/",
+      wrote.supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "deliverables")),
+      [{ table: "deliverables", columns: ["url", "image_url"] }]
+    ),
     { db: env.DB, source: "content", place: "POST /api/content/deliverables/update, file reclaim" }
   )
   // These are independent reads — one wait, not 2.

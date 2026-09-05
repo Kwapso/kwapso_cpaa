@@ -13,6 +13,7 @@ import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { INLINE_SAFE_UPLOAD, mediaKey, ownedMediaKey, reclaimMedia, parseUploadDataUrl } from "@shared/workers/image"
+import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countBrandAssets,
@@ -79,7 +80,13 @@ export async function postUpdateBrandAsset(request: Request, env: Env): Promise<
   // exactly like a reclaim that ran, which is why both sit beside the mint.
   await reclaimMedia(
     env.INTERNAL_MEDIA,
-    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "brand")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/internal/",
+      supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "brand")),
+      [{ table: "brand_assets", columns: ["file_url"] }]
+    ),
     { db: env.DB, source: "content", place: "POST /api/content/brand-assets/update, file reclaim" }
   )
   return json({ assets: await listBrandAssets(cfg, guard), total: await countBrandAssets(cfg, guard) })

@@ -19,6 +19,7 @@ import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
+import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
@@ -367,7 +368,13 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   // link somebody pasted returns null and nothing is deleted.
   await reclaimMedia(
     env.MEDIA,
-    supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "accounts")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/",
+      supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "accounts")),
+      [{ table: "accounts", columns: ["logo_url", "cover_url"] }]
+    ),
     { db: env.DB, source: "tenancy", place: "POST /api/tenancy/accounts/update, image reclaim" }
   )
   return json({ ok: true })

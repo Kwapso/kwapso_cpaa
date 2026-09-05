@@ -26,6 +26,7 @@ import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { INLINE_SAFE_UPLOAD, mediaKey, ownedMediaKey, reclaimMedia, parseUploadDataUrl } from "@shared/workers/image"
+import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countStaffCertificates,
@@ -79,7 +80,21 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
   // is the only place that knows what was superseded.
   await reclaimMedia(
     env.INTERNAL_MEDIA,
-    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/internal/",
+      supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+      // BOTH destinations, from BOTH doors. One generic upload endpoint answers
+      // with a URL that lands on either a profile's photo or a certificate's
+      // file and never learns which, so a photo and a certificate can name the
+      // same object — and a reclaim that asked only about its own table would
+      // delete the other's file.
+      [
+        { table: "staff_profiles", columns: ["photo_url"] },
+        { table: "staff_certificates", columns: ["file_url"] },
+      ]
+    ),
     { db: env.DB, source: "content", place: "POST /api/content/staff/profile, photo reclaim" }
   )
   return json({ profiles: await listStaffProfiles(cfg, guard), total: await countStaffProfiles(cfg, guard) })
@@ -267,7 +282,21 @@ export async function postUpdateStaffCertificate(request: Request, env: Env): Pr
   // base, same fail-soft order as the profile photo above.
   await reclaimMedia(
     env.INTERNAL_MEDIA,
-    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/internal/",
+      supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+      // BOTH destinations, from BOTH doors. One generic upload endpoint answers
+      // with a URL that lands on either a profile's photo or a certificate's
+      // file and never learns which, so a photo and a certificate can name the
+      // same object — and a reclaim that asked only about its own table would
+      // delete the other's file.
+      [
+        { table: "staff_profiles", columns: ["photo_url"] },
+        { table: "staff_certificates", columns: ["file_url"] },
+      ]
+    ),
     { db: env.DB, source: "content", place: "POST /api/content/staff/certificate/update, file reclaim" }
   )
   // These are independent reads — one wait, not 2.

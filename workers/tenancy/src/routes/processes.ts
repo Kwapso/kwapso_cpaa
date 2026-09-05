@@ -34,6 +34,7 @@ import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
 import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
+import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
   addProcessComment,
@@ -292,7 +293,13 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
   // deletes nothing, which is a reclaim that LOOKS like it ran.
   await reclaimMedia(
     env.MEDIA,
-    supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "apps")),
+    await unreferencedKeys(
+      cfg,
+      guard.databaseId,
+      "/media/",
+      supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "apps")),
+      [{ table: "apps", columns: ["logo_url"] }]
+    ),
     { db: env.DB, source: "tenancy", place: "POST /api/tenancy/apps/update, logo reclaim" }
   )
   return json({ ok: true })
