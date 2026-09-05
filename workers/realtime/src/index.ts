@@ -539,7 +539,15 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
     // What this worker cannot work without, answered by NAME (config-health.ts).
     if (url.pathname === "/api/realtime/health")
-      return json(healthBody("realtime", env, ["DB", "AUTH", "TEAM_CHANNEL", "INTERNAL_KEY"]))
+      // THE BINDING NAMES, NOT THE CLASS NAMES. `TEAM_CHANNEL` was named here on
+      // 5 Sep 2026 and does not exist: the wrangler config binds the Durable Objects
+      // as CHANNELS and INTEREST, whose CLASS names are TeamChannel and TeamInterest.
+      // So this door answered {"ok":false,"missing":["TEAM_CHANNEL"]} on a worker with
+      // nothing wrong with it — and the staging smoke, which asserts `ok === true`,
+      // failed the whole deploy on it. A health check that reports a healthy worker as
+      // broken costs exactly what a missed outage costs, in the other direction: the
+      // next person to see it red learns to ignore it.
+      return json(healthBody("realtime", env, ["DB", "AUTH", "CHANNELS", "INTEREST", "INTERNAL_KEY"]))
 
     // Public: a browser joins a live channel (WebSocket only). Two scopes:
     //   ?user=<id>  — your OWN identity channel (account events + sign-out),
