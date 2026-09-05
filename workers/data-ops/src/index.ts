@@ -17,6 +17,7 @@
 //   GET  /api/data-ops/health
 
 import { brand } from "@shared/brand"
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { identityFor, GuardError } from "@shared/workers/gating"
@@ -107,7 +108,9 @@ export default {
     const route = `${request.method} ${pathname}`
 
     try {
-      if (route === "GET /api/data-ops/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/data-ops/health")
+        return json(healthBody("data-ops", env, ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"]))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such data-ops action.")
       // Measured on the way out — see timing.ts.
@@ -115,7 +118,16 @@ export default {
       logIfSlow(request, route)
       return withTiming(request, res)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       console.error("data-ops worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.

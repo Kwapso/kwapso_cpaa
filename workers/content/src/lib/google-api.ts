@@ -116,16 +116,36 @@ async function googleFetch(
   token: string,
   init?: { method?: string; body?: string; contentType?: string; missingIsNull?: boolean }
 ): Promise<unknown> {
-  const res = await fetch(url, {
-    method: init?.method ?? "GET",
-    // R11: a hung Google socket must not stall the worker.
-    signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.body ? { "Content-Type": init.contentType ?? "application/json" } : {}),
-    },
-    ...(init?.body ? { body: init.body } : {}),
-  })
+  // A TIMEOUT IS A DIFFERENT FAILURE FROM A REFUSAL, and until this it reached
+  // the error store as a bare `TimeoutError: The operation was aborted due to
+  // timeout` naming no endpoint at all — a row you cannot act on, in a table
+  // whose whole purpose is rows you can. The RESPONSE is deliberately unchanged:
+  // this rethrows a plain Error, so the central catch answers it exactly as it
+  // did (500, "Something went wrong on our side"), and only the row improves.
+  // Naming Google here rather than turning it into a clean refusal is the
+  // conservative half — "Google was slow" is not the same promise as "Google
+  // said no", and that is a product decision, not a logging one.
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: init?.method ?? "GET",
+      // R11: a hung Google socket must not stall the worker.
+      signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.body ? { "Content-Type": init.contentType ?? "application/json" } : {}),
+      },
+      ...(init?.body ? { body: init.body } : {}),
+    })
+  } catch (e) {
+    const where = `${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname}`
+    const said = e instanceof Error ? e.message : String(e)
+    throw new Error(
+      /^(TimeoutError|AbortError)$/.test((e as { name?: string })?.name ?? "")
+        ? `google ${where} did not answer within ${GOOGLE_TIMEOUT_MS}ms (R11 deadline): ${said}`
+        : `google ${where} could not be reached: ${said}`
+    )
+  }
   // WHAT GOOGLE ACTUALLY SAID, in the log and nowhere else.
   //
   // These two refusals are clean GuardErrors, so they never reach the worker's
@@ -146,9 +166,15 @@ async function googleFetch(
     // makes a tail unreadable.
     if (res.status === 404 && init?.missingIsNull) return null
     const said = await res.text().catch(() => "")
-    console.error(
-      `google ${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname} → ${res.status}: ${said.slice(0, 400)}`
-    )
+    // ONE SENTENCE, WRITTEN ONCE, AND NOW IT LEAVES THE TAIL. The console line
+    // below is unchanged and the `detail` is the SAME string: what a person is
+    // told stays Google's own wording, and what a developer needs — which call,
+    // what status, what Google said — rides on the refusal to the central catch,
+    // which records it (gating.ts `detail` records why this was worth doing).
+    // Still no token and still no query string: the URL is origin + pathname,
+    // because the query is where a person's search words live.
+    const detail = `google ${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname} → ${res.status}: ${said.slice(0, 400)}`
+    console.error(detail)
     // 401 AND 403 ARE DIFFERENT SENTENCES, and conflating them cost a night.
     //
     // 401 is "these credentials are dead" — a fact about the CONNECTION, true of
@@ -170,15 +196,22 @@ async function googleFetch(
       throw new GuardError(
         409,
         "google_access_lost",
-        "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings."
+        "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings.",
+        `${detail} — the credentials are DEAD, every call on this connection will fail until the person reconnects Google in Settings.`
       )
     if (res.status === 403)
       throw new GuardError(
         403,
         "google_forbidden",
-        "Google wouldn't allow that — this item may not be shared with you."
+        "Google wouldn't allow that — this item may not be shared with you.",
+        `${detail} — a fact about this RESOURCE, not the connection: the next call may be fine.`
       )
-    throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
+    throw new GuardError(
+      502,
+      "google_refused",
+      "Google couldn't answer that just now. Try again.",
+      detail
+    )
   }
   // A 2xx WITH NO BODY IS STILL A 2xx. `res.json()` throws on an empty body, and
   // Gmail answers a draft delete with 204 No Content — so the one call in this

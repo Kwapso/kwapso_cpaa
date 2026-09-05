@@ -19,6 +19,7 @@ import {
   sqlValue,
   type D1Rest,
 } from "@shared/workers/d1-rest"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { ulid } from "@shared/workers/id"
 import { brand } from "@shared/brand"
 import {
@@ -222,8 +223,24 @@ export async function ourDatabases<T extends { uuid: string }>(
       )
     for (const r of results) if (r.database_id) mine.add(r.database_id)
   } catch (e) {
+    // THE WATCHER GOING BLIND, and until 2026-09-05 it went blind quietly. If
+    // the teams table cannot be read, this returns CORE ONLY — so tonight's size
+    // check watches not one team database, prints a cheerful
+    // `size check: 1 team DBs, 0 alarm(s)`, and a team sitting at 95% is not
+    // alarmed. "Nothing crossed the line" and "we looked at nothing" produce the
+    // identical log line, which is the whole reason this needs a row of its own.
+    // The pattern beside it was already right (`result.capped` is recorded);
+    // this is the path that was missed.
     console.error(
       `[sharding] could not read the teams table to decide which databases are ours; claiming core only. ${String(e)}`
+    )
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      "cron/size-check (ourDatabases)",
+      new Error(
+        `could not read the teams table, so tonight's growth watch covers the CORE database only and NO team database was checked for size: ${e instanceof Error ? e.message : String(e)}`
+      )
     )
   }
   return everything.filter((d) => mine.has(d.uuid))
@@ -276,7 +293,20 @@ async function recordGrowth(
         .run()
       written++
     } catch (e) {
+      // A HOLE IN ONE DATABASE'S TREND LINE. Not fatal — the alarm itself does
+      // not depend on it — but `daysUntilFull` answers "no growth reading yet,
+      // or it is not growing" for a database whose reading merely failed, and
+      // those are opposite sentences. Recorded so the reassuring one can be
+      // checked.
       console.error(`db growth reading failed for ${db.name}:`, e)
+      await recordWorkerError(
+        env.DB,
+        "tenancy",
+        `cron/size-check (growth reading, ${db.name})`,
+        new Error(
+          `tonight's size reading for ${db.name} was not stored, so its trend line has a gap and "days until full" cannot be answered for it: ${e instanceof Error ? e.message : String(e)}`
+        )
+      )
     }
   }
   return written

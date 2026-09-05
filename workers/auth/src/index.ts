@@ -12,6 +12,7 @@
 //   POST /api/auth/logout                                -> forget me
 //   GET  /api/auth/health                                -> is this worker alive?
 
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { GuardError } from "@shared/workers/gating"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -95,7 +96,8 @@ export default {
         case "POST /api/auth/logout":
           return await logout(request, env)
         case "GET /api/auth/health":
-          return json({ ok: true })
+          // What this worker cannot work without, answered by NAME (config-health.ts).
+          return json(healthBody("auth", env, ["DB", "RESEND_API_KEY", "INTERNAL_KEY"]))
         // Internal: other workers send branded emails THROUGH auth (it owns the
         // Resend key). NOT under /api/ — the gateway never routes it publicly;
         // only a service binding (env.AUTH.fetch) can reach it.
@@ -121,7 +123,16 @@ export default {
       // every intended 400 would have become a 500 — and a 500 on the
       // unauthenticated sign-in door writes a row to the GLOBAL core database
       // per request. The two changes only make sense together.
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request))
+        return fail(e.status, e.code, e.message)
+      }
       console.error("auth worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.

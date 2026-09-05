@@ -22,6 +22,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 
 import type { AgentQuota, UsageLogRow } from "../types"
+import { logError } from "./error-log"
 import type { Actor } from "./gating"
 import { ulid } from "./id"
 import { numberVar } from "./limits"
@@ -174,8 +175,22 @@ export async function refundAiUnits(
       )
         .bind(freeUnits, now, teamId, today())
         .run()
-  } catch {
-    /* refund is best-effort — a hiccup must never break the turn the user cares about */
+  } catch (e) {
+    /* BEST-EFFORT DELIVERY AND NO RECORD OF THE FAILURE ARE TWO DIFFERENT
+     * DECISIONS, and only the first one was ever made here. A refund that never
+     * landed is money a customer PAID for a turn that did nothing — the one
+     * swallow in this file that costs somebody something real — and it left no
+     * trace anywhere. The swallow is still right (a refund hiccup must never
+     * break the turn), and `logError` cannot throw, so recording it costs the
+     * turn nothing at all. */
+    console.error("ai refund failed:", e)
+    await logError(env.DB, {
+      source: "credits",
+      place: `refund/${teamId}`,
+      message: `AI refund of ${creditUnits} credit(s) + ${freeUnits} free unit(s) FAILED for team ${teamId} — the team was charged for work that did not happen: ${e instanceof Error ? e.message : String(e)}`,
+      stack: e instanceof Error ? e.stack : undefined,
+      teamId,
+    })
   }
 }
 

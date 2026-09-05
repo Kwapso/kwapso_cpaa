@@ -134,6 +134,32 @@ export const CRON_ALERT_CAP = 50
  * no read). */
 export const CRON_GROWTH_CAP = 200
 
+/** Error SIGNATURES one nightly ops digest will name.
+ *
+ * The digest reads yesterday's rows grouped by signature, so this bounds the
+ * lines in an email rather than the work: a night with three hundred distinct
+ * new failures is a night where the first twenty tell you everything and the
+ * mail nobody can read is the one nobody reads. The count of signatures that
+ * did not fit is stated in the message, because a truncated list presented as a
+ * complete one is exactly the fault R14 exists to prevent. */
+export const OPS_SIGNATURE_CAP = 20
+
+/** Teams one nightly ops digest will name as running out of AI allowance. Same
+ * shape and the same reason as OPS_SIGNATURE_CAP, and sized smaller because a
+ * list of teams is a list of people somebody has to contact. */
+export const OPS_QUOTA_TEAM_CAP = 10
+
+/** Rows the digest's "has this signature been seen before?" read may scan.
+ *
+ * The question is answered against a WINDOW rather than the whole table on
+ * purpose: `error_logs` is the one table built to grow, its retention is 90 days
+ * (ERROR_LOG_RETENTION_DAYS), and a comparison against 90 days of history would
+ * make the nightly digest the most expensive read in the estate for no extra
+ * truth — a signature nobody has seen for a month IS news. Thirty days, capped,
+ * and the cap is above what a healthy estate produces so hitting it is itself a
+ * signal. */
+export const OPS_HISTORY_CAP = 5_000
+
 /** Pending invitations one sign-in sweep will accept in a single pass. Each one is
  * three core-DB writes plus two live pings, and the list is keyed on an EMAIL
  * ADDRESS — anyone may invite any address, so the row count is attacker-influenced.

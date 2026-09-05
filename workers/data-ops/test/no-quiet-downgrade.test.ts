@@ -20,11 +20,12 @@
 // ONE place, with no second branch that could quietly substitute another — and a
 // door failure that still classifies into a sentence a person can act on.
 
-import { readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { classifyModelHttp, ModelError, retryAfterSeconds } from "@shared/workers/model-failure"
+import { MODEL_PRICES } from "@shared/workers/pricing"
 import { DEFAULT_AGENT_MODEL, selectModel } from "../src/lib/model"
 import { stripComments } from "@shared/rules/source-scan"
 
@@ -33,6 +34,61 @@ const SRC = readFileSync(join(__dirname, "..", "src", "lib", "model.ts"), "utf8"
 /** The AI binding a worker really has. Nothing here is called — `selectModel`
  * only chooses. */
 const env = { AI: { run: async () => new Response("{}") } } as never
+
+/** EVERY wrangler config in the repo, read off disk. Enumerated rather than
+ * listed, so a worker that starts naming an engine tomorrow is covered by this
+ * check on the day it does, without anybody remembering to add it. */
+function everyWranglerConfig(): { name: string; text: string }[] {
+  const dir = join(__dirname, "..", "..")
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => ({ name: d.name, path: join(dir, d.name, "wrangler.jsonc") }))
+    .filter((w) => existsSync(w.path))
+    .map((w) => ({ name: w.name, text: readFileSync(w.path, "utf8") }))
+}
+
+describe("the engine is named in one voice, wherever it is named", () => {
+  it("no wrangler config pins an AGENT_MODEL the code does not name", () => {
+    // WHY THIS EXISTS. `DEFAULT_AGENT_MODEL` and data-ops' own pin were held
+    // together by the it below and by a paragraph in model.ts recording what
+    // happened the last time they drifted: the constant said gpt-oss, the
+    // deployment said something else, and "a default that disagrees with the
+    // deployment is not a preference, it is a decision nobody is making".
+    //
+    // On 2026-09-05 a SECOND worker started naming the engine — tenancy, which
+    // makes no model call and needs the name only to turn the tokens
+    // `agent_usage_log` recorded into money. A rate card applied to the wrong
+    // engine is a cost report that is confidently wrong (kimi's input is 2.7x
+    // gpt-oss's), and it would look exactly like a right one. So the pairing is
+    // not left to whoever edits one file: every config that names an engine is
+    // read off disk and must name THIS one.
+    //
+    // Derived, not listed. The failure is not "somebody forgot tenancy" — it is
+    // "somebody adds a third and nobody remembers this check exists".
+    const named = everyWranglerConfig()
+      .flatMap(({ name, text }) =>
+        [...text.matchAll(/"AGENT_MODEL":\s*"([^"]+)"/g)].map((m) => ({ name, model: m[1] }))
+      )
+    expect(named.length, "no config names an engine at all — this check has stopped checking").toBeGreaterThan(0)
+    const wrong = named.filter((n) => n.model !== DEFAULT_AGENT_MODEL)
+    expect(
+      wrong.map((w) => `${w.name}: ${w.model}`),
+      `every AGENT_MODEL pin must name ${DEFAULT_AGENT_MODEL} — change both or neither`
+    ).toEqual([])
+  })
+
+  it("every engine a config pins has a price, so nothing is costed at zero", () => {
+    // The other half, and the reason the pricing table refuses to guess: an
+    // engine with no line in MODEL_PRICES is `UNPRICED_MODEL`, a negative
+    // number, so a total cannot silently absorb it as free. That is only useful
+    // if the engine we actually ship is priced, which is what this asserts.
+    for (const { name, model } of everyWranglerConfig().flatMap(({ name, text }) =>
+      [...text.matchAll(/"AGENT_MODEL":\s*"([^"]+)"/g)].map((m) => ({ name, model: m[1] }))
+    ))
+      expect(MODEL_PRICES[model], `${name} pins ${model} and shared/workers/pricing.ts has no rate for it`).toBeTruthy()
+    expect(MODEL_PRICES[DEFAULT_AGENT_MODEL], "the default engine must be priced").toBeTruthy()
+  })
+})
 
 describe("one engine, chosen in one place, with no hatch beside it", () => {
   it("a worker with no model var still gets a working assistant, not a silent nothing", () => {

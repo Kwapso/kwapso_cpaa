@@ -2271,6 +2271,11 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
     why: "a database crossing 80% is an operational record with no screen on EITHER front door — it lives in the core database's db_growth table, which no app screen reads. Its real destination is the runbook, which the footnote names (OPERATIONS.md, Growth watch), and inventing an admin screen to have somewhere to point at would be building a product out of an email.",
   },
 
+  "workers/tenancy/src/lib/ops-alert.ts::sendOpsDigest": {
+    refersToRecord: false,
+    why: "the nightly ops digest names error SIGNATURES and teams near their AI allowance — neither is a record with a screen on either front door. `error_logs` is read through an owner-gated curl door (GET /api/data-ops/admin/errors) that no front-end code calls, and a team's allowance is a counter rather than a record. Its real destination is that door and the runbook, which the footnote names, exactly as the sibling growth alarm above points at OPERATIONS.md. Giving it a `ctaUrl` would mean inventing an admin screen so an email had somewhere to point, which is building a product out of a notification.",
+  },
+
   /* ── content: the work itself, and the two emails a client ever receives ── */
   "workers/content/src/lib/notify.ts::notifyReplyAndMentions": {
     refersToRecord: true,

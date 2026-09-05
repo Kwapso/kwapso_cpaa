@@ -23,6 +23,7 @@
 // see it), the same reviewed class as auth's session rows. Tool calls themselves
 // mutate nothing here — the REAL doors they forward to publish their own pings.
 
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { GuardError, whoAmI } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
@@ -194,12 +195,22 @@ export default {
         case "POST /api/mcp/tokens/revoke":
           return await postRevoke(request, env)
         case "GET /api/mcp/health":
-          return json({ ok: true })
+          // What this worker cannot work without, answered by NAME (config-health.ts).
+          return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
         default:
           return fail(404, "not_found", "No such MCP action.")
       }
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, new Error(e.detail), requestId(request))
+        return fail(e.status, e.code, e.message)
+      }
       console.error("mcp worker error:", e)
       await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request))
       return fail(500, "internal", "Something went wrong on our side. Try again.")

@@ -9,6 +9,7 @@
 // happened and is logged in activity).
 
 import { brand } from "@shared/brand"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import { type Audience, recordLink } from "@shared/workers/record-link"
 import type { Env } from "../env"
@@ -47,6 +48,7 @@ export async function notifyRoleChanged(
     })
   } catch (e) {
     console.error("role-change notice failed:", e)
+    await recordWorkerError(env.DB, "tenancy", `notify/role-changed (team ${teamId})`, e, undefined, { teamId, userId: member.userId })
   }
 }
 
@@ -67,6 +69,7 @@ export async function notifyRemoved(
     })
   } catch (e) {
     console.error("removal notice failed:", e)
+    await recordWorkerError(env.DB, "tenancy", `notify/removed (team ${teamId})`, e, undefined, { teamId })
   }
 }
 
@@ -90,5 +93,6 @@ export async function notifyInviteRevoked(
     })
   } catch (e) {
     console.error("revoke notice failed:", e)
+    await recordWorkerError(env.DB, "tenancy", `notify/invite-revoked (team ${teamId})`, e, undefined, { teamId })
   }
 }

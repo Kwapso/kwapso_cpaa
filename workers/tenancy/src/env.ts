@@ -59,5 +59,14 @@ export type Env = {
   /** The free daily AI allowance — MUST match data-ops and content, or one
    *  allowance is enforced at two different heights. */
   AGENT_FREE_DAILY?: string
+  /** WHICH ENGINE THE ASSISTANT RUNS ON — read here only to PRICE what it spent.
+   * Tenancy makes no model call; the nightly ops digest reads the tokens
+   * `agent_usage_log` recorded and turns them into money, and it cannot do that
+   * without knowing which rate card applies. Unset means the digest reports
+   * tokens and says "unpriced" rather than guessing a rate — and
+   * `no-quiet-downgrade.test.ts` reads every wrangler config off disk and fails
+   * the build if any of them names an engine the code does not, so this second
+   * mention can never drift away from data-ops' pin. */
+  AGENT_MODEL?: string
   AGENT_NO_DAILY_CAP?: string
 }

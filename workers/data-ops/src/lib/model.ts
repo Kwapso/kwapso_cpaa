@@ -1,9 +1,24 @@
 // The swappable MODEL seam. The agent loop talks to this interface only — switching
-// providers is a one-line change in selectModel(), never a rewrite. It is Claude
-// (Anthropic Messages API, full tool use), and a worker with no ANTHROPIC_API_KEY
-// has no assistant rather than a quietly weaker one — see selectModel for the
-// ruling and what that costs. The cheap INLINE path is a different question and
-// still runs on Workers AI: shared/workers/model-text.ts.
+// providers is a one-line change in selectModel(), never a rewrite.
+//
+// CORRECTED 2026-09-05. This header said "It is Claude (Anthropic Messages API,
+// full tool use), and a worker with no ANTHROPIC_API_KEY has no assistant" for a
+// week after that stopped being true: the owner moved the assistant onto
+// Cloudflare on 28 Aug, `selectModel` returns `new WorkersAiModel(...)` on its one
+// branch, `no-quiet-downgrade.test.ts` asserts the Anthropic adapter cannot come
+// back, and no worker in this repository calls Anthropic at all. A stale header
+// is not a cosmetic defect on a file like this one: the next person costing this
+// app reads the first paragraph and prices it at Anthropic's rates, which is a
+// three-times error on the largest line in the bill, and that nearly happened on
+// 2026-09-05.
+//
+// IT IS A WORKERS AI MODEL, over the `AI` binding, named by `AGENT_MODEL` in
+// wrangler and by DEFAULT_AGENT_MODEL below (the two are held together by
+// `no-quiet-downgrade.test.ts`, which reads every wrangler config off disk). It
+// bills Cloudflare NEURONS; the published per-token rates and the neuron
+// equivalents live in `shared/workers/pricing.ts`, and COSTS.md is where a turn
+// is priced. The cheap INLINE path is a different question and runs on the same
+// binding: shared/workers/model-text.ts.
 
 import type { Env } from "../env"
 import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
@@ -254,8 +269,9 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * ── AND ON 30 AUG THE DEFAULT WENT BACK TO gpt-oss, because the paragraph above
  *    measured the wrong thing and the deployment had been quietly right all along.
  *
- * `wrangler.jsonc` has pinned `AGENT_MODEL` to gpt-oss-120b since 28 Aug, in both
- * environments. So the 29 Aug revisit changed this constant and changed NOTHING a
+ * `wrangler.jsonc` had pinned `AGENT_MODEL` to gpt-oss-120b since 28 Aug, in both
+ * environments (it pins kimi-k2.6 now — see the 1 Sep block below; this paragraph
+ * is the record of a decision made on 30 Aug and is left in its own tense). So the 29 Aug revisit changed this constant and changed NOTHING a
  * person experiences: the var wins in `selectModel`, and every turn the owner has
  * complained about was gpt-oss. A default that disagrees with the deployment is
  * not a preference, it is a decision nobody is making.
@@ -275,6 +291,29 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * affinity header does nothing through `env.AI.run`, which is the door the worker
  * actually uses — so shipping glm would have bought the 7-10s column and no cache
  * at all.
+ *
+ * ── AND THAT LAST CLAUSE IS NOT TRUE OF THE SHIPPED PATH (2026-09-05) ───────
+ *
+ * "The affinity header does nothing through `env.AI.run`" was measured on glm
+ * over eight calls and then carried forward as a fact about the BINDING. The
+ * meter says otherwise for the engine we actually ship. Read off
+ * `agent_usage_log` on staging (`node scripts/ai-spend.mjs`), where `readUsage`
+ * puts `prompt_tokens_details.cached_tokens` into `cache_read_tokens`:
+ *
+ *     Aug 2026   6,291,515 fresh input   5,945,863 cached   657,244 cache-WRITE
+ *     Sep 2026     902,555 fresh input   1,778,240 cached         0 cache-write
+ *
+ * September is entirely on this path — the Anthropic key went on 28 Aug, and the
+ * zero cache-write column is the tell, because Cloudflare reports a cached count
+ * and never a write. So roughly two thirds of September's prompt tokens were
+ * served from a prefix cache that the paragraph above says cannot exist here.
+ *
+ * WHAT IT SAVES IS STILL UNKNOWN, and that is the honest end of this. Cloudflare
+ * publishes ONE input rate for kimi-k2.6 and no cached rate beside it (read
+ * 2026-09-05), so `shared/workers/pricing.ts` prices a cached token at full
+ * input rate — conservative, and the only thing the published table supports.
+ * The claim to retire is not "the cache saves money"; it is "there is no cache
+ * on this path", which the meter has now contradicted twice.
  *
  * The owner's "the assistant is still replying very slowly" is therefore NOT a
  * wrong model. gpt-oss is the fast one and it is the one deployed. The remaining
@@ -313,10 +352,35 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  *
  * AND WHAT IT COSTS, off the METER rather than a price sheet: 16,593 neurons for
  * both runs, about $0.18 — against the bench's own per-token estimate of $1.92
- * PER RUN, which was computed at Claude's prices because kimi has no line in
- * that table. Cloudflare bills neurons; a per-token table cannot predict them
- * (deepseek-v4-pro metered 24× its price sheet). The bench no longer prints a
- * figure it cannot stand behind. */
+ * PER RUN, which was computed at Claude's prices because kimi had no line in
+ * that table.
+ *
+ * ── THAT $0.18 DOES NOT RECONCILE, AND IT IS RECORDED HERE RATHER THAN QUIETLY
+ *    RE-USED (2026-09-05) ────────────────────────────────────────────────────
+ *
+ * Two runs is 44 model calls, each carrying the whole preamble. Three of this
+ * repo's own measurements agree on what that preamble is and disagree with the
+ * $0.18:
+ *
+ *   · `node scripts/measure-preamble.mjs` — 132,528 chars, ~34,672 tokens.
+ *   · The bench's own header, from the PROVIDER's tokenizer on 29 Aug:
+ *     775,265 input tokens over 22 questions = 35,239 per step.
+ *   · The bench's own note, from the METER on 30 Aug: ~880 neurons per question
+ *     on gpt-oss-120b with this catalogue.
+ *
+ * gpt-oss meters 31,818 neurons per M input tokens and kimi meters 86,364 — 2.7x
+ * — so the same question should meter roughly 2,400 neurons on kimi, and 44 of
+ * them roughly 105,000, not 16,593. `--dry` now derives that figure from the
+ * rate card and prints ~65,877 neurons for ONE run before you agree to it.
+ *
+ * The most likely explanation is the analytics WINDOW: a meter read that missed
+ * most of the calls looks exactly like a cheap run. It is not settled, and it is
+ * not settled by reasoning — it is settled by running a KNOWN number of turns and
+ * reading `aiInferenceAdaptiveGroups` for exactly that window. Until somebody
+ * does, treat $0.18 as a floor of unknown depth and COSTS.md's rate-derived
+ * figures as the number to plan with. Cloudflare does bill neurons and a metered
+ * model can exceed its price sheet (deepseek-v4-pro metered 24x), which is an
+ * argument for reading the meter — never for reading it once. */
 export const DEFAULT_AGENT_MODEL = "@cf/moonshotai/kimi-k2.6"
 
 class WorkersAiModel implements Model {
