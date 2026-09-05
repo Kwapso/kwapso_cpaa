@@ -51,6 +51,17 @@ import { GoogleScopeDialog } from "@/components/google-scope-dialog"
 import { GoogleSourceDialog } from "@/components/google-source-dialog"
 import { GoogleSyncButton } from "@/components/google-sync"
 import { useT } from "@shared/web/language"
+import { brand } from "@shared/brand"
+
+/** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
+ * itself "THE one place to brand this app" and twenty-three files read it; the
+ * sentences below used to spell the name out instead, which meant a rebrand — or
+ * a fork of this base for the next product — would have left them saying the old
+ * one, in four languages, on a screen that looked finished. Written as a `{brand}`
+ * hole rather than concatenated, because a hole is the only shape a translator
+ * can reorder (shared/i18n.ts, `fill`). */
+const BRAND = { brand: brand.name }
+
 
 /** The word a person reads for each service, and the sentence saying what
  * connecting it actually lets kwapso see. The second half matters more than the
@@ -84,7 +95,7 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
   calendar: {
     label: "Calendar",
     scope:
-      "Your main calendar, read only. kwapso never adds, changes or cancels anything in it. Name other calendars below to include them too.",
+      "Your main calendar, read only. {brand} never adds, changes or cancels anything in it. Name other calendars below to include them too.",
   },
   chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
@@ -187,7 +198,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       toast.success(
         r.revokedAtGoogle
           ? t("Disconnected.")
-          : t("Disconnected here. Remove kwapso in your Google account too.")
+          : t("Disconnected here. Remove {brand} in your Google account too.", BRAND)
       )
       setDisconnecting(null)
     } catch (err) {
@@ -201,7 +212,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     <section className="motion-panel-in flex flex-col gap-4">
       <h2 className="text-muted-foreground text-micro uppercase">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
-        {t("Connect your own Google account. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
+        {t("Connect your own Google account. {brand} never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.", BRAND)}
       </p>
 
       {/* ONE BUTTON, ALL FOUR, AND IT IS THE LEAD ACTION FOR A REASON.
@@ -275,7 +286,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                       ? live.lastUsedAt
                         ? t("Last used {when}", { when: formatActivityWhen(live.lastUsedAt) })
                         : t("Never used yet")
-                      : t(SERVICE_COPY[service].scope)}
+                      : t(SERVICE_COPY[service].scope, BRAND)}
                   </span>
                   <div className="flex items-center gap-2">
                     {live && NAMED.includes(service) && (
@@ -301,7 +312,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         size="sm"
                         onClick={() => setScoping(service as GoogleScopedService)}
                         className="gap-1"
-                        title={t("Choose what kwapso may read")}
+                        title={t("Choose what {brand} may read", BRAND)}
                       >
                         <PencilSimple className="size-3.5" aria-hidden />
                         <span className="hidden sm:inline">{t("What it may read")}</span>
@@ -363,7 +374,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   * row above this line. */}
                 {live && live.extraScopes.length > 0 && (
                   <p className="text-warning text-xs">
-                    {t("Google still allows kwapso more than it asks for here. Disconnecting and connecting again is the only thing that clears it.")}
+                    {t("Google still allows {brand} more than it asks for here. Disconnecting and connecting again is the only thing that clears it.", BRAND)}
                   </p>
                 )}
 
@@ -379,7 +390,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   * the only half a person can act on differently. */}
                 {live && live.missingScopes.length > 0 && (
                   <p className="text-warning text-xs">
-                    {t("This connection is missing a permission kwapso now needs. Disconnect it and connect it again.")}
+                    {t("This connection is missing a permission {brand} now needs. Disconnect it and connect it again.", BRAND)}
                   </p>
                 )}
 
@@ -394,7 +405,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                       * misreading. */}
                     {SCOPED.includes(service) && live.scopeMode !== "only" && (
                       <p className="text-muted-foreground text-xs">
-                        {t(SERVICE_COPY[service].scope)}
+                        {t(SERVICE_COPY[service].scope, BRAND)}
                       </p>
                     )}
                     {SCOPED.includes(service) && live.scopeMode === "only" && named.length === 0 && (
@@ -407,7 +418,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                     {named.length === 0 && !SCOPED.includes(service) ? (
                       <p className="text-muted-foreground text-xs">
                         {t("Nothing shared yet — {scope}", {
-                          scope: t(SERVICE_COPY[service].scope),
+                          scope: t(SERVICE_COPY[service].scope, BRAND),
                         })}
                       </p>
                     ) : (
@@ -638,7 +649,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
               * different things are the description. The paragraph gets a second
               * line inside it instead. */}
             <AlertDialogDescription>
-              {t("kwapso stops reading and writing there straight away, and anything you shared through it stops being shared. We'll ask Google to drop the connection too.")}
+              {t("{brand} stops reading and writing there straight away, and anything you shared through it stops being shared. We'll ask Google to drop the connection too.", BRAND)}
               <span className="mt-2 block">
                 {t("Your Google connections are all one app at Google, so the others may need connecting again afterwards. The card will say which.")}
               </span>

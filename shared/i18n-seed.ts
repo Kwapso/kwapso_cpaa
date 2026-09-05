@@ -151,10 +151,10 @@ export const SEED: Catalogue = {
 
   /* ── The language switcher itself ────────────────────────────────────────── */
   Language: { de: "Sprache", es: "Idioma", ca: "Idioma" },
-  "Choose the language you want kwapso in.": {
-    de: "Wählen Sie die Sprache, in der Sie kwapso sehen möchten.",
-    es: "Elige el idioma en el que quieres ver kwapso.",
-    ca: "Tria l'idioma en què vols veure kwapso.",
+  "Choose the language you want {brand} in.": {
+    de: "Wählen Sie die Sprache, in der Sie {brand} sehen möchten.",
+    es: "Elige el idioma en el que quieres ver {brand}.",
+    ca: "Tria l'idioma en què vols veure {brand}.",
     
     
     
@@ -1480,7 +1480,7 @@ export const SEED: Catalogue = {
   "Deliverable updated.": { de: "Ergebnis aktualisiert.", es: "Entregable actualizado.", ca: "Lliurable actualitzat."},
   "Demo walkthrough": { de: "Demo-Rundgang", es: "Recorrido de demostración", ca: "Recorregut de demostració"},
   "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions.": { de: "Beschreiben Sie das Problem, das Sie haben. Tauschen Sie sich mit anderen aus, oder nutzen Sie dieses Ticket als Forum, um Lösungen zu besprechen.", es: "Describe el problema que tienes. Habla con otras personas, o usa este ticket como foro para discutir soluciones.", ca: "Descriu el problema que tens. Parla amb altres persones, o fes servir aquest ticket com a fòrum per debatre solucions."},
-  "Disconnected here. Remove kwapso in your Google account too.": { de: "Hier getrennt. Entfernen Sie kwapso auch in Ihrem Google-Konto.", es: "Desconectado aquí. Quita kwapso también en tu cuenta de Google.", ca: "Desconnectat aquí. Treu kwapso també del teu compte de Google."},
+  "Disconnected here. Remove {brand} in your Google account too.": { de: "Hier getrennt. Entfernen Sie {brand} auch in Ihrem Google-Konto.", es: "Desconectado aquí. Quita {brand} también en tu cuenta de Google.", ca: "Desconnectat aquí. Treu {brand} també del teu compte de Google."},
   "Disconnected.": { de: "Getrennt.", es: "Desconectado.", ca: "Desconnectat."},
   "Earlier meetings haven't been loaded yet, so this month may not be the whole of it.": { de: "Frühere Termine wurden noch nicht geladen, dieser Monat ist also möglicherweise nicht vollständig.", es: "Las reuniones anteriores aún no se han cargado, así que puede que este mes no esté completo.", ca: "Les reunions anteriors encara no s'han carregat, així que potser aquest mes no hi és tot."},
   "Edit app": { de: "App bearbeiten", es: "Editar app", ca: "Editar app"},
@@ -1730,7 +1730,7 @@ export const SEED: Catalogue = {
   "1 source matches": { de: "1 Quelle passt", es: "1 fuente coincide", ca: "1 font coincideix"},
   "1 story matches": { de: "1 Story passt", es: "1 historia coincide", ca: "1 història coincideix"},
   "1 ticket matches": { de: "1 Ticket passt", es: "1 ticket coincide", ca: "1 tiquet coincideix"},
-  "A conversation, with what you mean to cover. It is kept here — kwapso reads your calendar and never writes to it.": { de: "Ein Gespräch mit dem, was Sie besprechen wollen. Es wird hier festgehalten – kwapso liest Ihren Kalender und schreibt nie hinein.", es: "Una conversación, con lo que quieres tratar. Se guarda aquí: kwapso lee tu calendario y nunca escribe en él.", ca: "Una conversa, amb allò que vols tractar. Es desa aquí: kwapso llegeix el teu calendari i mai no hi escriu."},
+  "A conversation, with what you mean to cover. It is kept here — {brand} reads your calendar and never writes to it.": { de: "Ein Gespräch mit dem, was Sie besprechen wollen. Es wird hier festgehalten – {brand} liest Ihren Kalender und schreibt nie hinein.", es: "Una conversación, con lo que quieres tratar. Se guarda aquí: {brand} lee tu calendario y nunca escribe en él.", ca: "Una conversa, amb allò que vols tractar. Es desa aquí: {brand} llegeix el teu calendari i mai no hi escriu."},
   "A message on the ticket. It does not resolve it.": { de: "Eine Nachricht am Ticket. Sie löst es nicht.", es: "Un mensaje en el ticket. No lo resuelve.", ca: "Un missatge al tiquet. No el resol."},
   "A section of this app, like Settings or Documents. Tickets say which one they are about.": { de: "Ein Bereich dieser App, etwa Einstellungen oder Dokumente. Tickets nennen den Bereich, um den es geht.", es: "Una sección de esta aplicación, como Ajustes o Documentos. Los tickets indican a cuál se refieren.", ca: "Una secció d'aquesta aplicació, com Configuració o Documents. Els tiquets indiquen a quina es refereixen."},
   "Activate profile": { de: "Profil aktivieren", es: "Activar perfil", ca: "Activa el perfil"},
@@ -1747,7 +1747,7 @@ export const SEED: Catalogue = {
   "Colour": { de: "Farbe", es: "Color", ca: "Color"},
   "Compare with": { de: "Vergleichen mit", es: "Comparar con", ca: "Compara amb"},
   "Connect everything": { de: "Alles verbinden", es: "Conectar todo", ca: "Connecta-ho tot"},
-  "Connect your own Google account. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.": { de: "Verbinden Sie Ihr eigenes Google-Konto. kwapso nutzt nie das von jemand anderem – der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können, und nicht mehr.", es: "Conecta tu propia cuenta de Google. kwapso nunca usa la de otra persona: el asistente que trabaja para ti ve exactamente lo que tú puedes ver, y nada más.", ca: "Connecta el teu propi compte de Google. kwapso mai no fa servir el d'una altra persona: l'assistent que treballa per a tu veu exactament el que tu pots veure, i res més."},
+  "Connect your own Google account. {brand} never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.": { de: "Verbinden Sie Ihr eigenes Google-Konto. {brand} nutzt nie das von jemand anderem – der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können, und nicht mehr.", es: "Conecta tu propia cuenta de Google. {brand} nunca usa la de otra persona: el asistente que trabaja para ti ve exactamente lo que tú puedes ver, y nada más.", ca: "Connecta el teu propi compte de Google. {brand} mai no fa servir el d'una altra persona: l'assistent que treballa per a tu veu exactament el que tu pots veure, i res més."},
   "Couldn't accept the invite.": { de: "Einladung konnte nicht angenommen werden.", es: "No se pudo aceptar la invitación.", ca: "No s'ha pogut acceptar la invitació."},
   "Couldn't activate that rate.": { de: "Dieser Satz konnte nicht aktiviert werden.", es: "No se pudo activar esa tarifa.", ca: "No s'ha pogut activar aquesta tarifa."},
   "Couldn't attach that.": { de: "Das konnte nicht angehängt werden.", es: "No se pudo adjuntar eso.", ca: "No s'ha pogut adjuntar això."},
@@ -2129,10 +2129,10 @@ export const SEED: Catalogue = {
     es: "Cambia un paso que ya tienes",
     ca: "Canvia un pas que ja tens",
   },
-  "Choose what kwapso may read": {
-    de: "Wählen Sie, was kwapso lesen darf",
-    es: "Elige lo que kwapso puede leer",
-    ca: "Tria el que kwapso pot llegir",
+  "Choose what {brand} may read": {
+    de: "Wählen Sie, was {brand} lesen darf",
+    es: "Elige lo que {brand} puede leer",
+    ca: "Tria el que {brand} pot llegir",
   },
   "Clear filters": { de: "Filter löschen", es: "Borrar filtros", ca: "Esborra filtres" },
   "Compare": { de: "Vergleichen", es: "Comparar", ca: "Comparar" },
@@ -2386,10 +2386,10 @@ export const SEED: Catalogue = {
     es: "Déjalo en blanco para listar tus etiquetas",
     ca: "Deixa en blanc per llistar les teves etiquetes",
   },
-  "Leave it off and what kwapso already read stays answerable. Only what it reads from now on follows the new answer.": {
-    de: "Lassen Sie es aus und das, was kwapso bereits gelesen hat, bleibt beantwortbar. Nur das, was es ab jetzt liest, folgt der neuen Antwort.",
-    es: "Déjalo desactivado y lo que kwapso ya ha leído sigue siendo respondible. Sólo lo que lea a partir de ahora seguirá la nueva respuesta.",
-    ca: "Deixa-ho desactivat i el que kwapso ja ha llegit continua sent respondible. Només el que llegeixi d'ara endavant seguirà la nova resposta.",
+  "Leave it off and what {brand} already read stays answerable. Only what it reads from now on follows the new answer.": {
+    de: "Lassen Sie es aus und das, was {brand} bereits gelesen hat, bleibt beantwortbar. Nur das, was es ab jetzt liest, folgt der neuen Antwort.",
+    es: "Déjalo desactivado y lo que {brand} ya ha leído sigue siendo respondible. Sólo lo que lea a partir de ahora seguirá la nueva respuesta.",
+    ca: "Deixa-ho desactivat i el que {brand} ja ha llegit continua sent respondible. Només el que llegeixi d'ara endavant seguirà la nova resposta.",
   },
   "Leaving out": { de: "Auslassen", es: "Omitiendo", ca: "Ometent" },
   "Let go of what was already read": {
@@ -2849,10 +2849,10 @@ export const SEED: Catalogue = {
     es: "Hasta ahora solo hay una cifra para comparar.",
     ca: "Fins ara només hi ha una xifra per comparar.",
   },
-  "This can ADD calendars kwapso cannot see today, as well as leaving your main one out. Name none and no calendar is read at all.": {
-    de: "Dies kann ADD-Kalender hinzufügen, die kwapso heute nicht sehen kann, und gleichzeitig Ihren Hauptkalender auslassen. Nennen Sie keinen und es wird kein Kalender gelesen.",
-    es: "Esto puede ADD calendarios que kwapso no puede ver hoy, además de excluir tu principal. No nombres ninguno y no se leerá ningún calendario.",
-    ca: "Això pot ADD calendaris que kwapso no pot veure avui, a més d’excloure el teu principal. No en nomenis cap i no es llegirà cap calendari.",
+  "This can ADD calendars {brand} cannot see today, as well as leaving your main one out. Name none and no calendar is read at all.": {
+    de: "Dies kann ADD-Kalender hinzufügen, die {brand} heute nicht sehen kann, und gleichzeitig Ihren Hauptkalender auslassen. Nennen Sie keinen und es wird kein Kalender gelesen.",
+    es: "Esto puede ADD calendarios que {brand} no puede ver hoy, además de excluir tu principal. No nombres ninguno y no se leerá ningún calendario.",
+    ca: "Això pot ADD calendaris que {brand} no pot veure avui, a més d’excloure el teu principal. No en nomenis cap i no es llegirà cap calendari.",
   },
   "This isn't your team's assistant credits — those are untouched. The account the assistant itself runs on needs topping up before it can answer again.": {
     de: "Dies sind nicht die Assistant-Guthaben Ihres Teams — diese bleiben unverändert. Der Kunde, auf dem der Assistant selbst läuft, muss aufgeladen werden, bevor er wieder antworten kann.",
@@ -2960,15 +2960,15 @@ export const SEED: Catalogue = {
   },
   "What it is done in": { de: "Wo es erledigt wird", es: "En qué se hace", ca: "En què es fa" },
   "What it may read": { de: "Was es lesen könnte", es: "Qué puede leer", ca: "Què pot llegir" },
-  "What kwapso may read in your calendar": {
-    de: "Was kwapso in Ihrem Kalender lesen kann",
-    es: "Qué puede leer kwapso en tu calendario",
-    ca: "Què pot llegir kwapso al teu calendari",
+  "What {brand} may read in your calendar": {
+    de: "Was {brand} in Ihrem Kalender lesen kann",
+    es: "Qué puede leer {brand} en tu calendario",
+    ca: "Què pot llegir {brand} al teu calendari",
   },
-  "What kwapso may read in your mail": {
-    de: "Was kwapso in Ihrer Mail lesen kann",
-    es: "Qué puede leer kwapso en tu correo",
-    ca: "Què pot llegir kwapso al teu correu",
+  "What {brand} may read in your mail": {
+    de: "Was {brand} in Ihrer Mail lesen kann",
+    es: "Qué puede leer {brand} en tu correo",
+    ca: "Què pot llegir {brand} al teu correu",
   },
   "What the call proposed": {
     de: "Was der Anruf vorgeschlagen hat",
@@ -3015,10 +3015,10 @@ export const SEED: Catalogue = {
     es: "Lo que nos has enviado",
     ca: "El que ens has enviat",
   },
-  "Whatever you leave out is never fetched at all, so it never reaches kwapso even for a moment.": {
-    de: "Alles, was Sie weglassen, wird nie abgeholt, sodass es nie für einen Moment kwapso erreicht.",
-    es: "Todo lo que omitas nunca se recupera, así que nunca llega a kwapso ni por un momento.",
-    ca: "Tot el que deixis fora mai s’obté, de manera que mai arriba a kwapso ni un moment.",
+  "Whatever you leave out is never fetched at all, so it never reaches {brand} even for a moment.": {
+    de: "Alles, was Sie weglassen, wird nie abgeholt, sodass es nie für einen Moment {brand} erreicht.",
+    es: "Todo lo que omitas nunca se recupera, así que nunca llega a {brand} ni por un momento.",
+    ca: "Tot el que deixis fora mai s’obté, de manera que mai arriba a {brand} ni un moment.",
   },
   "Where does this step sit?": {
     de: "Wo dieser Schritt sitzt?",
@@ -3065,10 +3065,10 @@ export const SEED: Catalogue = {
     es: "Solo tu calendario principal. Tus otros calendarios no se leen. Así funciona hoy.",
     ca: "Només el teu calendari principal. Els teus altres calendaris no es llegeixen. Així funciona avui.",
   },
-  "Your main calendar, read only. kwapso never adds, changes or cancels anything in it. Name other calendars below to include them too.": {
-    de: "Ihr Hauptkalender, schreibgeschützt. kwapso fügt nie etwas hinzu, ändert oder storniert nichts darin. Benennen Sie unten weitere Kalender, um sie ebenfalls einzubeziehen.",
-    es: "Tu calendario principal, solo lectura. kwapso nunca añade, cambia o cancela nada en él. Nombra otros calendarios abajo para incluirlos también.",
-    ca: "El teu calendari principal, només de lectura. kwapso mai afegeix, canvia o cancel·la res dins. Nomena altres calendaris a continuació per incloure'ls també.",
+  "Your main calendar, read only. {brand} never adds, changes or cancels anything in it. Name other calendars below to include them too.": {
+    de: "Ihr Hauptkalender, schreibgeschützt. {brand} fügt nie etwas hinzu, ändert oder storniert nichts darin. Benennen Sie unten weitere Kalender, um sie ebenfalls einzubeziehen.",
+    es: "Tu calendario principal, solo lectura. {brand} nunca añade, cambia o cancela nada en él. Nombra otros calendarios abajo para incluirlos también.",
+    ca: "El teu calendari principal, només de lectura. {brand} mai afegeix, canvia o cancel·la res dins. Nomena altres calendaris a continuació per incloure'ls també.",
   },
   "Your role can read the knowledge base — every source is here, and so is the record behind it — but asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role.": {
     de: "Ihre Rolle kann die Wissensdatenbank lesen — jede Quelle ist hier, ebenso der dahinterstehende Datensatz —, aber das Stellen einer Frage erfolgt über den Assistenten, den Ihre Rolle nicht nutzen kann. Ein Team-Administrator kann das für Ihre Rolle aktivieren.",

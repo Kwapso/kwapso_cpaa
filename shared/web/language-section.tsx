@@ -40,7 +40,18 @@ import {
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
+import { brand } from "../brand"
 import { useLanguage } from "./language"
+
+/** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
+ * itself "THE one place to brand this app" and twenty-three files read it; the
+ * sentences below used to spell the name out instead, which meant a rebrand — or
+ * a fork of this base for the next product — would have left them saying the old
+ * one, in four languages, on a screen that looked finished. Written as a `{brand}`
+ * hole rather than concatenated, because a hole is the only shape a translator
+ * can reorder (shared/i18n.ts, `fill`). */
+const BRAND = { brand: brand.name }
+
 
 export function LanguageSection({
   /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
@@ -94,7 +105,7 @@ export function LanguageSection({
       </h2>
       <div className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">
         <p className="text-muted-foreground text-sm">
-          {t("Choose the language you want kwapso in.")}{" "}
+          {t("Choose the language you want {brand} in.", BRAND)}{" "}
           {t("What people type stays in the language they typed it.")}
         </p>
         <Select
