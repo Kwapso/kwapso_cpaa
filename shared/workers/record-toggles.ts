@@ -350,6 +350,16 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
 /** The entry a caller named, or undefined. `hasOwnProperty`, not bracket
  * access — `record=__proto__` resolves an inherited member on a bare object
  * literal and would then read as a live door. */
+/** THE KINDS, as an allow-list both machine surfaces declare in their schema.
+ *
+ * DERIVED from the map above, never typed out beside it. `set_record_active`
+ * used to take `record` as a free string and forward an unrecognised one to the
+ * ACCOUNTS door — so a caller asking to archive a ticket silently archived a
+ * client. Both surfaces now declare this as an enum, which turns that into a 400
+ * naming the kinds; a hand-written second list would have re-opened the same hole
+ * the first time somebody added a toggle and updated only one of the three. */
+export const RECORD_TOGGLE_NAMES = Object.keys(RECORD_TOGGLES)
+
 export function recordToggle(name: string | undefined): RecordToggle | undefined {
   if (!name) return undefined
   return Object.prototype.hasOwnProperty.call(RECORD_TOGGLES, name)
