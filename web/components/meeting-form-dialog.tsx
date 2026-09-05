@@ -32,6 +32,17 @@ import { richTextValue } from "@shared/web/rich-text"
 import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
+import { brand } from "@shared/brand"
+
+/** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
+ * itself "THE one place to brand this app" and twenty-three files read it; the
+ * sentences below used to spell the name out instead, which meant a rebrand — or
+ * a fork of this base for the next product — would have left them saying the old
+ * one, in four languages, on a screen that looked finished. Written as a `{brand}`
+ * hole rather than concatenated, because a hole is the only shape a translator
+ * can reorder (shared/i18n.ts, `fill`). */
+const BRAND = { brand: brand.name }
+
 
 /** A picker can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
@@ -163,7 +174,8 @@ export function MeetingFormDialog({
                  that promises an action the app refuses to take is worse than a
                  form that says nothing, so it now says what actually happens. */
               t(
-                "A conversation, with what you mean to cover. It is kept here — kwapso reads your calendar and never writes to it."
+                "A conversation, with what you mean to cover. It is kept here — {brand} reads your calendar and never writes to it.",
+                BRAND
               )}
         </DialogDescription>
       }

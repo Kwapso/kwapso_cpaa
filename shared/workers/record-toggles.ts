@@ -356,5 +356,3 @@ export function recordToggle(name: string | undefined): RecordToggle | undefined
     ? RECORD_TOGGLES[name]
     : undefined
 }
-
-export const RECORD_TOGGLE_NAMES = Object.keys(RECORD_TOGGLES)

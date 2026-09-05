@@ -31,8 +31,9 @@
 // It exits non-zero if any check fails or any artefact could not be taken back.
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
-const BASE = process.env.SWEEP_BASE ?? "https://agency-staging.kwapso.app"
+const BASE = process.env.SWEEP_BASE ?? FRONT_DOORS.staging.agency
 /** The one Google account this sweep is allowed to touch. Named here so a
  * misconfigured run stops at the door rather than mailing a stranger — the
  * signed-in connection is checked against it before a single write. */

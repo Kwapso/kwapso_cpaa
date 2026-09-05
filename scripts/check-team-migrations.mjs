@@ -166,6 +166,9 @@ import { fileURLToPath } from "node:url"
 
 import ts from "typescript"
 
+import { expectedAccount } from "./check-cloudflare-account.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
 /** The core database + the gateway origin per environment. The database names
@@ -175,8 +178,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
  * remedy line, so a drift here misprints a URL — it can never turn a red run
  * green, which is why this one is a list and the version is not. */
 export const ENVIRONMENTS = {
-  staging: { db: "kwapso-core-staging", origin: "https://agency-staging.kwapso.app" },
-  production: { db: "kwapso-core", origin: "https://agency.kwapso.app" },
+  staging: { db: "kwapso-core-staging", origin: FRONT_DOORS.staging.agency },
+  production: { db: "kwapso-core", origin: FRONT_DOORS.production.agency },
 }
 
 /**
@@ -418,7 +421,11 @@ function main(argv) {
   // that is a DIFFERENT client's account. It is deliberately hard rather than a
   // warning: every deploy here runs through `cf-exec`, so the correct path is
   // never the one that trips it.
-  const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+  //
+  // The id itself comes from `check-cloudflare-account.mjs`, which derives it
+  // from the workers' own configs — the two guards were always the same
+  // sentence; since 5 Sep 2026 they are the same VALUE too.
+  const KWAPSO_ACCOUNT_ID = expectedAccount()
   if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
     console.error(
       `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +

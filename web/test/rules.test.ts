@@ -110,6 +110,47 @@ function componentFiles(): string[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
+/** THE CLIENT PORTAL'S ALLOW-LIST, READ OFF THE GATEWAY'S OWN TABLE.
+ *
+ * THREE LAWS ASK THE SAME QUESTION and, until 5 Sep 2026, they asked it with two
+ * different instruments. R21 and R24's first clause ran `stripComments` over the
+ * WHOLE FILE; R24's outbound clause sliced the table out and dropped comment
+ * LINES. The outbound clause is the right one, and its own header says why: a
+ * block-comment OPENER in prose or in a string literal — the two characters that
+ * end a wildcard path like the gateway's own media route — opens a comment to a
+ * naive stripper, which then runs to the next closing marker anywhere below and
+ * takes every door in between with it.
+ *
+ * MEASURED BOTH WAYS AT THIS COMMIT, 5 Sep 2026: 31 doors either way. The hazard
+ * has never actually fired here, because the gateway's media prose sits in `//`
+ * line comments and the line pass removes those before the block pass ever sees
+ * them — so the outbound clause's own note that eleven doors are being swallowed
+ * describes a shape, not this file. It fires the moment somebody writes the same
+ * two characters inside a STRING: a canary that injects one near the top of the
+ * table, with an ordinary doc comment below it to supply the closing marker,
+ * costs `stripComments` six of the thirty-one and costs the line filter none.
+ *
+ * ALLOW-LIST SEMANTICS ARE WHY A SILENT LOSS MATTERS. A door IN this set is
+ * SKIPPED by R21's walk ("the portal opens it on purpose") and asserted ABSENT by
+ * R24's. Losing one does not go red — it narrows both laws in silence, which is
+ * the failure mode this whole file is written against.
+ *
+ * And it reads the TABLE rather than the file: an allow-list should come from the
+ * allow-list. One entry per line, so dropping comment LINES is exact rather than
+ * heuristic. */
+function portalDoorList(): string[] {
+  const src = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+  const table = /export const PORTAL_DOORS[^=]*=\s*\{([\s\S]*?)\n\}/.exec(src)
+  expect(table, "PORTAL_DOORS not found in the portal gateway — did the table move?").toBeTruthy()
+  const body = (table as RegExpExecArray)[1]
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join("\n")
+  const doors = [...body.matchAll(/"([A-Z]+ \/[^"]+)":\s*"(\w+)"/g)].map((m) => m[1])
+  expect(doors.length, "PORTAL_DOORS did not parse").toBeGreaterThan(20)
+  return doors
+}
+
 /** R2 / R8 — THE BESPOKE RECORD DETAILS, READ OFF THE CODE.
  *
  * A law that enumerates its subject from a hand-kept list has a hole by
@@ -1975,11 +2016,11 @@ describe("RULES — the laws of the base", () => {
     // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`.
     // R21 is the law written because a client login reached the agency's own
     // doors twice; an allow-list it shares with prose is not a law.
-    const portalSrc = stripComments(
-      read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
-    )
-    const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
-    expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
+    //
+    // Through `portalDoorList` since 5 Sep 2026 — the one reader, whose header
+    // says why a comment STRIPPER is the wrong instrument for an allow-list even
+    // when it happens to lose nothing today.
+    const portalDoors = new Set(portalDoorList())
 
     // ── 3. every route, and the source its handler actually runs ─────────────
     // auth and realtime answer from a switch rather than a ROUTES table, and
@@ -2123,20 +2164,16 @@ describe("RULES — the laws of the base", () => {
     ).toBeGreaterThan(3)
 
     // ── 1. none of them is on the portal's surface ────────────────────────────
-    // COMMENTS OFF. `portalDoors` is an ALLOW-LIST — a door in it is SKIPPED by
-    // the walk below ("the portal opens it ON PURPOSE") — and this read was raw,
-    // so a comment in the portal gateway shaped like a PORTAL_DOORS entry
-    // silenced R21 for whatever door it named. Proved 27 Aug 2026: removing
-    // `refusePortalCaller` from getBrandAssets is caught and names the door, and
-    // stops being caught once portal-gateway/src/index.ts carries the line
-    // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`.
-    // R21 is the law written because a client login reached the agency's own
-    // doors twice; an allow-list it shares with prose is not a law.
-    const portalSrc = stripComments(
-      read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
-    )
-    const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
-    expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
+    // THE ALLOW-LIST, THROUGH THE ONE READER (`portalDoorList`). This clause used
+    // to run `stripComments` over the whole gateway file, which is the wrong
+    // instrument for an allow-list twice over: a comment shaped like an entry can
+    // ADD a door (proved 27 Aug 2026 — removing `refusePortalCaller` from
+    // getBrandAssets stops being caught once the gateway carries the line
+    // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`), and a
+    // block-comment opener in prose or in a string can LOSE one. This clause is
+    // asserting ABSENCE, so a lost door is a lost assertion and nothing goes red.
+    // The reader's header carries the measurement and the canary.
+    const portalDoors = new Set(portalDoorList())
     const published = internalDoors.filter((d) => portalDoors.has(d.door))
     expect(
       published.map((d) => d.door),
@@ -2321,21 +2358,13 @@ describe("RULES — the laws of the base", () => {
 
     // ── ii · the client-readable doors are the portal's own allow-list ────────
     //
-    // LINE COMMENTS DROPPED, NOT COMMENTS STRIPPED. The gateway's prose contains
-    // `/media/*`, which opens a block comment to a naive stripper and swallows
-    // eleven real doors after it. Losing doors here would make the pin look
-    // complete while the runtime set was short — a check agreeing with a
-    // narrower version of itself, which is the failure mode this whole law is
-    // written against. One line per entry, so dropping comment LINES is exact.
-    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
-    const table = /export const PORTAL_DOORS[^=]*=\s*\{([\s\S]*?)\n\}/.exec(portalSrc)
-    expect(table, "PORTAL_DOORS not found in the portal gateway — did the table move?").toBeTruthy()
-    const body = (table as RegExpExecArray)[1]
-      .split("\n")
-      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
-      .join("\n")
-    const portalDoors = [...body.matchAll(/"([A-Z]+ \/[^"]+)":\s*"(\w+)"/g)].map((m) => m[1])
-    expect(portalDoors.length, "PORTAL_DOORS did not parse").toBeGreaterThan(20)
+    // LINE COMMENTS DROPPED, NOT COMMENTS STRIPPED — the reasoning that used to
+    // sit here now sits on `portalDoorList`, because on 5 Sep 2026 the two older
+    // readers of this same allow-list (R21's clause 2 and R24's clause 1) were
+    // folded into it. Losing doors here would make the pin look complete while
+    // the runtime set was short: a check agreeing with a narrower version of
+    // itself, which is the failure mode this whole law is written against.
+    const portalDoors = portalDoorList()
     expect(
       portalDoors.filter((d) => !d.startsWith("GET ")).sort(),
       `CLIENT_READABLE_WRITE_DOORS (shared/workers/money-taint.ts) has drifted from the non-GET half of PORTAL_DOORS. The allow-list is the definition of what a client's browser may call, so it is the oracle — re-pin it (R24 outbound)`

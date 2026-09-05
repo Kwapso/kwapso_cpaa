@@ -54,6 +54,7 @@ import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const SOURCE = resolve(ROOT, "glide/normalised.json")
@@ -64,8 +65,8 @@ const WORK_DIR = resolve(tmpdir(), "kwapso-glide-visuals")
 // ── where, and may we ────────────────────────────────────────────────────────
 
 const TARGETS = {
-  staging: { base: "https://agency-staging.kwapso.app", label: "staging" },
-  production: { base: "https://agency.kwapso.app", label: "PRODUCTION" },
+  staging: { base: FRONT_DOORS.staging.agency, label: "staging" },
+  production: { base: FRONT_DOORS.production.agency, label: "PRODUCTION" },
 }
 
 const target = process.argv[2]

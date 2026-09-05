@@ -30,12 +30,19 @@
 import { execSync } from "node:child_process"
 import { writeFileSync, unlinkSync } from "node:fs"
 
+import { expectedAccount } from "./check-cloudflare-account.mjs"
+
 const GLOBAL_DB = { staging: "kwapso-core-staging", production: "kwapso-core" }
 const KEEP = new Set(["d1_migrations"]) // migration history survives a reset
 
 // The one account these databases live in. A destructive script may not infer
-// this from ambient login state.
-const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+// this from ambient login state — and, since 5 Sep 2026, may not carry it as a
+// literal either: `expectedAccount()` DERIVES it from the ten `CF_ACCOUNT_ID`
+// declarations in the workers' own wrangler configs and requires them to agree.
+// That file's header made the argument before this one followed it — a copy is
+// the one that goes stale, and it welds a client's account number into a base
+// meant to be forked. Five scripts held the literal; none does now.
+const KWAPSO_ACCOUNT_ID = expectedAccount()
 if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
   console.error(
     `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +

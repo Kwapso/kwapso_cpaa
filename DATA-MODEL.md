@@ -758,6 +758,18 @@ turn is persisted here, so the conversation is replayable and auditable. The
 agent acts AS the signed-in user through the same gated endpoints the UI uses, so
 these rows are a record of intent, never a separate set of powers.
 
+**`agent_messages.content` is WRITE-ONCE, and that is the point rather than an
+omission.** No door updates it; a turn is inserted and never revised. Said here
+because it was the one immutable user-facing column in the base with no reason on
+file — the other four each carry theirs where they are declared
+(`knowledge_terms.term` is half the primary key, `client_tool_prices` is an
+append-only price history so that March's arithmetic does not get rewritten, and
+`google_connections.service` / `google_sources.service` are structural) — so the
+next person auditing one-way columns had to re-derive this one, as a tidiness
+review did on 5 Sep 2026. A conversation that can be edited afterwards is not a
+record of what was asked and answered, which is the only thing these rows are
+for. Correcting a turn means adding another one.
+
 ### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest. KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors` + `0022_knowledge_files`). THE KNOWLEDGE BASE
 One knowledge base, many **compartments**, chosen for the reader rather than by
 them. Four tables, one per job:

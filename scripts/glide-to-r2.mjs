@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Move the rescued Glide files off Google's storage and onto OUR R2, permanently.
 //
-//   export CLOUDFLARE_API_TOKEN=$(security find-generic-password -s cf-token-kwapso -w)
-//   export CLOUDFLARE_ACCOUNT_ID=b5bb3d84a59c029ea5e0fe164dab1cf7
-//   node scripts/glide-to-r2.mjs staging
-//   node scripts/glide-to-r2.mjs production
+//   cf-exec node scripts/glide-to-r2.mjs staging
+//   cf-exec node scripts/glide-to-r2.mjs production
+//
+// `cf-exec` resolves the account from the folder and puts the id and the key in
+// the environment (OPERATIONS.md § 0). Exporting the pair by hand still works and
+// the refusal below prints the two lines — it just no longer spells the account
+// number out in a comment, which is a copy that cannot be kept current.
 //
 // glide/files/manifest.json is the source of truth — every file Glide was hosting
 // for us, with the row and column that referenced it (scripts/glide-files.mjs put
@@ -62,6 +65,9 @@ import { createHash } from "node:crypto"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { expectedAccount } from "./check-cloudflare-account.mjs"
+import { FRONT_DOORS as DECLARED_DOORS } from "./lib/front-doors.mjs"
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const MANIFEST = resolve(ROOT, "glide/files/manifest.json")
 const FILES_DIR = resolve(ROOT, "glide/files")
@@ -72,13 +78,14 @@ const BUCKET = { staging: "kwapso-glide-archive-staging", production: "kwapso-gl
 
 /** The two public front doors, per environment — the ones the refusal check asks.
  * Production answers on its custom domains only (OPERATIONS.md); staging keeps its
- * workers.dev names, which is where the smoke and the seed reach it. */
+ * workers.dev names, which is where the smoke and the seed reach it — so the
+ * staging half is NOT the declared front door and is written out on purpose. */
 const FRONT_DOORS = {
   staging: {
     agency: "https://kwapso-staging.kwapso.workers.dev",
     portal: "https://kwapso-portal-staging.kwapso.workers.dev",
   },
-  production: { agency: "https://agency.kwapso.app", portal: "https://client.kwapso.app" },
+  production: { agency: DECLARED_DOORS.production.agency, portal: DECLARED_DOORS.production.portal },
 }
 
 // R11 — an external call always has a deadline. Generous, because the biggest
@@ -93,7 +100,11 @@ const PAGE = 1000 // R2's list page, followed to the end by cursor
 // wrangler and the API both take whatever account the machine is pointed at, and
 // on the machine this was written for that default is a DIFFERENT client's. This
 // script writes 79 MB of one client's files; it may not infer where.
-const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+//
+// Said out loud, DERIVED — `expectedAccount()` reads the id off the workers' own
+// wrangler configs (check-cloudflare-account.mjs). Naming it and remembering it
+// are two different things, and only the first one was ever the point.
+const KWAPSO_ACCOUNT_ID = expectedAccount()
 const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN
 if (ACCOUNT !== KWAPSO_ACCOUNT_ID || !TOKEN) {

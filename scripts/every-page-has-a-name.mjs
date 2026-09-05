@@ -22,9 +22,10 @@
 // Exits non-zero when a page has no visible name, so it can gate a deploy.
 
 import { chromium } from "playwright"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const API = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
-const AGENCY = process.env.AGENCY_BASE ?? "https://agency-staging.kwapso.app"
+const AGENCY = process.env.AGENCY_BASE ?? FRONT_DOORS.staging.agency
 const KEY = process.env.TEST_LOGIN_KEY
 if (!KEY) {
   console.log("FAIL no TEST_LOGIN_KEY — export it first")
