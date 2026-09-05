@@ -521,8 +521,8 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
  * validation seam behind — that is precisely the substitution R20's query census
  * exists to catch.
  *
- * THE KEY CARRIES NO CALLER INPUT AT ALL. `mediaKey(teamId)` is the team's id and
- * a fresh ULID, so there is no path to contain, no dot-segment to reject and no
+ * THE KEY CARRIES NO CALLER INPUT AT ALL. It is the team's id, this module's own
+ * segment and a fresh ULID, so there is no path to contain, no dot-segment to reject and no
  * escape to think about — the strongest form of the rule `safeObjectKey` states
  * for the backup, arrived at by the key having no user-supplied segment rather
  * than by filtering one. The declared FILE NAME is a label on the row; it never

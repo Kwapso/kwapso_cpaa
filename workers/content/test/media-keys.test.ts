@@ -293,3 +293,71 @@ describe("a reclaim is proved against the key some door actually mints", () => {
       ).toHaveLength(1)
   })
 })
+
+// "FIND, COUNT, MOVE OR DELETE ONE TENANT'S OBJECTS" HAS TO BE ANSWERABLE.
+//
+// R2 has no folders — a prefix is whatever the keys happen to start with — so the
+// set of prefixes a tenant's objects live under IS the answer to that question,
+// and it was never written down. Nine different shapes were live at once across
+// three incompatible conventions (kind-first `story/<team>`, team-first
+// `<team>/apps`, and a bare `<team>` shared by four modules), one of which
+// (`users/<id>`) carries no team at all.
+//
+// A key cannot be renamed once it is written, so the fix is not one shape: it is
+// that the SET is derived off disk, pinned with a reason each, and cannot grow by
+// accident. It fails both ways — a new shape nobody listed, and a listed shape
+// nothing mints any more — so the table is a description of the bucket rather
+// than a record of what the bucket used to look like.
+//
+// There is no tenant-DELETE path today (deactivate, never delete), so this is
+// latent. It becomes real the first time a client asks for erasure, and that is
+// the worst possible moment to be discovering the shapes.
+describe("every object prefix a tenant's files live under is written down", () => {
+  const PREFIXES: Record<string, string> = {
+    '"users", user.id': "a person's profile photo — the ONE shape with no team in it, because a photo belongs to the person and follows them between teams (workers/auth/src/lib/profile.ts)",
+    '"teams", teamId': "the team's own logo, keyed by the team it IS rather than by a team it belongs to (workers/tenancy/src/lib/teams.ts)",
+    '"ticket", guard.teamId': "a ticket's attachments — kind-first, from before the team-first convention (workers/content/src/routes/help.ts)",
+    '"story", guard.teamId': "a story's attachments — kind-first, same vintage (workers/content/src/routes/stories.ts)",
+    '"todo", guard.teamId': "the file a CLIENT sends back through the portal to close a to-do — kind-first, same vintage (workers/content/src/routes/todos.ts)",
+    'guard.teamId, "accounts"': "a client's logo and cover (workers/tenancy/src/routes/accounts.ts)",
+    'guard.teamId, "apps"': "an app's logo (workers/tenancy/src/routes/processes.ts)",
+    'guard.teamId, "tasks"': "the photo of the letter on a piece of our own admin (workers/content/src/routes/todos.ts)",
+    'guard.teamId, "knowledge"': "the material behind a knowledge source (workers/content/src/routes/knowledge.ts)",
+    'guard.teamId, "brand"': "the brand library's files (workers/content/src/routes/brand-assets.ts)",
+    'guard.teamId, "staff"': "staff photos and certificates — one generic upload door, two destination columns (workers/content/src/routes/staff.ts)",
+    'guard.teamId, "deliverables"': "what we handed over on an app (workers/content/src/routes/deliverables.ts)",
+  }
+
+  const minted = () => {
+    const found = new Set<string>()
+    for (const [, src] of workerSources())
+      for (const m of src.matchAll(/mediaKey\(\s*([^)]*)\)/g))
+        found.add(m[1].replace(/\s+/g, " ").trim())
+    return found
+  }
+
+  it("finds the mints at all", () => {
+    // The tripwire: both assertions below are set differences, and a scan that
+    // found nothing would satisfy the first one.
+    expect(minted().size, "expected to find the upload doors' key mints").toBeGreaterThan(8)
+  })
+
+  it("no upload writes under a prefix nobody has described", () => {
+    const undescribed = [...minted()].filter((o) => !PREFIXES[o])
+    expect(
+      undescribed,
+      "these mint object keys under a prefix this table does not describe, so 'which objects belong " +
+        "to this tenant' has an answer nobody has written down. Add a line naming what lives there " +
+        `and which door writes it: ${undescribed.map((o) => `mediaKey(${o})`).join(", ")}`
+    ).toEqual([])
+  })
+
+  it("…and no line describes a prefix nothing writes any more", () => {
+    const stale = Object.keys(PREFIXES).filter((o) => !minted().has(o))
+    expect(
+      stale,
+      `this table describes prefixes no door mints: ${stale.join(", ")}. Delete the line — a description ` +
+        "of a bucket that no longer exists is worse than none, because it is read as current."
+    ).toEqual([])
+  })
+})

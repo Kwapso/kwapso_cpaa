@@ -343,6 +343,34 @@ repeatable core write now carries a per-caller ceiling that rides its INSERT
 watches **every** database in the account, core included, it used to filter
 `team-*`, so `kwapso-core` could never raise one.
 
+### Where a tenant's FILES live — the object-key prefixes
+
+R2 has no folders; a prefix is whatever the keys happen to start with. So "find,
+count, move or delete one tenant's objects" is answered by the SET of prefixes its
+uploads are minted under, and that set is pinned with a reason each in
+`workers/content/test/media-keys.test.ts` (`PREFIXES`), derived off the doors' own
+`mediaKey(...)` calls and failing both ways — a shape nobody described, and a
+described shape nothing mints.
+
+Three conventions are live at once and a key cannot be renamed once written, so
+the set is documented rather than unified: kind-first (`ticket/<team>/`,
+`story/<team>/`, `todo/<team>/`, from before the team-first convention),
+team-first (`<team>/accounts/`, `<team>/apps/`, `<team>/tasks/`,
+`<team>/knowledge/`, `<team>/brand/`, `<team>/staff/`, `<team>/deliverables/`),
+and two that are keyed by the thing they belong to rather than by a team
+(`teams/<team>/` for the team's own logo, `users/<user>/` for a profile photo —
+the one shape with no team in it at all, because a photo follows a person between
+teams).
+
+Four of the team-first segments were added on 5 Sep 2026. Those modules shared a
+bare `<team>/` prefix into one bucket, which meant an ownership proof could say
+"this team's" and never "this module's" — enough for a read, not enough for a
+delete. Objects already written under the bare shape stay where they are and are
+never reclaimed.
+
+There is no tenant-DELETE path today (deactivate, never delete), so this is
+latent — it becomes real the first time a client asks for erasure.
+
 ### team_module_databases + team_module_moves. KEEP (BUILT: routing `db/core/0004`, the resumable ledger `db/core/0023`). WHERE A MODULE LIVES, AND HOW IT GETS THERE
 *(Sections added 26 Aug 2026 — both tables predate them, and "the canonical
 data-model reference" was carrying two core tables it never named.)*

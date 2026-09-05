@@ -238,6 +238,22 @@ exactly this reason and says `UNPROVEN` rather than `moved`. Roll it out with
 
 **WARNING, before any usage pull or cleanup that lists D1 databases:** kwapso's per-team databases share the Cloudflare account with another product (rest-o) that uses the SAME `team-<ulid>` naming, one of them live production. Derive the list of kwapso's databases from the core `teams.database_id` column — the way `backup.mjs` and `reset-all.mjs` already do — never from a name-prefix filter, which excludes kwapso's own shards and includes somebody else's.
 
+**AND IT IS THE ONLY DOOR D1 READ REPLICATION CAN COME THROUGH (checked live
+5 Sep 2026).** Cloudflare's read replication raises read throughput for a busy
+database, and its Sessions API "is only available via the D1 Worker Binding and
+not yet available via the REST API". Production configures **zero** `TEAM_DB_<n>`
+pairs today, so 100% of production team traffic takes the REST door and the one
+lever the platform offers against a large tenant's read load is structurally
+unreachable. Staging has a pair on content, data-ops and tenancy — which is the
+wrong way round twice over: the environment that does not need the throughput is
+the only one that could have it, and every latency figure measured on staging is
+measured on a path production does not use (~1 ms against the REST door's ~400).
+
+Wiring a pair is the prerequisite, not the fix; adopting the Sessions API
+(`withSession`, threading the bookmark) is a further change in `d1Query`. Both are
+worth knowing about BEFORE a tenant is slow, because the first one needs a deploy
+and the second needs the first.
+
 **The native-binding fast path is wired per team, by hand.** Every worker reaches team databases over the D1 REST door by default; a deployment that HOLDS a binding for a particular database uses it directly instead (single-digit-ms instead of an API round trip — `natives` in `shared/workers/d1-rest.ts`). The wiring is a paired declaration in the worker's `wrangler.jsonc`: a `d1_databases` binding named `TEAM_DB_<n>` plus a var `TEAM_DB_<n>_ID` carrying that database's id — `nativeTeamDatabases` in `shared/workers/gating.ts` matches the pairs up and `d1Query` picks the direct path whenever the id is in the map. When a tenant grows past REST-door comfort, add the pair (top-level AND under `env.staging`, envs don't inherit) and redeploy; nothing else changes, and removing the pair falls the worker back to the REST door with no code change.
 
 ## Secrets (set once per env, never in git)
