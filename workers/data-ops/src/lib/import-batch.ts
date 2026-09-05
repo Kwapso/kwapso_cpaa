@@ -320,6 +320,31 @@ export async function confirmBatch(
     report.created += tally.created
     report.skipped += tally.skipped
     report.failed += tally.failed
+
+    // WHAT HAS HAPPENED SO FAR, WHILE IT IS STILL HAPPENING. The report used to
+    // be written exactly once, at the very end, so for the whole of a run —
+    // minutes, and before the waves above, half an hour — the batch row said
+    // `running` and nothing else. A person could not tell a working import from
+    // a hung one, and when one DID die the rows it had written were unaccounted
+    // for: the claim is one-way (`planned` → `running`, never back), so a
+    // crashed run left no record of which tables it had got through.
+    //
+    // PER TARGET, not per row: a table is the unit the plan is ordered in and
+    // the unit the report is grouped by, so it is the only checkpoint that can
+    // be written without inventing a shape. Eight writes at the very most, on a
+    // job measured in minutes.
+    //
+    // NOTHING ON A SCREEN CHANGES. The import screen renders the report the
+    // CONFIRM call hands back and never polls the batch row, so this is written
+    // for whoever goes looking — the batch door, and the person reading it after
+    // a run that did not come home.
+    await d1ExecScript(
+      cfg,
+      guard.databaseId,
+      `UPDATE data_import_batches SET report_json = ${sqlString(JSON.stringify(report))},
+         updated_at = ${sqlString(new Date().toISOString())}
+       WHERE id = ${sqlString(batchId)};`
+    )
   }
 
   const now = new Date().toISOString()

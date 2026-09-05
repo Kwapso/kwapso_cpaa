@@ -24,6 +24,18 @@ export function makeCoreBinding(get: () => DatabaseSync) {
   })
   return {
     prepare: (sql: string) => ({ bind: (...args: unknown[]) => wrap(sql, args), ...wrap(sql, []) }),
+    // `batch()` — the shape the shipped code already uses for a set of
+    // statements that belong together (d1-rest's `d1ExecScript` on the native
+    // path, and the catalogue self-heal in data-ops). It was missing here, so a
+    // suite that drove one of those through this fake would have died on
+    // "batch is not a function" rather than on anything it was testing. Runs
+    // them in order, which is what the real one guarantees; it is NOT a
+    // transaction, and no test yet depends on the rollback half.
+    batch: async (statements: { run: () => Promise<unknown> }[]) => {
+      const out = []
+      for (const s of statements) out.push(await s.run())
+      return out
+    },
   } as never
 }
 

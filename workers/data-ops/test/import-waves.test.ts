@@ -38,6 +38,17 @@ function source(file: string): string {
   return readFileSync(join(__dirname, "..", "src", "lib", file), "utf8")
 }
 
+/** The per-target loop's body: from the loop's own `for` to the terminal write
+ * that closes the batch. Anchored on two strings that are load-bearing in their
+ * own right, so an edit that removed either fails loudly here rather than
+ * silently handing this file an empty string to assert nothing about. */
+function targetLoop(src: string): string {
+  const from = src.indexOf("for (const targetKey of plan.order)")
+  const to = src.indexOf("overall_status = 'complete'")
+  if (from < 0 || to < 0 || to <= from) throw new Error("import-batch.ts no longer has the shape this reads")
+  return src.slice(from, to)
+}
+
 describe("the import writes in waves", () => {
   const src = source("import-batch.ts")
 
@@ -108,5 +119,37 @@ describe("the vocabulary-creating targets keep their serial loop", () => {
 
   it("BULK_CONCURRENCY is a real wave size, not one", () => {
     expect(BULK_CONCURRENCY).toBeGreaterThan(1)
+  })
+})
+
+describe("a run that does not come home leaves a record of how far it got", () => {
+  const src = source("import-batch.ts")
+
+  it("the report is written per target, not only at the end", () => {
+    // It used to land exactly once, after everything. For the whole of a run the
+    // batch row said `running` and nothing else, so a person could not tell a
+    // working import from a hung one — and when one DID die, the claim being
+    // one-way (`planned` → `running`, never back) meant the rows it had already
+    // written were unaccounted for.
+    const loop = targetLoop(src)
+    expect(loop).toMatch(/report_json = \$\{sqlString\(JSON\.stringify\(report\)\)\}/)
+  })
+
+  it("the checkpoint comes AFTER the tally is folded in, or it records a lie", () => {
+    const loop = src.slice(src.indexOf("for (const targetKey of plan.order)"))
+    const fold = loop.indexOf("report.failed += tally.failed")
+    const checkpoint = loop.indexOf("report_json =")
+    expect(fold).toBeGreaterThan(-1)
+    expect(checkpoint).toBeGreaterThan(fold)
+  })
+
+  it("the terminal write still sets a terminal status", () => {
+    // The per-target checkpoint touches `report_json` and `updated_at` ONLY. If
+    // it ever started writing `overall_status` the batch would call itself
+    // complete halfway through, and the door's own idempotency would then refuse
+    // the rest of the run.
+    const loop = targetLoop(src)
+    expect(loop).not.toContain("overall_status")
+    expect(src).toContain("overall_status = 'complete'")
   })
 })
