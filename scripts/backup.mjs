@@ -73,6 +73,7 @@ import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { timedFetch } from "./lib/api.mjs"
+import { expectedAccount } from "./check-cloudflare-account.mjs"
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -81,8 +82,10 @@ const GLOBAL_DB = { staging: "kwapso-core-staging", production: "kwapso-core" }
 // The one account these databases live in. Read-only or not, a script that names
 // databases may not infer the account from ambient login state — wrangler picks
 // whatever the machine is logged into, and on the machine this was written for
-// that is a different client's account. Same guard, same reason, as reset-all.
-const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+// that is a different client's account. Same guard, same reason, as reset-all —
+// and, since 5 Sep 2026, the same SOURCE: `expectedAccount()` derives the id from
+// the workers' own wrangler configs rather than five scripts each remembering it.
+const KWAPSO_ACCOUNT_ID = expectedAccount()
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN
 // The TOKEN is required, not optional, and that is a decision rather than an
 // oversight. The R2 half goes through the REST API, so without a token this

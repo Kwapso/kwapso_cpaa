@@ -24,7 +24,13 @@
 // The cursors go too (`knowledge_ingest`). Leaving them would tell the next
 // sweep it had already read everything, and the base would stay empty.
 
-const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+// The account, DERIVED rather than carried: `expectedAccount()` reads the ten
+// `CF_ACCOUNT_ID` declarations in the workers' own wrangler configs and requires
+// them to agree. See check-cloudflare-account.mjs — its header argued against a
+// third literal copy while five of them existed; this is one of the five.
+import { expectedAccount } from "./check-cloudflare-account.mjs"
+
+const KWAPSO_ACCOUNT_ID = expectedAccount()
 if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
   console.error(
     `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +

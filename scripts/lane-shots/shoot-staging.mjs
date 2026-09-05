@@ -2,7 +2,8 @@
 // work; nobody checks what they add up to. No dev server — this is the real site.
 import { chromium } from "playwright"
 import { mkdirSync } from "node:fs"
-const BASE = "https://agency-staging.kwapso.app"
+import { FRONT_DOORS } from "../lib/front-doors.mjs"
+const BASE = FRONT_DOORS.staging.agency
 const API = "https://kwapso-staging.kwapso.workers.dev"
 const KEY = process.env.TEST_LOGIN_KEY
 const OUT = process.argv[2] || "/tmp/staging-shots"
@@ -40,7 +41,7 @@ for (const [name, path] of SCREENS) {
   for (const [wname,[w,h]] of Object.entries(WIDTHS)) {
     for (const theme of ["light","dark"]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 })
-      await ctx.addCookies([{ name: "kwapso_session", value: token, domain: "agency-staging.kwapso.app", path: "/" }])
+      await ctx.addCookies([{ name: "kwapso_session", value: token, domain: new URL(BASE).hostname, path: "/" }])
       await ctx.addInitScript((t) => { try { localStorage.setItem("theme", t); localStorage.setItem("kwapso:install-prompt-dismissed","1") } catch {} }, theme)
       const page = await ctx.newPage()
       const errs = []
