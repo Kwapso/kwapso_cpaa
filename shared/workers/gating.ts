@@ -11,7 +11,7 @@ import { d1Query, type D1Rest } from "./d1-rest"
 import { LIST_HARD_CAP } from "./limits"
 import { fail } from "./http"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
-import { beginD1Timing } from "./timing"
+import { beginD1Timing, noteTeam } from "./timing"
 import { requestId, traceHeaders } from "./trace"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
@@ -227,6 +227,10 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // because this is the one function every team-scoped door passes exactly
   // once — the property the two paragraphs above already lean on twice.
   errorIdentity.set(request, { teamId: guard.teamId, userId: guard.userId })
+  // …and to the SLOW-DOOR line, for the same reason and in the same place: a
+  // door that is slow for the one team with ninety thousand rows printed
+  // identically to a door that is slow for everybody (timing.ts).
+  noteTeam(request, guard.teamId)
   return { user, actor: toActor(user), cfg, guard }
 }
 

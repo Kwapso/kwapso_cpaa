@@ -17,6 +17,8 @@ import { GuardError } from "@shared/workers/gating"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { logError, recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
@@ -52,69 +54,25 @@ import {
 } from "./lib/users"
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
-      switch (route) {
-        case "POST /api/auth/email/start":
-          return await emailStart(request, env)
-        case "POST /api/auth/email/verify":
-          return await emailVerify(request, env)
-        // "Continue with Google" — the SECOND way to prove the SAME identity,
-        // never a second identity. Both halves are GET because Google's flow is
-        // a browser redirect: see lib/google.ts for why the Identity-Services
-        // POST button is the wrong shape behind refuseForeignOrigin.
-        case "GET /api/auth/google/start":
-          return await googleStart(request, env)
-        case "GET /api/auth/google/callback":
-          return await googleCallback(request, env)
-        // NON-PRODUCTION test door (its OWN TEST_LOGIN_KEY secret, fails closed,
-        // and refused outright when ENVIRONMENT is "production"): mints a normal
-        // login code and returns it ONCE, so automated tests can sign in without
-        // any code ever being echoed by the real send door. See adminTestLogin.
-        case "POST /api/auth/admin/test-login":
-          return await adminTestLogin(request, env)
-        case "POST /api/auth/email/change/start":
-          return await emailChangeStart(request, env)
-        case "POST /api/auth/email/change/verify":
-          return await emailChangeVerify(request, env)
-        case "GET /api/auth/me":
-          return await me(request, env)
-        case "GET /api/auth/activity":
-          return await activity(request, env)
-        case "POST /api/auth/profile":
-          return await profile(request, env)
-        case "POST /api/auth/language":
-          return await language(request, env)
-        case "POST /api/auth/scale":
-          return await scale(request, env)
-        case "POST /api/auth/spine":
-          return await spine(request, env)
-        case "POST /api/auth/logout":
-          return await logout(request, env)
-        case "GET /api/auth/health":
-          return json({ ok: true })
-        // Internal: other workers send branded emails THROUGH auth (it owns the
-        // Resend key). NOT under /api/ — the gateway never routes it publicly;
-        // only a service binding (env.AUTH.fetch) can reach it.
-        case "POST /internal/send-email":
-          return await internalSendEmail(request, env)
-        // Internal: the gateway forwards CLIENT error beacons here so web errors
-        // land in the same central error_logs table the workers write to (auth
-        // owns the door because it holds the core DB + the internal-key guard).
-        case "POST /internal/log-error":
-          return await internalLogError(request, env)
-        // Internal: the mcp worker bridges a verified personal access token to a
-        // short-lived session PINNED to the token's team (ARCHITECTURE: the MCP
-        // front desk). Live membership is re-checked here at mint AND by every
-        // downstream door per request.
-        case "POST /internal/mcp-session":
-          return await internalMcpSession(request, env)
-        default:
-          return fail(404, "not_found", "No such auth action.")
-      }
+      // Measured on the way out (timing.ts), and this worker in particular:
+      // EVERY request in the product passes through auth to have its session
+      // verified, and until 5 Sep 2026 auth emitted no timing at all. The 24 Aug
+      // reading put `/api/auth/me` at ~280ms against a ~90ms transport floor, so
+      // ~190ms of every request in the app was session work with no shape to it.
+      // There is no ROUTES table here to read a kind off, so the method decides:
+      // a GET answers to the read budget, everything else to the write budget.
+      const res = await handle(route, request, env)
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
       // A refusal is an ANSWER, not a crash. Every sibling worker maps this
       // first; auth did not, so the moment its handlers started validating,
@@ -123,13 +81,80 @@ export default {
       // per request. The two changes only make sense together.
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("auth worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
 } satisfies ExportedHandler<Env>
+
+/** THE ROUTING TABLE, as a function because auth has a `switch` where its
+ * siblings have a `ROUTES` object. Lifted out of `fetch` so the dispatcher can
+ * hold the answer for a moment and measure it (timing.ts) before handing it
+ * back — the same two lines every other worker already runs. */
+async function handle(route: string, request: Request, env: Env): Promise<Response> {
+  switch (route) {
+    case "POST /api/auth/email/start":
+      return await emailStart(request, env)
+    case "POST /api/auth/email/verify":
+      return await emailVerify(request, env)
+    // "Continue with Google" — the SECOND way to prove the SAME identity,
+    // never a second identity. Both halves are GET because Google's flow is
+    // a browser redirect: see lib/google.ts for why the Identity-Services
+    // POST button is the wrong shape behind refuseForeignOrigin.
+    case "GET /api/auth/google/start":
+      return await googleStart(request, env)
+    case "GET /api/auth/google/callback":
+      return await googleCallback(request, env)
+    // NON-PRODUCTION test door (its OWN TEST_LOGIN_KEY secret, fails closed,
+    // and refused outright when ENVIRONMENT is "production"): mints a normal
+    // login code and returns it ONCE, so automated tests can sign in without
+    // any code ever being echoed by the real send door. See adminTestLogin.
+    case "POST /api/auth/admin/test-login":
+      return await adminTestLogin(request, env)
+    case "POST /api/auth/email/change/start":
+      return await emailChangeStart(request, env)
+    case "POST /api/auth/email/change/verify":
+      return await emailChangeVerify(request, env)
+    case "GET /api/auth/me":
+      return await me(request, env)
+    case "GET /api/auth/activity":
+      return await activity(request, env)
+    case "POST /api/auth/profile":
+      return await profile(request, env)
+    case "POST /api/auth/language":
+      return await language(request, env)
+    case "POST /api/auth/scale":
+      return await scale(request, env)
+    case "POST /api/auth/spine":
+      return await spine(request, env)
+    case "POST /api/auth/logout":
+      return await logout(request, env)
+    case "GET /api/auth/health":
+      return json({ ok: true })
+    // Internal: other workers send branded emails THROUGH auth (it owns the
+    // Resend key). NOT under /api/ — the gateway never routes it publicly;
+    // only a service binding (env.AUTH.fetch) can reach it.
+    case "POST /internal/send-email":
+      return await internalSendEmail(request, env)
+    // Internal: the gateway forwards CLIENT error beacons here so web errors
+    // land in the same central error_logs table the workers write to (auth
+    // owns the door because it holds the core DB + the internal-key guard).
+    case "POST /internal/log-error":
+      return await internalLogError(request, env)
+    // Internal: the mcp worker bridges a verified personal access token to a
+    // short-lived session PINNED to the token's team (ARCHITECTURE: the MCP
+    // front desk). Live membership is re-checked here at mint AND by every
+    // downstream door per request.
+    case "POST /internal/mcp-session":
+      return await internalMcpSession(request, env)
+    default:
+      return fail(404, "not_found", "No such auth action.")
+  }
+}
 
 /** Internal (service-binding only): mint a short-lived TEAM-PINNED session for a
  * verified MCP token. The mcp worker has already verified the token hash; this

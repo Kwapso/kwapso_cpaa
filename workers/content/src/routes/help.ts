@@ -7,6 +7,7 @@
 // best-effort in lib/notify.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { afterResponse } from "@shared/workers/parallel"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { MENTIONS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
@@ -463,15 +464,23 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   // land on the client's screen, and on their colleagues' — and on nobody else's.
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", ticket.accountId ?? undefined)
   await publishChange(env, guard.teamId, "help", helpId, "edit", ticket.accountId ?? undefined)
-  await notifyReplyAndMentions(
-    env,
-    cfg,
-    guard,
-    guard.teamId,
-    { id: ticket.id, raiserId },
-    { id: actor.id, name: actor.name },
-    replyBody,
-    tagged
+  // AFTER THE ANSWER, not before it. This is an outbound call to the mail
+  // provider, it swallows its own failures already (lib/notify wraps the whole
+  // thing and every send carries its own `.catch`), and nothing in the response
+  // depends on it — so the person's reply stops spinning while the mail goes.
+  // `waitUntil` still guarantees it completes (shared/workers/parallel.ts).
+  afterResponse(
+    request,
+    notifyReplyAndMentions(
+      env,
+      cfg,
+      guard,
+      guard.teamId,
+      { id: ticket.id, raiserId },
+      { id: actor.id, name: actor.name },
+      replyBody,
+      tagged
+    )
   )
   // The same pair, on the other most common action: sending a reply.
   const [replies, total] = await Promise.all([
@@ -523,8 +532,9 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", accountId ?? undefined)
   await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
   // Best-effort and last: a failed email must never fail the answer. It is on
-  // their screen either way.
-  await notifyTicketResolved(env, cfg, guard, id, resolution)
+  // their screen either way — and now it does not delay the answer either, which
+  // is what "best-effort and last" was always trying to say (parallel.ts).
+  afterResponse(request, notifyTicketResolved(env, cfg, guard, id, resolution))
   return json({ sent: true, alreadyResolved: false })
 }
 

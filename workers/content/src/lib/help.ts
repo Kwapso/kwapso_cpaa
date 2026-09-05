@@ -41,6 +41,7 @@ import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // now (no account-code prefix), and app/wave mint from the same seam over in
 // tenancy, so it moved out of this worker entirely (2026-08-31 ruling).
 import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { inOrder } from "@shared/workers/parallel"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -955,12 +956,29 @@ export async function createTicket(
   // A CLIENT's ticket belongs to the company they are standing in — from the
   // guard corridor, never from the body. THE AGENCY's ticket belongs to whichever
   // client it names, or to nobody when it is our own internal question.
-  const accountId =
-    scope.kind === "portal" ? scope.currentAccountId : await accountForStaffTicket(cfg, guard, input.accountId)
-  const appId = await appForTicket(cfg, guard, input.appId)
-  // AFTER the app, because the app is what it is checked against.
-  const moduleId = await moduleForTicket(cfg, guard, input.moduleId, appId)
-  const raisedBy = await contactForTicket(cfg, guard, input.raisedByContactId, accountId)
+  //
+  // TWO WAVES, NOT SIX TRIPS (shared/workers/parallel.ts). Each of these checks
+  // is its own round trip to the team database — ~150ms each, measured 25 Aug
+  // 2026 — and the dependency graph the comments below describe only chains
+  // TWO of them: the module is checked against the app, and the contact against
+  // the client. Everything else was sequential because it was written on
+  // consecutive lines, not because it had to be. `inOrder` keeps the refusal a
+  // person gets identical to the sequence's (first failure IN ARRAY ORDER), so
+  // this is the same six statements in half the wall clock.
+  const [accountId, appId] = await inOrder([
+    scope.kind === "portal"
+      ? Promise.resolve(scope.currentAccountId)
+      : accountForStaffTicket(cfg, guard, input.accountId),
+    appForTicket(cfg, guard, input.appId),
+  ])
+  // AFTER the app, because the app is what it is checked against; the contact is
+  // AFTER the client for the same reason, so the two ride the second wave
+  // together with the rank, which depends on nothing.
+  const [moduleId, raisedBy, rank] = await inOrder([
+    moduleForTicket(cfg, guard, input.moduleId, appId),
+    contactForTicket(cfg, guard, input.raisedByContactId, accountId),
+    topRank(cfg, guard),
+  ])
   const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
   const now = new Date().toISOString()
   // WHERE IT STARTS, and it is a FACT about the kind of thing being asked rather
@@ -985,8 +1003,12 @@ export async function createTicket(
   // wide now (no account-code prefix, shared/workers/refs.ts), but "the number
   // a client quotes" still needs a client. The agency's own question, with no
   // account, gets no reference — same answer as before, for the same reason.
+  //
+  // ON ITS OWN LINE, AFTER THE WAVES, because it is the one preflight step that
+  // WRITES: it mints the next number in the sequence a client quotes. Run beside
+  // a check that fails and it would burn a reference nobody ever sees — the rule
+  // parallel.ts states for exactly this call.
   const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.ticket) : null
-  const rank = await topRank(cfg, guard)
   // WHO IS RAISING IT decides whether the wording is still the account's. A
   // ticket a STAFF member types is locked the instant it exists: the first staff
   // touch has already happened — it is us. A client's own question stays theirs
