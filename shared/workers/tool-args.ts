@@ -19,6 +19,24 @@ export const obj = (props: Record<string, unknown>, required: string[] = []): Re
   required,
 })
 
+/** A STRING FROM A FIXED SET. Two jobs in one declaration: the model is told
+ * which values exist, and `checkArgTypes` REFUSES anything else at the boundary
+ * before a builder or a router ever sees it.
+ *
+ * Earned by `set_record_active`, whose `record` argument selects one of
+ * twenty-one doors. Declared as a bare string, an unrecognised kind type-checked
+ * fine and then fell through to the CANONICAL door — so
+ * `{record: "ticket", id: "<a ticket id>"}` was forwarded to the ACCOUNTS
+ * archive door, and the caller was told an account does not exist about an
+ * account they never named. The narrower and realer shape is an unrecognised
+ * kind carrying a valid ACCOUNT id, which archives that account having been
+ * asked to archive something else. A type check cannot catch that; an enum can,
+ * and it can only be declared where the allowed set already lives. */
+export const enumOf = (values: readonly string[]): Record<string, unknown> => ({
+  type: "string",
+  enum: [...values],
+})
+
 /** Read a tool input field as a string. A value of the WRONG TYPE reads as absent
  * rather than being coerced: `String({})` is `"[object Object]"`, which is a
  * perfectly valid 17-character name as far as the door's text validation is
@@ -43,10 +61,22 @@ export const str = (input: Record<string, unknown>, key: string): string => {
  * actually sent — an omitted optional stays omitted. Throws the GuardError both
  * executors already know how to turn into a clean 400. */
 export function checkArgTypes(schema: Record<string, unknown>, input: Record<string, unknown>): void {
-  const props = (schema.properties ?? {}) as Record<string, { type?: string }>
+  const props = (schema.properties ?? {}) as Record<string, { type?: string; enum?: string[] }>
   for (const [key, spec] of Object.entries(props)) {
     const v = input[key]
     if (v === undefined || v === null) continue
+    // A FIXED SET IS CHECKED AGAINST ITS MEMBERS, not just its type. Before the
+    // type check, because "must be one of…" is the more useful sentence and a
+    // non-string is not one of them either.
+    if (spec?.enum) {
+      if (!spec.enum.includes(v as string))
+        throw new GuardError(
+          400,
+          "invalid_input",
+          `"${key}" must be one of: ${spec.enum.join(", ")}.`
+        )
+      continue
+    }
     const want = spec?.type
     const ok =
       want === "string" ? typeof v === "string"
