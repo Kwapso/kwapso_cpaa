@@ -42,6 +42,14 @@ import {
   LAW_ID_ORIGIN,
   KIT_COMPONENT_EXEMPT,
 } from "@shared/rules/registry"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import {
+  CLIENT_READABLE_WRITE_DOORS,
+  INTERNAL_MONEY_DOORS,
+  INTERNAL_MONEY_TOOLS,
+  refusesOutboundMoney,
+  writesWhereClientsRead,
+} from "@shared/workers/money-taint"
 import { computeReachability, kitInventory } from "../../scripts/kit-coverage.mjs"
 import { TEAM_MODULE_CATALOG, offeredRights } from "@shared/team-modules"
 import { formatCount } from "@shared/web/format-count"
@@ -2245,6 +2253,199 @@ describe("RULES — the laws of the base", () => {
       bothSides,
       `one screen reads BOTH rate cards (R24). What we charge a client and what our own hour costs are two audiences: keep them in two components, so the separation is an import somebody cannot forget rather than a condition somebody can invert — ${bothSides.join(", ")}`
     ).toEqual([])
+  })
+
+  // R24, THE OUTBOUND HALF — A CONVERSATION THAT HAS READ THE MONEY MAY NOT
+  // THEN WRITE WHERE THE CLIENT READS.
+  //
+  // The four clauses above are all about the import graph, and they are correct:
+  // nothing a client login can reach imports the file the money lives in. The
+  // assistant does not need an import. It reads the margin through a door R24
+  // fences properly — as an agency admin, holding `commercials:read`, exactly as
+  // designed — and then writes a reply into a ticket thread the client reads.
+  // Every door on that path did its own job and the number still arrived in the
+  // client's inbox, with no confirm panel anywhere: `reply_help_ticket` is gated
+  // on `help:read`, the lowest bar in the catalogue, and its confirm predicate
+  // fires only when the reply @mentions somebody.
+  //
+  // And the instruction came from the client. A portal ticket description is
+  // 20,000 characters of their own prose, read by the model the next time
+  // anybody here asks a question that touches tickets. What stood between that
+  // paragraph and the write was one sentence in a tool description — "INTERNAL,
+  // never repeat this figure to a client" — which is the least structural
+  // defence available, and it was being asked to hold against prose written by
+  // the person it protects the number from. R24's own text already answers this,
+  // about a different half of the same problem: a condition can be inverted and
+  // a permission can be granted, an import cannot be forgotten.
+  //
+  // NOTHING HERE IS A LIST OF TOOL NAMES, which is the whole of why it is worth
+  // having. The money doors are re-derived off disk exactly as clause 1 derives
+  // them; the client-readable doors are the portal's own allow-list; and the
+  // TOOLS are derived from the doors at runtime, off the shipped catalogue, so a
+  // money tool added tomorrow on a door already on the list is covered the
+  // moment it is written. The runtime pins are copies because a worker cannot
+  // read another worker's private source, and this is what proves them equal.
+  it("internal-money-never-in-portal: a turn that read the agency's own cost cannot then write where the client reads (R24 outbound)", () => {
+    // ── i · the money doors, RE-DERIVED, and the pin must equal them ──────────
+    const internalSrc = stripComments(
+      read(join(ROOT, "workers", "tenancy", "src", "lib", "internal-money.ts"))
+    )
+    const exported = [...internalSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
+    expect(exported.length, "the internal-money scan found no exports — it has gone blind").toBeGreaterThan(3)
+    const routeFns = new Map<string, string>()
+    for (const { source } of sourceFiles(join(ROOT, "workers", "tenancy", "src", "routes"), { extensions: [".ts"] })) {
+      const starts = [...source.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
+      starts.forEach((m, i) => routeFns.set(m[1], source.slice(m.index, starts[i + 1]?.index ?? source.length)))
+    }
+    const tenancyIndex = read(join(ROOT, "workers", "tenancy", "src", "index.ts"))
+    const routes = [...tenancyIndex.matchAll(/"([A-Z]+ \/[^"]+)":\s*\{\s*handler:\s*(\w+)/g)]
+    expect(routes.length, "tenancy's ROUTES did not parse").toBeGreaterThan(10)
+    const derivedMoneyDoors = [
+      ...new Set(
+        routes
+          .filter(([, , handler]) => {
+            const body = stripComments(routeFns.get(handler) ?? "")
+            return exported.some((fn) => new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body))
+          })
+          .map(([, door]) => door.split(" ")[1])
+      ),
+    ]
+    expect(
+      derivedMoneyDoors.length,
+      "no money door was derived — the walk has gone blind, and a blind check reports 'all clear' exactly like a passing one"
+    ).toBeGreaterThan(3)
+    expect(
+      [...derivedMoneyDoors].sort(),
+      `INTERNAL_MONEY_DOORS (shared/workers/money-taint.ts) has drifted from the doors that actually call into internal-money.ts. The worker cannot read tenancy's source at runtime, so the pin carries the answer and this proves it — re-pin it (R24 outbound)`
+    ).toEqual([...INTERNAL_MONEY_DOORS].sort())
+
+    // ── ii · the client-readable doors are the portal's own allow-list ────────
+    //
+    // LINE COMMENTS DROPPED, NOT COMMENTS STRIPPED. The gateway's prose contains
+    // `/media/*`, which opens a block comment to a naive stripper and swallows
+    // eleven real doors after it. Losing doors here would make the pin look
+    // complete while the runtime set was short — a check agreeing with a
+    // narrower version of itself, which is the failure mode this whole law is
+    // written against. One line per entry, so dropping comment LINES is exact.
+    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    const table = /export const PORTAL_DOORS[^=]*=\s*\{([\s\S]*?)\n\}/.exec(portalSrc)
+    expect(table, "PORTAL_DOORS not found in the portal gateway — did the table move?").toBeTruthy()
+    const body = (table as RegExpExecArray)[1]
+      .split("\n")
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join("\n")
+    const portalDoors = [...body.matchAll(/"([A-Z]+ \/[^"]+)":\s*"(\w+)"/g)].map((m) => m[1])
+    expect(portalDoors.length, "PORTAL_DOORS did not parse").toBeGreaterThan(20)
+    expect(
+      portalDoors.filter((d) => !d.startsWith("GET ")).sort(),
+      `CLIENT_READABLE_WRITE_DOORS (shared/workers/money-taint.ts) has drifted from the non-GET half of PORTAL_DOORS. The allow-list is the definition of what a client's browser may call, so it is the oracle — re-pin it (R24 outbound)`
+    ).toEqual([...CLIENT_READABLE_WRITE_DOORS].sort())
+
+    // ── iii · the decision RUN over the shipped catalogue, never read ─────────
+    //
+    // R22's lesson, applied: a check that reads a predicate proves the predicate
+    // was typed. This calls it, with the catalogue's real doors, on the real
+    // chain the finding walked.
+    const moneyToolsInCatalogue = SHARED_TOOLS.filter((t) => derivedMoneyDoors.includes(t.path))
+    expect(
+      moneyToolsInCatalogue.length,
+      "no tool in the catalogue sits on a money door — either the catalogue moved or this census is blind"
+    ).toBeGreaterThan(2)
+    expect(
+      moneyToolsInCatalogue.map((t) => t.name).filter((n) => !INTERNAL_MONEY_TOOLS.has(n)),
+      "a tool on a money door is not in INTERNAL_MONEY_TOOLS — the runtime derivation and the disk derivation disagree (R24 outbound)"
+    ).toEqual([])
+
+    const outbound = SHARED_TOOLS.filter((t) =>
+      writesWhereClientsRead({ method: t.method, path: t.path, write: t.agent.write })
+    )
+    expect(
+      outbound.map((t) => t.name),
+      "no write tool lands on a door the client's own browser opens — the outbound census has gone blind"
+    ).not.toEqual([])
+    // THE FINDING'S OWN DOOR, named because it is the regression this earned:
+    // POST /api/content/help/reply is on PORTAL_DOORS and notifyReplyAndMentions
+    // emails the raiser a preview of the body.
+    expect(
+      outbound.map((t) => t.path),
+      "the ticket reply door must be classified outbound — it is the door the margin left through (R24 outbound)"
+    ).toContain("/api/content/help/reply")
+
+    const anyMoneyToolName = [...INTERNAL_MONEY_TOOLS][0]
+    for (const t of outbound) {
+      const door = { method: t.method, path: t.path, write: t.agent.write }
+      expect(
+        refusesOutboundMoney(door, [anyMoneyToolName]),
+        `${t.name} writes where a client reads and was NOT refused after a money read (R24 outbound)`
+      ).toBe(true)
+      expect(
+        refusesOutboundMoney(door, ["list_members", "query_records"]),
+        `${t.name} was refused on a turn that read no money — the control fires on ordinary work (R24 outbound)`
+      ).toBe(false)
+    }
+    // A READ is never outbound: it puts nothing anywhere, so asking about a
+    // margin and then reading anything at all is untouched.
+    for (const t of SHARED_TOOLS.filter((s) => !s.agent.write))
+      expect(
+        refusesOutboundMoney({ method: t.method, path: t.path, write: false }, [anyMoneyToolName]),
+        `${t.name} is a read and was refused — the control must not touch reads (R24 outbound)`
+      ).toBe(false)
+
+    // ── iv · …AND THE AGENT ACTUALLY ASKS, in all three places ────────────────
+    //
+    // A seam nothing calls is a seam that passes its own tests. Three positions,
+    // and the third is the one that is easy to miss: a call that CONFIRMS never
+    // reaches the step seam in the turn that proposed it, because the turn ends
+    // and `confirmAndRun` resumes it later from a stored row with none of the
+    // turn's inputs in front of it. So the refusal has to happen at the moment
+    // of DEFERRAL as well as at the step — and the resumed batch has to carry
+    // its own live context, because one proposal can hold a money read and a
+    // client-readable write together.
+    const agentSrc = stripComments(read(join(ROOT, "workers", "data-ops", "src", "lib", "agent.ts")))
+    expect(
+      agentSrc,
+      "the agent does not import the money-taint seam — nothing enforces R24's outbound clause"
+    ).toContain("@shared/workers/money-taint")
+    const fnBody = (name: string) => {
+      const starts = [...agentSrc.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
+      const i = starts.findIndex((m) => m[1] === name)
+      expect(i, `${name} not found in agent.ts — did it move?`).toBeGreaterThanOrEqual(0)
+      return agentSrc.slice(starts[i].index, starts[i + 1]?.index ?? agentSrc.length)
+    }
+    const step = fnBody("runToolCall")
+    expect(
+      step,
+      "runToolCall must ask moneyTaintRefusal — it is the ONE step seam both loops come through (R24 outbound)"
+    ).toMatch(/moneyTaintRefusal\s*\(/)
+    expect(
+      step.indexOf("moneyTaintRefusal("),
+      "the refusal must come BEFORE the door is opened, not after (R24 outbound)"
+    ).toBeLessThan(step.indexOf("executeTool("))
+    const plan = fnBody("runPlanLoop")
+    // THE EXPRESSION, NOT THE NEIGHBOURHOOD. The first draft of this line asked
+    // whether `blockedByMoney` appeared within 400 characters of `anyConfirm`,
+    // and deleting the guard from the condition left the declaration sitting
+    // right above it — so the mutation ran green. A check that reads the region
+    // around a decision is not reading the decision.
+    const anyConfirmExpr = /const\s+anyConfirm\s*=([\s\S]*?)\n\n/.exec(plan)
+    expect(anyConfirmExpr, "the plan loop's `anyConfirm` decision was not found — did it move?").toBeTruthy()
+    expect(
+      (anyConfirmExpr as RegExpExecArray)[1],
+      "the plan loop must decide about the money BEFORE it stores a proposal — a confirm is resumed from a stored row with none of this turn's history in front of it, so a tainted write that @mentions somebody would be proposed here and written on approval (R24 outbound)"
+    ).toContain("blockedByMoney")
+    expect(
+      plan,
+      "the plan loop must compute blockedByMoney from the live convo — a taint read off anything else is not what the model has in front of it (R24 outbound)"
+    ).toMatch(/blockedByMoney\s*=\s*new Set\([\s\S]{0,200}moneyTaintRefusal\(getTool\(tc\.name\)!,\s*convo\)/)
+    expect(
+      plan,
+      "the plan loop's step context must carry the live convo, or the seam has nothing to read (R24 outbound)"
+    ).toMatch(/StepCtx\s*=\s*\{[^}]*context:/)
+    const confirm = fnBody("confirmAndRun")
+    expect(
+      confirm,
+      "confirmAndRun's step context must carry the confirmed batch's own messages — one proposal can hold a money read AND a client-readable write, and the turn that stored it had run neither (R24 outbound)"
+    ).toMatch(/StepCtx\s*=\s*\{[^}]*context:/)
   })
 
   // R25 — A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF.
