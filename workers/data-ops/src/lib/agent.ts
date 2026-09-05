@@ -23,6 +23,7 @@ import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCa
 import { ModelError } from "@shared/workers/model-failure"
 import { TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import { chipForService, servicesForChips } from "@shared/knowledge-chips"
+import { refusesOutboundMoney } from "@shared/workers/money-taint"
 import {
   executeTool,
   getTool,
@@ -823,6 +824,10 @@ type StepCtx = {
   budget: ReturnType<typeof readBudget>
   /** THE SOURCE CHIPS this conversation is using — see `injectSources`. */
   sources?: string[]
+  /** THE MESSAGES THE MODEL IS READING, live — see `moneyTaintRefusal`. The
+   * array itself, not a copy: both loops push each step's tool message onto it
+   * as the step finishes, so a call made after a money read sees that read. */
+  context?: ChatMessage[]
   emit?: Emit
 }
 
@@ -904,6 +909,50 @@ export function chipRefusal(tool: AgentTool, sources: string[] | undefined): str
   )
 }
 
+/** R24, OUTBOUND — WHAT THIS TURN HAS ALREADY READ, in the model's own words.
+ *
+ * The taint is the tool NAMES this turn has run, taken off the very messages the
+ * model is reading rather than off a counter kept beside them. That is the whole
+ * reason it survives the deferral: a confirm ends the turn, `confirmAndRun`
+ * resumes later from a stored row on a request that remembers nothing, and a
+ * tracker would be empty there — but the messages are rebuilt, so the answer is
+ * rebuilt with them. The same reading that made the chips OVERWRITE the model's
+ * argument rather than fill in a gap it left. */
+function toolNamesIn(context: ChatMessage[] | undefined): string[] {
+  return (context ?? []).flatMap((m) => (m.role === "tool" && m.toolName ? [m.toolName] : []))
+}
+
+/** REFUSED BECAUSE OF WHAT THIS TURN ALREADY KNOWS — or null to make the call.
+ *
+ * R24 keeps the agency's own cost out of the client's app by making it a fact
+ * about the import graph. This is the same sentence pointed the other way: a
+ * conversation holding an internal number may not write to a door the client's
+ * own browser opens. See shared/workers/money-taint.ts for both derivations and
+ * for what this deliberately does not cover.
+ *
+ * A REFUSAL RATHER THAN A CONFIRM PANEL, and rather than a smaller version of
+ * the call. There is no smaller version — the model composes the prose, so
+ * "write the reply but without the margin in it" is a promise, not a control —
+ * and a panel would put the decision in front of a person on ordinary work,
+ * which the owner considered and turned down. `chipRefusal`'s reasoning, on a
+ * different fact.
+ *
+ * READS ARE NEVER OUTBOUND, so an agency admin asking about a margin and then
+ * reading anything at all is untouched; only a WRITE to the portal's own surface
+ * in the SAME turn is refused, which is the shape the injected instruction has
+ * to take. */
+function moneyTaintRefusal(tool: AgentTool, context: ChatMessage[] | undefined): string | null {
+  if (!refusesOutboundMoney(tool, toolNamesIn(context))) return null
+  return (
+    "Not run, and not because of a permission. This turn has already read one of the agency's own " +
+    "internal figures — what our own hours cost, what a role's hour is worth, or a margin — and this " +
+    "door writes somewhere the client themselves can read. Those two things may not happen in the " +
+    "same turn. Do not repeat any internal figure anywhere. Tell the person plainly that you did not " +
+    "write it, and that if they want something written there they can ask for that on its own, in a " +
+    "new message, without the money question in it."
+  )
+}
+
 /** A STEP THAT DOES NOT HAPPEN, written down exactly like one that did.
  *
  * A refusal is not an absence: the model asked, and a trail that quietly dropped
@@ -940,6 +989,16 @@ const HELD_BACK_BY_CHIPS =
   "their source chips, and an action that asks for approval cannot be held open across that. " +
   "Say what was refused and why; if they still want this one, they can ask again."
 
+/** THE SAME SENTENCE FOR THE MONEY — see the branch in `runPlanLoop`. A proposal
+ * is resumed later, from a stored row, and nothing about the turn that made it
+ * comes back; so an action that would ask for approval cannot be held open
+ * across a turn this one has already refused a client-readable write in. */
+const HELD_BACK_BY_MONEY =
+  "Not run. Another step in this turn was refused because this conversation has read one of the " +
+  "agency's own internal figures and that step wrote somewhere the client can read. An action " +
+  "that asks for approval cannot be held open across that. Say what was refused and why; if they " +
+  "still want this one, they can ask for it on its own, in a new message."
+
 /** RUN ONE TOOL CALL — the single step seam, shared by the plan loop and confirmAndRun.
  * Emits the step rows, runs the tool AS the caller, tallies the turn, and persists the
  * step's OUTCOME on its own tool row (the panel rehydrates a reopened chat from these,
@@ -971,6 +1030,14 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   // so a reopened chat still shows what was refused and why.
   const refused = t ? chipRefusal(t, ctx.sources) : null
   if (refused) return refuseStep(ctx, tc, summary, refused)
+  // R24 OUTBOUND, IN THE SAME POSITION AND FOR THE SAME REASON — see
+  // `moneyTaintRefusal`. Ahead of the repeat cache and ahead of the door: a
+  // client-readable write made after this turn read an internal figure is not
+  // attempted, so there is no answer of the door's to recall and no row for it to
+  // have written. Both loops come through here, so the refusal cannot depend on
+  // which one ran the call.
+  const tainted = t ? moneyTaintRefusal(t, ctx.context) : null
+  if (tainted) return refuseStep(ctx, tc, summary, tainted)
   // THE SAME READ, TWICE, IN ONE TURN. Answered from the first one — see
   // repeatGuard for why this is reads only. It is not hidden: the step row is
   // still emitted and still written, and it SAYS which it was, because the model
@@ -1423,9 +1490,24 @@ async function runPlanLoop(
     const blockedByChips = new Set(
       valid.filter((tc) => chipRefusal(getTool(tc.name)!, opts.sources)).map((tc) => tc.id)
     )
+    // R24 OUTBOUND DECIDES BEFORE A CONFIRM PANEL CAN EXIST TOO, and the trap is
+    // the same one the chips found, one turn further along. `runToolCall` refuses
+    // a tainted write at the step, which settles every ordinary case. A call that
+    // CONFIRMS never reaches it: this branch ends the turn, stores the proposal
+    // server-side, and `confirmAndRun` executes it later — from a request that
+    // remembers nothing about the turn that proposed it. So a
+    // `reply_help_ticket` carrying a margin, @mentioning somebody so that it
+    // confirms, would have been PROPOSED here and then written on approval,
+    // straight past a control that had already decided against it. Refuse before
+    // you defer.
+    const blockedByMoney = new Set(
+      valid.filter((tc) => moneyTaintRefusal(getTool(tc.name)!, convo)).map((tc) => tc.id)
+    )
     // input-aware: a (de)activate toggle confirms only when it's turning something OFF.
     const anyConfirm =
-      blockedByChips.size === 0 && valid.some((tc) => requiresConfirm(getTool(tc.name)!, tc.input))
+      blockedByChips.size === 0 &&
+      blockedByMoney.size === 0 &&
+      valid.some((tc) => requiresConfirm(getTool(tc.name)!, tc.input))
 
     if (anyConfirm) {
       // Store the FULL proposal (name + input) server-side so /confirm runs EXACTLY
@@ -1480,7 +1562,7 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
-    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, emit }
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, context: convo, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
       const t = getTool(tc.name)
@@ -1497,6 +1579,23 @@ async function runPlanLoop(
           tc,
           t.summarize(tc.input, names),
           HELD_BACK_BY_CHIPS
+        )
+        convo.push(message)
+        failed = true
+        continue
+      }
+      // …AND THE SAME FOR THE MONEY, for the same reason and with its own
+      // sentence, because the person is being told a different thing. The
+      // tainted write is refused inside `runToolCall`; a call beside it that
+      // would have opened a confirm panel is held back here, because the only
+      // way to ask is to store a proposal and a stored proposal is resumed with
+      // none of this turn's history in front of it.
+      if (blockedByMoney.size && t && !blockedByMoney.has(tc.id) && requiresConfirm(t, tc.input)) {
+        const { message } = await refuseStep(
+          stepCtx,
+          tc,
+          t.summarize(tc.input, names),
+          HELD_BACK_BY_MONEY
         )
         convo.push(message)
         failed = true
@@ -1608,8 +1707,15 @@ export async function confirmAndRun(
   // loop ran the call (see runToolCall: writes title the row, reads ride along quietly).
   // A fresh guard: these are the CONFIRMED calls, which are writes — the guard
   // never touches a write — and the plan this turn resumes into gets its own.
-  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), paging: pagingGuard(), budget: readBudget(), emit }
+  // DECLARED BEFORE THE STEP CONTEXT, because the context holds THIS array and
+  // reads it as each call finishes (R24 outbound — see `moneyTaintRefusal`). One
+  // proposal can hold a money READ and a client-readable WRITE together: a turn
+  // that needs confirming stores ALL of its calls, not just the dangerous subset,
+  // so `read_margin` beside a `reply_help_ticket` arrives here as one approved
+  // batch, and the refusal that decided against it in the proposing turn was
+  // never asked — the read had not run yet when that turn ended.
   const toolMsgs: ChatMessage[] = []
+  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), paging: pagingGuard(), budget: readBudget(), context: toolMsgs, emit }
   let failed = false
   for (const tc of calls) {
     const { message, ok } = await runToolCall(stepCtx, tc)
