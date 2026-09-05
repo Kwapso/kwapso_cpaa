@@ -56,6 +56,25 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
     "portal-tickets.search"
   )
   const searching = term.trim().length > 0
+  // R50 ON THE PORTAL'S OWN IDIOM — "never toolbar on an empty collection, not
+  // even the create button".
+  //
+  // The agency door gets this for free: `<ToolbarRow>` and `<PagedFind>` take a
+  // required `empty` prop and return NOTHING before any slot is considered. This
+  // screen draws its own row (deliberately — the law is about the FUNCTION being
+  // present and the two front doors are different shapes, UI-RULEBOOK L5), which
+  // means the law's enforcement could not see it: a client with zero tickets got
+  // a search box over an empty list and a lone `+` floating above it, which is
+  // the exact shape R50 was written after it recurred eight times on the other
+  // door.
+  //
+  // `restingEmpty` is the collection itself, before any find — never the
+  // search's own result, or clearing a search that matched nothing would take
+  // the box away with the letters still in it. It is written as the EXACT
+  // negation of the three branches drawn ahead of the empty body below (error,
+  // first load, then zero rows), so "the toolbar is hidden" and "the empty body
+  // is showing" are one condition rather than two that agree today.
+  const restingEmpty = !(error && !tickets) && !(loading && !tickets) && (tickets ?? []).length === 0
 
   async function raise(input: { description: string; appId?: string; moduleId?: string }) {
     await support.raise(input)
@@ -81,14 +100,24 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
           // accessible name and its tooltip, the same seam the agency app's
           // own `AddButton` (web/components/deep-link/screen-bits.tsx) draws
           // create actions from.
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" onClick={() => setRaising(true)} aria-label={t("Ask us something")}>
-                <Plus className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("Ask us something")}</TooltipContent>
-          </Tooltip>
+          //
+          // …AND ABSENT WHILE THE COLLECTION IS EMPTY (R50). The act is not
+          // withdrawn, it MOVES: the empty body below carries it as a labelled
+          // button, which is composition 27.21's own carved-out exception to
+          // the one-word rule ("the only place a labelled create button is
+          // allowed, because there is no toolbar + to lean on and the screen
+          // exists to be filled") — the same trade the agency door already
+          // makes on all sixteen of its collections.
+          restingEmpty ? null : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" onClick={() => setRaising(true)} aria-label={t("Ask us something")}>
+                  <Plus className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("Ask us something")}</TooltipContent>
+            </Tooltip>
+          )
         }
       />
 
@@ -97,30 +126,36 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         * Drawn in the portal's own calm idiom (one column, no toolbar row, no
         * filter chips) rather than by importing the agency's `ToolbarRow`: the
         * law is about the FUNCTION being present, and the two front doors are
-        * deliberately different shapes (UI-RULEBOOK L5). */}
-      <div className="relative">
-        <MagnifyingGlass
-          className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
-          aria-hidden
-        />
-        <Input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder={t("Search your tickets")}
-          aria-label={t("Search your tickets")}
-          className="pr-12 pl-12"
-        />
-        {term ? (
-          <button
-            type="button"
-            onClick={() => setTerm("")}
-            aria-label={t("Clear the search")}
-            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
-      </div>
+        * deliberately different shapes (UI-RULEBOOK L5).
+        *
+        * R50: and not drawn AT ALL over a collection with nothing in it — see
+        * `restingEmpty` above. A search box is a promise there is something to
+        * find. */}
+      {restingEmpty ? null : (
+        <div className="relative">
+          <MagnifyingGlass
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
+            aria-hidden
+          />
+          <Input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder={t("Search your tickets")}
+            aria-label={t("Search your tickets")}
+            className="pr-12 pl-12"
+          />
+          {term ? (
+            <button
+              type="button"
+              onClick={() => setTerm("")}
+              aria-label={t("Clear the search")}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {searching ? (
         search.failed ? (
@@ -167,11 +202,22 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
       ) : (tickets ?? []).length === 0 ? (
         // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
         // impact-screen.tsx's own note on this box for the full reasoning.
-        <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
+        // THE EMPTY BODY NAMES THE ACT, and it is the only place on this
+        // screen that does now (see the heading above). Two honest sentences
+        // and one labelled button, which is what the agency door's own
+        // `CollectionEmptyState` draws — until 2026-09-05 the portal's five
+        // empty screens said something true and offered nothing to press,
+        // while the act sat in an icon-only `+` a first-time reader has no
+        // reason to look at.
+        <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
           <p>{t("Nothing here yet.")}</p>
-          <p className="mt-1 text-sm">
+          <p className="text-sm">
             {t("Anything you ask us, a question, a problem, a change, lives on this page.")}
           </p>
+          <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
+            <Plus className="size-3.5" />
+            {t("Ask us something")}
+          </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

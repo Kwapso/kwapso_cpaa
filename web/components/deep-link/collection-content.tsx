@@ -238,6 +238,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.stories}
         canCreate={can("work", "create")}
+        onImport={() => go(`/t/${teamId}/import/stories`)}
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -307,6 +308,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         canCreate={can("meetings", "create")}
         canReadPurposes={can("delivery", "read")}
         onPurposes={() => go(`/t/${teamId}/purposes`)}
+        onImport={() => go(`/t/${teamId}/import/meetings`)}
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -527,6 +529,18 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                         label: t("New account"),
                         icon: <Plus className="size-4" />,
                         onCreate: () => go(sectionPath, { panel: "add", module: "accounts" }),
+                        // …AND THE IMPORT ACT WITH IT. The toolbar's own
+                        // "Import CSV" button (above, in `actions`) is drawn
+                        // by `PagedFind`, which draws NOTHING while the
+                        // collection is empty (R50) — so on the one screen
+                        // where importing matters most, a brand-new team's
+                        // first account list, the way in was invisible.
+                        // `CollectionEmptyState` puts it back, in the body,
+                        // beside "Add the first".
+                        secondary: {
+                          label: t("Import CSV"),
+                          onClick: () => go(`/t/${teamId}/import/accounts`),
+                        },
                       }
                     : null
                 }

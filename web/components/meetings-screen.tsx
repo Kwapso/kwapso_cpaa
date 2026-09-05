@@ -25,7 +25,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Plus } from "@shared/ui/foundations/icons"
+import { Plus, UploadSimple } from "@shared/ui/foundations/icons"
 import {
   ScreenRenderer,
   type ScreenActionContext,
@@ -206,6 +206,7 @@ export function MeetingsScreen({
   canCreate,
   canReadPurposes,
   onPurposes,
+  onImport,
   onAction,
   onIntent,
 }: {
@@ -220,6 +221,12 @@ export function MeetingsScreen({
   /** `delivery:read` — the right the purposes screen itself gates on. */
   canReadPurposes: boolean
   onPurposes: () => void
+  /** THE CONTEXTUAL "IMPORT CSV" JUMP — see the identical note on
+   * `StoriesScreen`'s own `onImport`. `meetings` is the other of the two
+   * declared import targets that had no button anywhere in either front door:
+   * a new team arriving with two years of their diary in a spreadsheet had a
+   * working, gated, tested importer for it and no way to find it. */
+  onImport?: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -433,7 +440,21 @@ export function MeetingsScreen({
         // "NEW MEETING", AT THE RIGHT OF THE TOOLBAR — PagedFind's own
         // `actions` slot, exactly where Accounts' own New/Import/Export and
         // Tickets' own "Raise ticket" now sit.
-        actions={() => (canCreate ? <AddButton label={t("New meeting")} onClick={() => setOpen(true)} /> : null)}
+        actions={() => (
+          <>
+            {/* IMPORT KEEPS ITS WORD (B4: import and export are rare,
+                consequential and not guessable from a glyph) — the same
+                button, in the same slot, as Accounts' own. Gated on the
+                create right the importer itself demands for this target. */}
+            {canCreate && onImport && (
+              <Button variant="secondary" onClick={onImport} className="gap-1">
+                <UploadSimple className="size-4" />
+                {t("Import CSV")}
+              </Button>
+            )}
+            {canCreate ? <AddButton label={t("New meeting")} onClick={() => setOpen(true)} /> : null}
+          </>
+        )}
         // THE ONE CARD — toolbar, then rows — the same join Accounts and
         // Tickets draw (`collection-content.tsx`'s and `tickets-collection.tsx`'s
         // own `wrap`): zero gap to the tab row above, which is this file's own
@@ -504,7 +525,22 @@ export function MeetingsScreen({
             // lives in the toolbar above; the engine's zero-state still needs to
             // name the next act.
             <CollectionCreateActionProvider
-              action={canCreate ? { label: t("New meeting"), icon: <Plus className="size-4" />, onCreate: () => setOpen(true) } : null}
+              action={
+                canCreate
+                  ? {
+                      label: t("New meeting"),
+                      icon: <Plus className="size-4" />,
+                      onCreate: () => setOpen(true),
+                      // …AND THE IMPORT ACT WITH IT, so the genuinely-empty
+                      // body offers "Import a list" beside "Add the first"
+                      // (CollectionEmptyState). A brand-new team with a
+                      // spreadsheet of their diary should not have to find
+                      // the toolbar button that is not drawn while the
+                      // collection is empty.
+                      secondary: onImport ? { label: t("Import CSV"), onClick: onImport } : undefined,
+                    }
+                  : null
+              }
             >
               {view === "calendar" ? (
                 // NO `unloaded` SENTENCE ANY MORE. It said "earlier meetings

@@ -77,6 +77,12 @@ function InternalCollection({
         icon="plus"
         secondary={onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined}
         download={{ show: (data.rows?.length ?? 0) > 0, label: t("Export CSV"), href: exportHref }}
+        // R50 — nothing at all in the toolbar over a collection with no rows in
+        // it, import included. The act is still published to the empty body
+        // below (`CollectionEmptyState`'s "Import a list"), which is where a
+        // brand-new team should meet it; this only stops the same button being
+        // drawn twice on the one screen that has nothing else on it.
+        empty={(data.rows?.length ?? 0) === 0}
         onCreate={onCreate}
         useKitPanel
       >

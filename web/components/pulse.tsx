@@ -183,9 +183,39 @@ export function NothingYet({ what, how }: { what: string; how: string }) {
 }
 
 /** The one read every visual on this page shares. A screen showing two of them
- * makes ONE request, because the cache key is the same key. */
-function usePulse(teamId: string) {
+ * makes ONE request, because the cache key is the same key.
+ *
+ * EXPORTED as of 2026-09-05, for the one other question asked of the same
+ * answer: `pulseIsQuiet` below. Home reads it through this hook rather than
+ * through a second door, so naming a first act costs no request at all. */
+export function usePulse(teamId: string) {
   return useCached<TeamPulse>(insightsKey(teamId), () => contentApi.insights())
+}
+
+/** IS THERE NOTHING HAPPENING IN THIS TEAM AT ALL?
+ *
+ * Every number the pulse can draw, read as one question, over only the sections
+ * the caller's role can read — a module that answered `null` is a module they
+ * may not look at (R18), never a zero, so it cannot make a busy team look
+ * quiet.
+ *
+ * `undefined` (the read has not landed) is NOT quiet: a screen that guessed
+ * "brand new" while the answer was still in flight would flash a first-run
+ * block at somebody with two years of data in front of them, every morning.
+ *
+ * It is deliberately about the WEEK's shape rather than about row counts: the
+ * pulse is the only aggregate Home already holds, and a team where nothing is
+ * open, nothing is due, nothing was logged for eight weeks and nothing is in
+ * the diary is a team that either just started or has stopped — and the same
+ * three next acts are the right ones to offer either way. */
+export function pulseIsQuiet(pulse: TeamPulse | undefined): boolean {
+  if (!pulse) return false
+  const { tickets, work, meetings } = pulse
+  if (tickets && tickets.byStage.some((s) => s.count > 0)) return false
+  if (work && (work.storiesOpen > 0 || work.tasksDue > 0)) return false
+  if (work && work.weeks.some((w) => w.seconds > 0)) return false
+  if (meetings && meetings.thisWeek > 0) return false
+  return true
 }
 
 /* ------------------------------ the two pictures --------------------------- */

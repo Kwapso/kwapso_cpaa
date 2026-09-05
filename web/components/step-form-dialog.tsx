@@ -498,7 +498,12 @@ export function StepFormDialog({
                 place:
                   v === SPLIT
                     ? (st.place === AFTER_ALL || !peers.some((x) => x.stepKey === st.place)
-                        ? (besideNow?.stepKey ?? peers[0].stepKey)
+                        // GUARDED HERE, not by the `peers.length > 0` twenty
+                        // lines up: this whole Select is inside that check, so
+                        // `peers[0]` cannot be missing today — but a guard at a
+                        // distance is one edit away from not being one, and on
+                        // a brand-new process nothing is guaranteed non-empty.
+                        ? (besideNow?.stepKey ?? peers[0]?.stepKey ?? AFTER_ALL)
                         : st.place)
                     : AFTER_ALL,
                 branch: v === SPLIT ? st.branch : "",
@@ -568,7 +573,11 @@ export function StepFormDialog({
         <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
           <Field config={insteadField} htmlFor="step-place">
             <Select
-              value={place === AFTER_ALL ? peers[0].stepKey : place}
+              // `splitting` is only ever true when `place` names a real peer, so
+              // the left branch is unreachable — same reasoning as the guard
+              // above, written locally rather than inferred from two other
+              // expressions.
+              value={place === AFTER_ALL ? (peers[0]?.stepKey ?? AFTER_ALL) : place}
               onValueChange={(v) => setValues((st) => ({ ...st, place: v }))}
               disabled={busy}
             >

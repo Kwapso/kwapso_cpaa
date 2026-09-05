@@ -57,7 +57,16 @@ function listCollection(
   emptyText: string,
   searchPlaceholder: string,
   filterFacets: FilterFacet[] = [],
-  opts: { paged?: boolean; icon?: keyof typeof CONCEPT_ICON } = {}
+  opts: {
+    paged?: boolean
+    icon?: keyof typeof CONCEPT_ICON
+    /** THE SENTENCE UNDER `emptyText`, where this collection has one of its
+     * own. Left unset the frame draws its own default, which is true of any
+     * collection you can add to; set it where the route in is genuinely
+     * different, so the first sentence a brand-new team reads on this screen
+     * is about THIS screen. See `CollectionConfig.emptyDescription`. */
+    emptyDescription?: string
+  } = {}
 ): CollectionConfig {
   return {
     ...defaultCollectionConfig,
@@ -66,6 +75,7 @@ function listCollection(
     userFilter: filterFacets.length > 0,
     filterFacets,
     emptyText,
+    emptyDescription: opts.emptyDescription,
     // THE SECTION'S OWN CONCEPT GLYPH, above the empty sentence (library
     // v0.12.0 `emptyIcon`). A lone line of grey text in a dashed box reads as a
     // screen that FAILED rather than one with nothing on it yet — and that is
@@ -236,7 +246,13 @@ const membersListRecipe: ScreenRecipe = {
   actions: [],
   collection: listCollection("No members yet.", "Search members…", [
     { field: "role", label: "Role", control: "select" },
-  ], { icon: "members" }),
+  ], {
+    icon: "members",
+    // A member is never ADDED — they accept an invite — so the frame's own
+    // default ("whatever gets added shows up here") would point at a door
+    // that does not exist on this screen.
+    emptyDescription: "A member joins by accepting an invite. Send one from Invites and they appear here once they accept.",
+  }),
 }
 
 /** Member detail (Overview + Activity). Actions change-role + remove are gated by
@@ -328,7 +344,10 @@ const invitesListRecipe: ScreenRecipe = {
   actions: [],
   collection: listCollection("No invites yet.", "Search invites…", [
     { field: "status", label: "Status", control: "select" },
-  ], { icon: "invites" }),
+  ], {
+    icon: "invites",
+    emptyDescription: "Invite someone by email and choose their role. The invite waits here until they accept it.",
+  }),
 }
 
 /** Invite detail — who/what/when, plus Revoke (gated team_members:delete; the
@@ -400,7 +419,14 @@ const ticketsListRecipe: ScreenRecipe = {
   // the clutter the accounts screen took away ("two controls for one field").
   // The one in the frame narrowed the loaded fifty and was the same defect the
   // strip was built to avoid.
-  collection: listCollection("No tickets yet.", "Search tickets…", [], { paged: true, icon: "tickets" }),
+  collection: listCollection("No tickets yet.", "Search tickets…", [], {
+    paged: true,
+    icon: "tickets",
+    // THE ONE COLLECTION THE OLD SHARED SENTENCE WAS TRUE OF, kept — a ticket
+    // really does arrive from two places, and saying so is what tells a new
+    // team they do not have to type their clients' questions in themselves.
+    emptyDescription: "A ticket is something someone has asked us for. Raise one here, or wait for a client to raise one from their portal.",
+  }),
 }
 
 /* -------------------------------- accounts -------------------------------- */
@@ -470,7 +496,17 @@ const contactsListRecipe: ScreenRecipe = {
   // NO FACETS HERE, for the reason Accounts has none: the list PAGES, and a
   // facet in the frame would narrow the loaded page under a badge counting
   // everybody. The door's own filters (collection-filters.ts) still apply.
-  collection: listCollection("No contacts yet.", "Search contacts…", [], { paged: true, icon: "contacts" }),
+  collection: listCollection("No contacts yet.", "Search contacts…", [], {
+    paged: true,
+    icon: "contacts",
+    // THE ONE SCREEN IN THE APP WITH NO CREATE ACT AT ALL, and until now the
+    // only thing it said about that was silence: a contact is added by linking
+    // a person to the company they work at, from that company's own record
+    // (see contacts-screen.tsx's header for the ruling). The route was written
+    // down in a source comment and on no screen, so the empty body drew a
+    // title, a sentence about the portal, and nothing to press.
+    emptyDescription: "A contact is a person at one of your accounts. Open the company under Accounts and add them from its own screen.",
+  }),
 }
 
 /* -------------------------------- knowledge ------------------------------- */
@@ -523,7 +559,15 @@ const knowledgeListRecipe: ScreenRecipe = {
     // exists (it draws the rail entry and every mark on this collection's own
     // rows), so this was a call site that forgot to pass it, not a gap in
     // the vocabulary.
-    { paged: true, icon: "knowledge" }
+    {
+      paged: true,
+      icon: "knowledge",
+      // The one collection whose emptiness is about the ASSISTANT rather than
+      // about a list — a brand-new team's first question to it comes back with
+      // nothing, and this is the only screen that can say why.
+      emptyDescription:
+        "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it.",
+    }
   ),
 }
 
@@ -987,6 +1031,7 @@ function translateCollection(c: CollectionConfig, t: Translate): CollectionConfi
     ...c,
     title: c.title ? t(c.title) : c.title,
     emptyText: c.emptyText ? t(c.emptyText) : c.emptyText,
+    emptyDescription: c.emptyDescription ? t(c.emptyDescription) : c.emptyDescription,
     searchPlaceholder: c.searchPlaceholder ? t(c.searchPlaceholder) : c.searchPlaceholder,
     sortOptions: c.sortOptions.map((o) => ({ ...o, label: t(o.label) })),
     filterFacets: c.filterFacets.map((f) => ({ ...f, label: t(f.label) })),

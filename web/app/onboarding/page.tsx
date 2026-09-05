@@ -313,10 +313,21 @@ export default function OnboardingPage() {
           <Headline as="h1" size="display-m">
             {teamless ? t("You're not in a team") : t("Set up your profile")}
           </Headline>
+          {/* "YOUR TEAM GETS CREATED RIGHT AFTER" WAS NOT TRUE OF ANYBODY, and
+              it was the first full sentence a new member ever read. Team
+              creation is closed product-wide (TEAM_CREATION_CLOSED,
+              shared/product.ts — ruled three times, most recently 3 Sep 2026);
+              everyone standing here is joining a team that already exists,
+              because that is the only way anyone gets here. `finish` below
+              calls `bootstrap`, which ACCEPTS the invitation waiting on this
+              address — so the honest sentence names that, and the screen stops
+              describing a flow the product has closed. Not a dead end (nothing
+              broke), which is exactly why it survived: an untrue sentence
+              renders perfectly. */}
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
               ? t("An admin can invite you back — ask them to send a new invite to this email address.")
-              : t("Tell us who you are, your team gets created right after.")}
+              : t("Tell us who you are, and we'll take you into your team.")}
           </p>
         </div>
         {/* NO FORM FOR THE TEAMLESS under a closed product. The button used to

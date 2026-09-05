@@ -154,9 +154,10 @@ export function CollectionEmptyState({
   /** The collection's own word for what's missing — `config.emptyText`,
    * translated at the call site. */
   title: string
-  /** 27.21: "One sentence naming the two routes". Defaults to the
-   * composition's own words, verbatim, for a caller with nothing more
-   * specific to say. */
+  /** 27.21: "One sentence naming the two routes". Defaults below to a
+   * sentence that is true of every collection it can land on, for a caller
+   * with nothing more specific to say; a collection with a route of its own
+   * says so through `CollectionConfig.emptyDescription`. */
   description?: string
   /** The one mango on this register — composition 27.21's own exception to
    * B3. Absent draws no button (a reader with no create right). */
@@ -175,11 +176,24 @@ export function CollectionEmptyState({
       <Headline as="h3" size="h3">
         {title}
       </Headline>
+      {/* THE DEFAULT SENTENCE HAS TO BE TRUE ON EVERY COLLECTION IT LANDS ON,
+          and until 2026-09-05 it was not. It read "Records land here when
+          someone adds one, or when a client raises a request from the portal",
+          which sixteen recipe collections fell through to — and the portal
+          clause is right on exactly ONE of them, Tickets. A brand-new team
+          opening Roles was told that roles arrive when a client raises a
+          request, which is not merely vague, it is false, and it is the first
+          full sentence anybody reads on that screen.
+
+          So there are two defaults now, chosen by whether this reader has a
+          way in at all, and neither names a route they cannot take. A
+          collection with something more specific to say says it through
+          `CollectionConfig.emptyDescription` (Contacts, Tickets, Members). */}
       <Text as="p" size="sm" tone="secondary" measure>
         {description ??
-          t(
-            "Records land here when someone adds one, or when a client raises a request from the portal. The first one takes a minute."
-          )}
+          (onCreate || onImport
+            ? t("Whatever you add shows up here. The first one takes a minute.")
+            : t("Whatever gets added shows up here."))}
       </Text>
       {(onCreate || onImport) && (
         <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -656,7 +670,10 @@ function CollectionFrame<T>({
           // work (COMPOSITION-MISMATCHES.md).
           <CollectionEmptyState
             title={copy?.emptyTitle ?? t(config.emptyText)}
-            description={copy?.emptyDescription}
+            description={
+              copy?.emptyDescription ??
+              (config.emptyDescription ? t(config.emptyDescription) : undefined)
+            }
             onCreate={createAction?.onCreate}
             onImport={createAction?.secondary?.onClick}
           />
@@ -952,7 +969,10 @@ function CollectionFrame<T>({
         ) : (
           <CollectionEmptyState
             title={copy?.emptyTitle ?? t(config.emptyText)}
-            description={copy?.emptyDescription}
+            description={
+              copy?.emptyDescription ??
+              (config.emptyDescription ? t(config.emptyDescription) : undefined)
+            }
             onCreate={createAction?.onCreate}
             onImport={createAction?.secondary?.onClick}
           />

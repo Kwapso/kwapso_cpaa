@@ -36,6 +36,15 @@ const VISIBLE_PROPS = new Set([
   "description",
   "alt",
   "emptyText",
+  // THE SENTENCE UNDER `emptyText`, added 2026-09-05 beside it and for exactly
+  // the same reason. `emptyText` is the TITLE of an empty collection and has
+  // been catalogued since this list was written; the sentence below it was
+  // hard-coded in one place (`CollectionEmptyState`) and so never needed a
+  // name. It does now: a collection can carry its own explanation
+  // (`CollectionConfig.emptyDescription`), and a sentence a brand-new team
+  // reads before anything else on the screen is the last one that should be
+  // silently English.
+  "emptyDescription",
   // A FIELD'S HELP TEXT is the sentence under the input, and it is copy by
   // definition: `helpText` is the library `FieldConfig`'s own property name
   // (shared/ui/lib/config), so it cannot hold data the way a bare `title` can.
