@@ -351,10 +351,33 @@ data-model reference" was carrying two core tables it never named.)*
 team's data lives in its one database (`teams.database_id`), and when a module gets
 heavy the mover relocates that module's tables to a dedicated database and records
 it here — `team_id`, `module`, `database_id`, `created_at`, `UNIQUE (team_id,
-module)`. The data door consults this table to know where a (team, module) lives,
-which is why the mover flips it LAST: no row, no re-routing, no doubled read.
+module)`. The mover flips it LAST, so an interrupted move is never a doubled read.
+
+**IT IS WRITTEN AND NOT YET READ (measured 5 Sep 2026).** No data door consults
+this table: `requireMember` resolves one `guard.databaseId` from
+`teams.database_id`, and `resolveModuleDatabases`/`queryModule` — the merged-read
+entry points — have no callers outside `workers/tenancy/src/lib/sharding.ts`. So
+the mover is refused at its own door (`SPLIT_READS_WIRED`) rather than left able to
+empty a module out of the app while reporting success. ARCHITECTURE §7 and
+BASE-MANUAL §"What's built today" carry the full argument, including why wiring the
+reads is not the whole job (a merged read cannot page, sort or count).
 `0004` also creates `db_alerts`, the 80%-of-10-GB size alarms `db_growth` above
 turns into a rate.
+
+**AND ONE ROW IN EACH IS NOT A DATABASE (5 Sep 2026).** D1 caps TOTAL storage per
+ACCOUNT at 1 TB, and nothing watched that: about 120 databases at 8.5 GB each are
+over the ceiling while every single per-database alarm reads a comfortable no, and
+the named remedy for those alarms — run the module mover — CREATES another
+database and spends the very thing that has run out. So the nightly check sums the
+whole account listing and writes it to both tables under the sentinel id
+`account:d1-storage` (`ACCOUNT_STORAGE_ID`), named
+`ALL D1 STORAGE ON THIS CLOUDFLARE ACCOUNT` for a human reading the row. A D1 uuid
+is 36 hex-and-dashes, so a colon cannot collide with one. The sum covers the
+WHOLE listing including the other two products sharing this account — counted,
+never named — because the 1 TB is charged to the account and not to the app; our
+own share rides back beside it as `ourBytes`. A reader of `db_growth` must measure
+that row against `D1_MAX_ACCOUNT_BYTES` and not the 10 GB per-database cap, which
+is what `daysUntilFull`'s `ceilingBytes` parameter exists for.
 
 **`team_module_moves`** (`0023_module_moves`) is what makes a killed move a
 CONTINUATION rather than an orphaned second database (ARCHITECTURE §7 marks the

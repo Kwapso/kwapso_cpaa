@@ -12,7 +12,7 @@ import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { INLINE_SAFE_UPLOAD, mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { INLINE_SAFE_UPLOAD, mediaKey, ownedMediaKey, reclaimMedia, parseUploadDataUrl } from "@shared/workers/image"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countBrandAssets,
@@ -70,8 +70,18 @@ export async function postUpdateBrandAsset(request: Request, env: Env): Promise<
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Asset", TEXT_LIMITS.short)
   requireText(body.name, "Name", TEXT_LIMITS.short)
-  await updateBrandAsset(cfg, guard, actor, id, body)
+  const { supersededUrls } = await updateBrandAsset(cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "brand_assets", id)
+  // The file this edit replaced or cleared, deleted after the row moved and
+  // fail-soft. `/media/internal/` is this module's base and `"brand"` is the
+  // segment its own uploads are minted under — the wrong base or the wrong
+  // segment returns null from `ownedMediaKey` and reclaims NOTHING while reading
+  // exactly like a reclaim that ran, which is why both sit beside the mint.
+  await reclaimMedia(
+    env.INTERNAL_MEDIA,
+    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "brand")),
+    { db: env.DB, source: "content", place: "POST /api/content/brand-assets/update, file reclaim" }
+  )
   return json({ assets: await listBrandAssets(cfg, guard), total: await countBrandAssets(cfg, guard) })
 }
 
@@ -112,7 +122,18 @@ export async function postUploadBrandAsset(request: Request, env: Env): Promise<
   // The key IS the credential — the gateway serves /media/* with no session, so
   // every upload carries a random ULID segment (mediaKey, the one place that's
   // decided), and the team id in front of it is what proves ownership later.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "brand")
   await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType: parsed.contentType })
@@ -178,7 +199,18 @@ export async function postStreamBrandAsset(request: Request, env: Env): Promise<
   // is the team's prefix plus a random ULID and carries NOTHING the caller sent.
   // No path to contain and no escape to filter, which is the strongest form of the
   // rule rather than a filter over a weaker one.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "brand")
   await env.INTERNAL_MEDIA.put(key, request.body, { httpMetadata: { contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType })

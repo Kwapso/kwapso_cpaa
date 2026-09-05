@@ -193,3 +193,103 @@ describe("safeMediaKey — the door validates the key at the boundary", () => {
     expect(doors, "the two gateways ship four media doors between them").toBe(4)
   })
 })
+
+// A RECLAIM THAT CANNOT FIRE IS WORSE THAN NO RECLAIM.
+//
+// `ownedMediaKey` answers null for anything it cannot prove — a foreign prefix, a
+// pasted external link, a deeper path — and `reclaimMedia` skips a null without a
+// murmur. That is exactly right for a hostile input and exactly wrong for a
+// DEVELOPER MISTAKE, because the two are indistinguishable at runtime: give the
+// reclaim `/media/` where the module writes to `/media/internal/`, or the owners
+// list of a neighbouring module, and every call returns null, nothing is ever
+// deleted, and the code reads as if the leak were closed. Ten of the app's upload
+// doors write to the internal shelf and six to the public one, so this is not a
+// hypothetical.
+//
+// So the pairing is checked rather than trusted: every reclaim's owners list must
+// be one some door actually MINTS with, and its base must be the one that door's
+// bucket is served under.
+describe("a reclaim is proved against the key some door actually mints", () => {
+  /** `ownedMediaKey(<stored>, "<base>", <owners…>)` — the base and the owners, as
+   * written. Text, deliberately: the point is that the two call sites say the
+   * SAME thing, and normalising them apart is how they would be allowed to
+   * differ. */
+  const RECLAIM = /ownedMediaKey\(\s*[^,]+,\s*"([^"]+)"\s*,\s*([^)]*)\)/g
+  /** `mediaKey(<owners…>)` — the mint. */
+  const MINT = /mediaKey\(\s*([^)]*)\)/g
+  const tidy = (owners: string) => owners.replace(/\s+/g, " ").trim()
+
+  /** Which base a file's uploads are served under, from the bucket it writes to.
+   * `INTERNAL_MEDIA` is the agency-only shelf and is served at
+   * `/media/internal/` by the agency gateway alone; everything else is
+   * `/media/`. Derived from the source rather than listed, so a module that
+   * changes shelves cannot leave a stale base behind in its reclaim. */
+  function baseOf(src: string): string | null {
+    if (/INTERNAL_MEDIA\.put\(/.test(src)) return "/media/internal/"
+    if (/MEDIA\.put\(|storeImageDataUrl\(\s*env\.MEDIA/.test(src)) return "/media/"
+    return null
+  }
+
+  it("every owners list a reclaim proves against is one a door mints with", () => {
+    const mints = new Map<string, string[]>() // owners → the files that mint them
+    for (const [path, src] of workerSources())
+      for (const m of src.matchAll(MINT)) {
+        const owners = tidy(m[1])
+        mints.set(owners, [...(mints.get(owners) ?? []), path])
+      }
+    // The tripwire: a scan that found no mints would pass every assertion below.
+    expect(mints.size, "expected to find the upload doors' key mints").toBeGreaterThan(5)
+
+    let reclaims = 0
+    for (const [path, src] of workerSources())
+      for (const m of src.matchAll(RECLAIM)) {
+        reclaims++
+        const [, base, ownersRaw] = m
+        const owners = tidy(ownersRaw)
+        const minters = mints.get(owners)
+        expect(
+          minters,
+          `${path} reclaims keys under \`${owners}\` and no upload door mints that — a prefix nothing wrote matches nothing, so this deletes NOTHING and looks like it works`
+        ).toBeTruthy()
+        // …and the shelf has to agree, which is the half a reader's eye slides
+        // over: `/media/` against an INTERNAL_MEDIA key fails `startsWith` and
+        // silently reclaims nothing.
+        for (const minter of minters ?? []) {
+          const want = baseOf(readFileSync(join(ROOT, minter), "utf8"))
+          if (!want) continue // the mint and the put are in different files
+          expect(
+            base,
+            `${path} reclaims \`${owners}\` at "${base}", but ${minter} writes those objects to the shelf served at "${want}" — every key would fail the prefix test and nothing would ever be deleted`
+          ).toBe(want)
+        }
+      }
+    expect(
+      reclaims,
+      "expected the reclaims: profile photo, team logo, account logo+cover, app logo, brand file, deliverable link+picture, staff photo, certificate file"
+    ).toBeGreaterThanOrEqual(7)
+  })
+
+  it("no two modules mint into the same owners prefix", () => {
+    // THE BUG THIS CLOSES, MEASURED 5 SEP 2026: knowledge, brand assets, staff and
+    // deliverables all minted `mediaKey(guard.teamId)` into the SAME bucket, so
+    // `ownedMediaKey(url, base, teamId)` proved "this team" and could never prove
+    // "this module". A brand asset's URL pasted into a staff certificate's file
+    // field passes that proof — and the staff door's reclaim would then destroy the
+    // brand library's file. One more segment makes it impossible by construction;
+    // this keeps it that way.
+    const byOwners = new Map<string, Set<string>>()
+    for (const [path, src] of workerSources()) {
+      if (!/\.put\(|storeImageDataUrl\(/.test(src)) continue
+      for (const m of src.matchAll(MINT)) {
+        const owners = tidy(m[1])
+        byOwners.set(owners, (byOwners.get(owners) ?? new Set()).add(path))
+      }
+    }
+    expect(byOwners.size, "expected to find the upload doors").toBeGreaterThan(5)
+    for (const [owners, files] of byOwners)
+      expect(
+        [...files],
+        `\`mediaKey(${owners})\` is minted by more than one module, so no reclaim on either can prove which module an object belongs to`
+      ).toHaveLength(1)
+  })
+})

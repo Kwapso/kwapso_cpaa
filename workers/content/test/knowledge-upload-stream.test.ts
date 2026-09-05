@@ -191,13 +191,16 @@ describe("the streamed knowledge upload: it does not hold the file", () => {
     const b = bucket()
     await postStreamKnowledgeFile(upload("fileName=..%2F..%2Fetc%2Fpasswd"), envWith(b))
     const key = b.puts[0].key
-    expect(key.startsWith("team01/"), "the team owns the prefix").toBe(true)
+    expect(key.startsWith("team01/knowledge/"), "the team AND the module own the prefix").toBe(true)
     expect(key).not.toContain("..")
     expect(key).not.toContain("passwd")
     // `/media/*` is served with no session, so the key IS the credential: it must
-    // not be derivable from anything the caller has seen.
-    expect(key.split("/")).toHaveLength(2)
-    expect(key.split("/")[1].length, "a ULID's worth of unguessable tail").toBeGreaterThan(20)
+    // not be derivable from anything the caller has seen. The middle segment is
+    // the MODULE, so a reclaim on another module's door can never prove ownership
+    // of this object — four modules used to share the bare `team01/` prefix.
+    expect(key.split("/")).toHaveLength(3)
+    expect(key.split("/")[1]).toBe("knowledge")
+    expect(key.split("/")[2].length, "a ULID's worth of unguessable tail").toBeGreaterThan(20)
   })
 })
 

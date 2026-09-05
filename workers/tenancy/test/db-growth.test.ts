@@ -15,7 +15,10 @@ import { describe, expect, it, vi, afterEach } from "vitest"
 
 import { CRON_GROWTH_CAP } from "@shared/workers/limits"
 import {
+  ACCOUNT_STORAGE_ID,
+  ACCOUNT_STORAGE_NAME,
   ALERT_THRESHOLD_BYTES,
+  D1_MAX_ACCOUNT_BYTES,
   D1_MAX_DATABASE_BYTES,
   checkDatabaseSizes,
   daysUntilFull,
@@ -161,10 +164,18 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
     const core = fakeCoreDb(allOf(3))
     const result = await checkDatabaseSizes({ DB: core.db } as Env, CFG)
     expect(result.alerted, "nothing is near the cap").toEqual([])
+    // Three databases plus the ACCOUNT's own row — the total is a reading like any
+    // other, and it is written on a quiet night for the same reason theirs are.
     expect(
-      core.growth.length,
+      core.growth.filter((p) => p[0] !== ACCOUNT_STORAGE_ID).length,
       "a trend you start measuring at 80% is a trend you measured too late"
     ).toBe(3)
+    const account = core.growth.find((p) => p[0] === ACCOUNT_STORAGE_ID)
+    expect(account, "the ceiling that takes every tenant down at once needs a trend too").toBeTruthy()
+    // 0 + 1M + 2M — the sum of the whole listing, not of the biggest one.
+    expect(account?.[2]).toBe(3_000_000)
+    expect(result.accountBytes).toBe(3_000_000)
+    expect(result.accountComplete, "a short page means the listing finished").toBe(true)
   })
 
   it("bounds the readings at CRON_GROWTH_CAP and takes the LARGEST", async () => {
@@ -172,15 +183,72 @@ describe("the nightly tick records readings, bounded and biggest-first", () => {
     stubAccount(total)
     const core = fakeCoreDb(allOf(total))
     await checkDatabaseSizes({ DB: core.db } as Env, CFG)
-    expect(core.growth.length, "a growth watch must not become the thing that grows").toBe(
+    const perDatabase = core.growth.filter((p) => p[0] !== ACCOUNT_STORAGE_ID)
+    expect(perDatabase.length, "a growth watch must not become the thing that grows").toBe(
       CRON_GROWTH_CAP
     )
     // `bind(database_id, database_name, size_bytes, at, …)` — the smallest of the
     // recorded set must still be bigger than every database left out.
-    const sizes = core.growth.map((p) => p[2] as number)
+    const sizes = perDatabase.map((p) => p[2] as number)
     expect(Math.min(...sizes), "the trend matters where there is a ceiling to reach").toBe(
       (total - CRON_GROWTH_CAP) * 1_000_000
     )
+  })
+
+  it("the account's own reading does not cost the estate a trend slot", async () => {
+    // THE TRAP THIS PINS. The account total is by construction the largest number
+    // of the night, so writing it as one more member of the list would push the
+    // smallest database out of `CRON_GROWTH_CAP` — a watch that narrows itself by
+    // one database the day the account row was added, silently and for ever. It is
+    // written BESIDE the capped slice, not inside it.
+    const total = CRON_GROWTH_CAP + 50
+    stubAccount(total)
+    const core = fakeCoreDb(allOf(total))
+    await checkDatabaseSizes({ DB: core.db } as Env, CFG)
+    expect(core.growth.length).toBe(CRON_GROWTH_CAP + 1)
+    const account = core.growth.find((p) => p[0] === ACCOUNT_STORAGE_ID)
+    // The sum of 0…(total-1) millions — every database on the account, including
+    // the ones whose own trend row did not fit.
+    expect(account?.[2]).toBe(((total - 1) * total) / 2 * 1_000_000)
+  })
+
+  it("alarms on the ACCOUNT's total while every single database is comfortable", async () => {
+    // THE FAILURE THE PER-DATABASE WATCH CANNOT SEE. Two hundred databases at
+    // 8 GB are all under the 8-GiB alarm line and together they are 1.6 TB —
+    // past D1's 1 TB per-account ceiling, at which point D1 refuses new writes
+    // and new databases across every tenant at once. Before this row existed the
+    // tick reported `alerted: []` on exactly this account.
+    const n = 200
+    const page = Array.from({ length: n }, (_, i) => ({
+      uuid: `u${i}`,
+      name: `team-${i}`,
+      file_size: 8 * GB,
+    }))
+    vi.stubGlobal("fetch", async (url: string) => {
+      const p = Number(/[?&]page=(\d+)/.exec(url)?.[1] ?? "1")
+      return new Response(
+        JSON.stringify({ success: true, errors: [], result: page.slice((p - 1) * 100, p * 100) }),
+        { status: 200 }
+      )
+    })
+    const core = fakeCoreDb(allOf(n))
+    const result = await checkDatabaseSizes({ DB: core.db } as Env, CFG)
+    expect(result.accountBytes).toBe(n * 8 * GB)
+    expect(result.accountBytes).toBeGreaterThan(D1_MAX_ACCOUNT_BYTES)
+    expect(
+      result.alerted,
+      "every database is under its own line and the account is over its own"
+    ).toContain(ACCOUNT_STORAGE_NAME)
+  })
+
+  it("does not alarm on the account while the estate is small", async () => {
+    // THE CANARY FOR THE ASSERTION ABOVE: the same code path, an account nowhere
+    // near the ceiling, and no account alarm. Without this, a bug that alarmed
+    // unconditionally would pass the test above.
+    stubAccount(3)
+    const core = fakeCoreDb(allOf(3))
+    const result = await checkDatabaseSizes({ DB: core.db } as Env, CFG)
+    expect(result.alerted).not.toContain(ACCOUNT_STORAGE_NAME)
   })
 
   it("a failed reading never costs the alarms", async () => {

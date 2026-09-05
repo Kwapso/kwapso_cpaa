@@ -33,6 +33,10 @@ declare module "node:sqlite" {
   export class DatabaseSync {
     constructor(path: string)
     exec(sql: string): void
+    /** Node's own API. Declared because the restore rehearsal builds and discards
+     * several scratch databases in one run and closes each one rather than
+     * leaving it to the collector. */
+    close(): void
     prepare(sql: string): {
       run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint }
       get(...params: unknown[]): unknown

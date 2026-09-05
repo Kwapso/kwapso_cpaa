@@ -60,7 +60,7 @@ import { fail, json } from "@shared/workers/http"
 import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { ANY_FILE_TYPE, mediaKey, storedContentType } from "@shared/workers/image"
+import { ANY_FILE_TYPE, mediaKey, ownedMediaKey, reclaimMedia, storedContentType } from "@shared/workers/image"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countDeliverables,
@@ -130,6 +130,14 @@ export async function postUpdateDeliverable(request: Request, env: Env): Promise
   requireText(body.title, "Title", TEXT_LIMITS.short)
   const wrote = await updateDeliverable(cfg, guard, actor, id, appId, body)
   await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
+  // The link's file and the picture, when this edit stopped pointing at either.
+  // After the write and fail-soft; archiving still reclaims nothing, which is the
+  // distinction lib/deliverables.ts draws between superseded and retired.
+  await reclaimMedia(
+    env.INTERNAL_MEDIA,
+    wrote.supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "deliverables")),
+    { db: env.DB, source: "content", place: "POST /api/content/deliverables/update, file reclaim" }
+  )
   // These are independent reads — one wait, not 2.
   const [deliverables, total] = await Promise.all([listDeliverables(cfg, guard, { appId }), countDeliverables(cfg, guard, { appId })])
   return json({
@@ -282,7 +290,18 @@ export async function postStreamDeliverableFile(request: Request, env: Env): Pro
     return fail(400, "invalid_input", "That upload did not say what kind of file it is.")
   if (!request.body) return fail(400, "invalid_input", "That upload had no file in it.")
 
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "deliverables")
   await env.INTERNAL_MEDIA.put(key, request.body, {
     httpMetadata: { contentType: storedContentType(contentType) },
   })

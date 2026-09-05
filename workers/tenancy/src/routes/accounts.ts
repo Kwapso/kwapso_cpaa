@@ -18,7 +18,7 @@ import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } fr
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
-import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
+import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
@@ -344,7 +344,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     logoUrl: typeof patch.logoUrl === "string" ? patch.logoUrl : undefined,
     coverUrl: typeof patch.coverUrl === "string" ? patch.coverUrl : undefined,
   })
-  await updateAccount(cfg, guard, scope, actor, id, {
+  const { supersededUrls } = await updateAccount(cfg, guard, scope, actor, id, {
     name,
     ...patch,
     ...(stored.logoUrl !== undefined ? { logoUrl: stored.logoUrl } : {}),
@@ -352,6 +352,24 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
   })
   await publishChange(env, guard.teamId, "accounts", id)
+  // THE PICTURE THAT IS NO LONGER ANYBODY'S — deleted AFTER the row moved, and
+  // fail-soft, exactly as the profile photo and the team logo already are.
+  //
+  // Until this landed, changing a client's logo or cover left the old object in
+  // R2 for ever with no row pointing at it and no way to find it again: the key
+  // was in the column that has just been overwritten. Two of these per account
+  // per rebrand is small; `scripts/backup.mjs` uses the bucket as its own
+  // inventory by design, so every abandoned object is copied on every backup run
+  // and the cost is paid nightly rather than once.
+  //
+  // `ownedMediaKey` is given the SAME owners list `accountImages` mints with, ten
+  // lines up. A key from anywhere else, a foreign team's prefix, or an external
+  // link somebody pasted returns null and nothing is deleted.
+  await reclaimMedia(
+    env.MEDIA,
+    supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "accounts")),
+    { db: env.DB, source: "tenancy", place: "POST /api/tenancy/accounts/update, image reclaim" }
+  )
   return json({ ok: true })
 }
 

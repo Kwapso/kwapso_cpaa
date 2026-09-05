@@ -131,6 +131,26 @@ export async function storeImageDataUrl(
   return `/media/${key}?v=${Date.now()}`
 }
 
+/** THE VALUE A WRITE JUST SUPERSEDED, or null when it superseded nothing.
+ *
+ * The one sentence every reclaim needs and the one that is easy to write four
+ * slightly different ways: an object stops being reachable exactly when the
+ * column that pointed at it stops pointing at it — which is a REPLACE (a new
+ * upload) and a CLEAR (the picture taken away) and nothing else. Written once,
+ * because "replaced" and "cleared" being the same case is the part a fifth
+ * implementation would get wrong, and because `before === after` — a save that
+ * did not touch the picture — must never hand a live key to a delete.
+ *
+ * It returns the STORED URL, not a key: proving that string is one of ours is
+ * `ownedMediaKey`'s job and is deliberately still done at the call site, where
+ * the owners list sits beside the `mediaKey` that minted it. */
+export function supersededMedia(
+  before: string | null | undefined,
+  after: string | null | undefined
+): string | null {
+  return before && before !== after ? before : null
+}
+
 /** Delete the objects a row no longer points at. ALWAYS called AFTER the row has
  * moved, and always FAIL-SOFT.
  *

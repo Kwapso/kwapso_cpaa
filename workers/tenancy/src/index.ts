@@ -533,7 +533,7 @@ export default {
     try {
       const result = await checkDatabaseSizes(env, d1Config(env))
       console.log(
-        `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s)`
+        `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s); account D1 storage ${result.accountBytes} bytes${result.accountComplete ? "" : " (LOWER BOUND — the listing was truncated)"}, ${result.ourBytes} of them ours`
       )
       // R12 IN SPIRIT: the run has a ceiling, and hitting it means databases over
       // 80% went un-alarmed tonight. That is not a crash, so the catch below

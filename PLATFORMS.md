@@ -23,7 +23,7 @@ code. A port = back these five with the target platform's primitives.
 
 | # | Pillar | What the Kwapso System uses (Cloudflare) | The one seam file to swap |
 |---|--------|-------------------------------|----------------------------|
-| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`), the ONLY place SQL runs |
+| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) for TEAM data — plus 151 raw `env.DB.prepare(…)` sites in 27 files for the CORE database, which has no adapter (see below) |
 | 2 | **The live layer** | the `TeamChannel` **Durable Object** fans out change pings | `shared/workers/realtime.ts` (`publishChange`), the ONLY broadcast seam |
 | 3 | **Compute** | **8 Workers** behind two public gateways (one per front end) | each `workers/*` + the gateway router (the shape ports; the runtime swaps) |
 | 4 | **File storage** | **R2**, keyed per team | the R2 `.put/.get` calls in `content` + `gateway` (`/media/*`) |
@@ -42,6 +42,27 @@ with a `team_id`** (recommended, one database, a policy per table), **schema-per
 (stronger isolation, heavier ops), or **database-per-team** (closest to the Kwapso System, most
 expensive). The base's data door (`d1-rest.ts`) is where that choice lands, rewrite
 that one seam and the 8 workers keep working unchanged.
+
+**AND THAT SENTENCE IS TRUE OF TEAM DATA AND FALSE OF CORE DATA — measured
+5 Sep 2026.** Pillar 1's row used to read "the ONLY place SQL runs", which is
+exactly right for the per-team databases: every statement against them goes
+through `d1Query` / `d1ExecScript`, and `web/test/rules.test.ts` holds it there.
+The GLOBAL core database is reached a different way — `env.DB.prepare(…).bind(…)`,
+Cloudflare's raw D1 binding API — at **151 call sites across 27 production files** —
+auth, tenancy, content, data-ops and mcp — with no adapter of any kind between
+them and the platform.
+
+Nothing is wrong with those call sites; the binding is the fast path and it is
+what core is bound through on purpose. What was wrong was the PRICE this file
+quoted. A port that rewrote `d1-rest.ts` and expected the workers to keep working
+would find identity, sessions, teams, memberships, invites, the error log, the
+usage ledgers, the token desk and the sharding tables all still speaking D1
+directly. Every effort band in §2 understates pillar 1 by that work — it is
+mechanical rather than clever (one adapter, then a codemod over 151 sites), but
+it is days, and it is days nobody had counted.
+
+The count is derivable, so it can be re-checked rather than trusted:
+`grep -rn "env\.DB\.prepare(" --include='*.ts' workers/ shared/ | grep -v test | wc -l`.
 
 ---
 

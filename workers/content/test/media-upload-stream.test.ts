@@ -88,6 +88,8 @@ const DOORS = [
     shelf: "internal" as const,
     prefix: "/media/internal/",
     gate: "staff_profiles:edit",
+    /** The module segment this door's keys carry — see the key test below. */
+    segment: "staff",
   },
   {
     name: "brand assets",
@@ -95,6 +97,7 @@ const DOORS = [
     shelf: "internal" as const,
     prefix: "/media/internal/",
     gate: "brand_assets:create",
+    segment: "brand",
   },
 ]
 
@@ -103,7 +106,7 @@ beforeEach(() => {
   ctx.gatedAs = []
 })
 
-describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate }) => {
+describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate, segment }) => {
   const shelves = () => {
     const other = bucket()
     const internal = bucket()
@@ -162,15 +165,21 @@ describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate }) => {
     expect(s.of(shelf).puts[0].opts.httpMetadata).toEqual({ contentType: "video/mp4" })
   })
 
-  it("the key is the team plus a random segment — never the caller's words", async () => {
+  it("the key is the team, the MODULE, and a random segment — never the caller's words", async () => {
     const s = shelves()
     await call(upload(), s.env)
     const key = s.of(shelf).puts[0].key
-    expect(key.startsWith("team01/")).toBe(true)
-    expect(key.split("/")).toHaveLength(2)
+    expect(key.startsWith(`team01/${segment}/`)).toBe(true)
+    expect(key.split("/")).toHaveLength(3)
+    // WHY THE MODULE IS IN THERE. Four modules wrote into this one bucket under
+    // the bare `team01/` prefix, so `ownedMediaKey(url, base, teamId)` — the proof
+    // a reclaim stands on — could say "this team's" and never "this module's". A
+    // brand asset's URL pasted into a staff certificate's file field would have
+    // passed that proof and been deleted by the staff door's reclaim.
+    expect(key.split("/")[1], "the module owns its own prefix").toBe(segment)
     // `/media/*` is served with no session, so the key IS the credential and must
     // not be derivable from an id the caller has already seen.
-    expect(key.split("/")[1].length, "a ULID's worth of unguessable tail").toBeGreaterThan(20)
+    expect(key.split("/")[2].length, "a ULID's worth of unguessable tail").toBeGreaterThan(20)
   })
 
   // THE ONE THAT MATTERS MOST. The parse is gone; the allow-list must not have

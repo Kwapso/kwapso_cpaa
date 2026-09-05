@@ -454,7 +454,18 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
   // already exists to hold "the agency's own files, for the agency's own eyes",
   // its own header argues against one bucket per module, and a new one would be
   // a step in BOOTSTRAP.md that a rebuild from zero can silently skip.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "knowledge")
   await env.INTERNAL_MEDIA.put(key, parsed.bytes as unknown as ArrayBuffer, {
     // NEVER the declared type. The object is served back on the app's own origin,
     // so a stored `text/html` would be stored XSS — and the structural answer is
@@ -567,7 +578,18 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   // its reasons — INTERNAL_MEDIA because `/media/internal/` is served by the
   // agency gateway alone, and NEUTRALISED_CONTENT_TYPE because an object served
   // back on the app's own origin must not carry a renderable label.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "knowledge")
   await env.INTERNAL_MEDIA.put(key, request.body, {
     httpMetadata: { contentType: NEUTRALISED_CONTENT_TYPE },
   })

@@ -16,6 +16,31 @@ import { requestId } from "./trace"
 /** Anything with `.fetch()` — a service binding, in worker terms. */
 type Upstream = { fetch(url: string, init?: RequestInit): Promise<Response> }
 
+/** A CEILING ON THE HOPS THAT REPORT A FAILURE — the last three calls in this
+ * file that had none.
+ *
+ * Every one of them is already allowed to FAIL: the identity read below is
+ * `.catch(() => null)`, and both `log-error` posts are too, because a door that
+ * cannot report is still a door that must answer. "Allowed to fail" and "allowed
+ * to hang" are different permissions, and that distinction is written out three
+ * times elsewhere in this codebase (`whoAmI`, `publishChange`, `sendBrandedEmail`)
+ * — it was simply missing here, on the one path that runs while something is
+ * ALREADY going wrong.
+ *
+ * That is what makes it the worst place to leave one out. `recordGatewayCrash`
+ * runs when the gateway has already thrown, and the stranger on the other end is
+ * waiting for a 500; without a ceiling an unwell auth turns "we crashed" into
+ * "we crashed and then held the socket open", which is the failure the crash
+ * handler exists to prevent, arriving through the crash handler.
+ *
+ * The same five seconds as the identity ceiling (`AUTH_UNAVAILABLE_MS` in
+ * gating.ts) and deliberately its own constant rather than an import: the two
+ * gateways bundle THIS file and not the gating seam, and pulling the data door's
+ * module into a worker that binds no database to borrow one number is a bigger
+ * change than writing the number down. If the identity ceiling ever moves, the
+ * comment there and this one both say so. */
+const REPORT_HOP_MS = 5_000
+
 /**
  * THE WRITE HAS TO HAVE STARTED HERE. The cross-site request forgery check,
  * on both front doors, in front of everything they forward.
@@ -263,12 +288,41 @@ export async function serveMedia(
    * body — the point of a HEAD is to learn the size and the type without
    * fetching the bytes, which is exactly what a media player asks first.
    * Optional so the callers that only ever serve GETs keep working unchanged. */
-  method?: string
+  method?: string,
+  /** THE COLO'S OWN COPY. The request to key it on, and the lifetime to finish
+   * writing it into (`ctx.waitUntil`).
+   *
+   * `Cache-Control: public, max-age=31536000, immutable` has been on these
+   * responses from the start and it only ever reached ONE BROWSER: a response a
+   * Worker BUILDS does not enter Cloudflare's cache on its own, it has to be put
+   * there. So every cold viewer of every avatar, logo and attachment cost an R2
+   * Class-B operation and worker CPU proportional to the file size — the second
+   * person to open a 25 MB video on a team paid exactly what the first did, and
+   * so did the two-hundredth.
+   *
+   * Safe to cache by construction, which is the only reason this is allowed on a
+   * door with no session check: `mediaKey` mints a NEW random key per upload, so
+   * an object is never overwritten in place and a cached body can never be the
+   * wrong version of anything. The key is the credential either way — a viewer
+   * who can name the key could already fetch the bytes.
+   *
+   * Optional, so a caller that passes nothing behaves exactly as before, and
+   * absent in tests and in any runtime with no `caches` global. */
+  edge?: { request: Request; waitUntil: (work: Promise<unknown>) => void }
 ): Promise<Response> {
   const head = method === "HEAD"
   const key = safeMediaKey(pathname.slice(prefix.length))
   if (!key) return new Response("Not found", { status: 404 })
   const range = byteRange(rangeHeader ?? null)
+  // WHOLE OBJECTS ONLY. A 206 is an answer to one client's `Range`, and putting
+  // it in a shared cache under the plain URL would serve those bytes to the next
+  // person as if they were the file. A HEAD is skipped for the mirror image of
+  // the same reason: it has no body to store.
+  const cache = !range && !head ? await edgeCache(edge) : null
+  if (cache) {
+    const hit = await cache.store.match(cache.key)
+    if (hit) return hit
+  }
   const object = await bucket.get(key, range ? { range } : undefined)
   if (!object) return new Response("Not found", { status: 404 })
   const headers = new Headers(mediaHeaders(object))
@@ -287,7 +341,27 @@ export async function serveMedia(
       return new Response(head ? null : (object.body ?? null), { status: 206, headers })
     }
   }
-  return new Response(head ? null : (object.body ?? null), { headers })
+  const res = new Response(head ? null : (object.body ?? null), { headers })
+  // The clone happens BEFORE the response leaves, and the write rides the
+  // request's own lifetime — a cache write that the viewer waits for would trade
+  // one person's R2 read for every person's extra latency.
+  if (cache) cache.waitUntil(cache.store.put(cache.key, res.clone()))
+  return res
+}
+
+/** The colo's shared cache, or null when there is not one to use.
+ *
+ * Structural and defensive on purpose: `caches` is a Workers global that does not
+ * exist under vitest or in the web workspaces that compile this file, and a
+ * media door must never fail because a cache was unavailable. Every failure here
+ * is "no cache", never an error. */
+async function edgeCache(
+  edge?: { request: Request; waitUntil: (work: Promise<unknown>) => void }
+): Promise<{ store: Cache; key: Request; waitUntil: (work: Promise<unknown>) => void } | null> {
+  if (!edge) return null
+  const store = (globalThis as { caches?: { default?: Cache } }).caches?.default
+  if (!store) return null
+  return { store, key: edge.request, waitUntil: edge.waitUntil }
 }
 
 /**
@@ -329,7 +403,12 @@ export async function recordClientError(
   const raw = await request.text().catch(() => "")
   const cookie = request.headers.get("Cookie") ?? ""
   const me = cookie.includes("kwapso_session=")
-    ? await auth.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } }).catch(() => null)
+    ? await auth
+        .fetch("https://internal/api/auth/me", {
+          headers: { Cookie: cookie },
+          signal: AbortSignal.timeout(REPORT_HOP_MS),
+        })
+        .catch(() => null)
     : null
   if (me?.ok) {
     // THE CONSOLE LINE IS ALSO A WRITE, and it used to happen first. Four
@@ -376,6 +455,7 @@ export async function recordClientError(
             // crash onto somebody else's trace. Same rule as userId, one line up.
             requestId: requestId(request),
           }),
+          signal: AbortSignal.timeout(REPORT_HOP_MS),
         })
         .catch(() => null) // recording must never break the beacon
   }
@@ -419,6 +499,7 @@ export async function recordGatewayCrash(
         // row the trace can't find.
         requestId: requestId(request),
       }),
+      signal: AbortSignal.timeout(REPORT_HOP_MS),
     })
     .catch(() => null)
   return fail(500, "server_error", "Something went wrong.")

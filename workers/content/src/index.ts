@@ -307,11 +307,30 @@ export async function teamSlice(
   if (total === 0) return []
   const windows = Math.ceil(total / CRON_TEAM_CAP)
   const window = windows <= 1 ? 0 : Math.floor(scheduledTime / everyMs) % windows
-  if (windows > 1)
-    console.warn(
-      `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. ` +
-        `A team is now visited once every ${windows} ticks; past a few windows this wants a work queue, not a bigger cap.`
-    )
+  if (windows > 1) {
+    const lap = `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. A team is now visited once every ${windows} ticks (about ${Math.round((windows * everyMs) / 3_600_000)} hours); past a few windows this wants a work queue, not a bigger cap.`
+    console.warn(lap)
+    // AND RECORDED, ONCE PER LAP. The console line above was the whole of it, and
+    // DATA-MODEL's own sentence about ALERT_TO applies to a log stream as much as
+    // to a table: a warning nobody receives is a warning nobody receives. This is
+    // the shape R12 asks of unattended work — except that here nothing has
+    // FAILED, which is exactly why it was missed: at ~2,000 tenants the sweep
+    // visits a team every two and a half hours and the morning digest lands every
+    // ten DAYS, and every tick still reports success. A promise the product no
+    // longer keeps looks identical to a healthy cron from the outside.
+    //
+    // ONCE PER LAP, not once per tick — `window === 0` is the lap's first tick, so
+    // a four-window sweep records hourly and a ten-window digest records every ten
+    // days. The signal scales with the problem rather than with the clock, which
+    // is what keeps it out of `logError`'s own hourly bucket ceiling.
+    if (window === 0)
+      await recordWorkerError(
+        env.DB,
+        "content",
+        `cron/${job} (lap length)`,
+        new Error(lap)
+      )
+  }
   const rows = await env.DB.prepare(
     `SELECT id, database_id FROM teams WHERE ${READY}
       ORDER BY id LIMIT ${CRON_TEAM_CAP} OFFSET ${window * CRON_TEAM_CAP}`

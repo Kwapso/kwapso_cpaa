@@ -25,7 +25,7 @@ import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { INLINE_SAFE_UPLOAD, mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { INLINE_SAFE_UPLOAD, mediaKey, ownedMediaKey, reclaimMedia, parseUploadDataUrl } from "@shared/workers/image"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
   countStaffCertificates,
@@ -66,8 +66,22 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
   const { actor, cfg, guard, body } = await gatedBody<StaffProfileInput>(request, env, "staff_profiles", "edit")
   await refusePortalCaller(cfg, guard)
   requireText(body.userId, "Member", TEXT_LIMITS.short)
-  const { id, created } = await saveStaffProfile(cfg, guard, actor, body)
+  const { id, created, supersededUrls } = await saveStaffProfile(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "staff_profiles", id, created ? "add" : "edit")
+  // The photo or the certificate this write stopped pointing at. AFTER the row
+  // moved, fail-soft, and proved against the SAME owners list the upload doors in
+  // this file mint with — `(guard.teamId, "staff")`, which is what makes "this
+  // team's staff material" provable rather than merely "this team's".
+  //
+  // The upload door here is generic: one endpoint whose answer lands on either a
+  // profile's photo or a certificate's file, and it never learns which. So the
+  // reclaim cannot live beside the put — it lives beside each RECORD write, which
+  // is the only place that knows what was superseded.
+  await reclaimMedia(
+    env.INTERNAL_MEDIA,
+    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+    { db: env.DB, source: "content", place: "POST /api/content/staff/profile, photo reclaim" }
+  )
   return json({ profiles: await listStaffProfiles(cfg, guard), total: await countStaffProfiles(cfg, guard) })
 }
 
@@ -97,7 +111,18 @@ export async function postUploadStaffFile(request: Request, env: Env): Promise<R
   if (!parsed) return fail(400, "invalid_input", "That file isn't a supported upload (max 25 MB).")
   // The key IS the credential (the gateway serves /media/* with no session), so
   // it carries a random ULID segment under the team's own prefix.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "staff")
   await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType: parsed.contentType })
 }
@@ -164,7 +189,18 @@ export async function postStreamStaffFile(request: Request, env: Env): Promise<R
   // is the team's prefix plus a random ULID and carries NOTHING the caller sent.
   // No path to contain and no escape to filter, which is the strongest form of the
   // rule rather than a filter over a weaker one.
-  const key = mediaKey(guard.teamId)
+  // THE MODULE IS PART OF THE KEY, and that is what makes a reclaim provable.
+  // A key of the team id alone was minted by FOUR modules into the same
+  // bucket — knowledge, brand assets, staff and deliverables — so
+  // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
+  // module": a brand asset's URL pasted into a staff certificate's file field
+  // would pass the ownership test and be destroyed by the staff door's own
+  // reclaim. One more segment makes that impossible by construction rather than
+  // by everybody remembering. Objects written under the old bare-team shape stay
+  // exactly where they are: a key cannot be renamed, they simply match no
+  // module's prefix and are never reclaimed, which is the behaviour they already
+  // had.
+  const key = mediaKey(guard.teamId, "staff")
   await env.INTERNAL_MEDIA.put(key, request.body, { httpMetadata: { contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType })
@@ -225,8 +261,15 @@ export async function postUpdateStaffCertificate(request: Request, env: Env): Pr
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Certificate", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  await updateStaffCertificate(cfg, guard, actor, id, body)
+  const { supersededUrls } = await updateStaffCertificate(cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "staff_certificates", id)
+  // The certificate file this edit replaced or cleared — same owners list, same
+  // base, same fail-soft order as the profile photo above.
+  await reclaimMedia(
+    env.INTERNAL_MEDIA,
+    supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
+    { db: env.DB, source: "content", place: "POST /api/content/staff/certificate/update, file reclaim" }
+  )
   // These are independent reads — one wait, not 2.
   const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
   return json({

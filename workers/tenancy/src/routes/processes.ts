@@ -33,7 +33,7 @@ import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
 import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
-import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
+import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
   addProcessComment,
@@ -251,7 +251,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "App", TEXT_LIMITS.short)
-  await updateApp(cfg, guard, scope, actor, id, {
+  const { supersededUrls } = await updateApp(cfg, guard, scope, actor, id, {
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     // Absent means "say nothing"; sent-and-empty means "clear it" — the patch
     // rule the accounts door learned the hard way (an edit that erased what it
@@ -285,6 +285,16 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
   })
   await savePeople(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "apps", id)
+  // The logo this edit replaced or took away. AFTER the row moved and fail-soft:
+  // an orphan costs storage, a lost save costs trust (shared/workers/image.ts).
+  // The owners list is the one `mediaKey(guard.teamId, "apps")` mints with,
+  // twenty lines up — a `.startsWith` on the wrong prefix returns null and
+  // deletes nothing, which is a reclaim that LOOKS like it ran.
+  await reclaimMedia(
+    env.MEDIA,
+    supersededUrls.map((u) => ownedMediaKey(u, "/media/", guard.teamId, "apps")),
+    { db: env.DB, source: "tenancy", place: "POST /api/tenancy/apps/update, logo reclaim" }
+  )
   return json({ ok: true })
 }
 

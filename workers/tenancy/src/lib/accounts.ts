@@ -14,6 +14,7 @@
 // refusal. Same shape as the last-admin guard (CONCURRENCY rule 1).
 
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import {
   accountScopeClause,
   idList,
@@ -668,7 +669,7 @@ export async function updateAccount(
     timezone?: Patch
     commercialsVisible?: boolean
   }
-): Promise<void> {
+): Promise<{ supersededUrls: (string | null)[] }> {
   // THE STORED ROW, not the caller's view of it — see accountRowOrThrow.
   const before = await accountRowOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "id")
@@ -741,6 +742,22 @@ export async function updateAccount(
     relatedTable: "accounts",
     relatedRowId: id,
   })
+  // WHAT THE ROW HAS STOPPED POINTING AT — handed back rather than deleted here.
+  //
+  // The reclaim itself belongs at the DOOR, and that is a structural claim, not a
+  // convenience: the door is where the bucket binding lives, and it is where
+  // `mediaKey(guard.teamId, "accounts")` mints the key. `ownedMediaKey` has to be
+  // given the SAME owners list, and the one way to guarantee that is for the two
+  // calls to be readable in one screenful of each other. A reclaim written here,
+  // with the mint two files away, is the drift the seam's own comment warns about
+  // — and it fails SILENTLY, because a wrong prefix returns null and deletes
+  // nothing while looking exactly like a reclaim that ran.
+  return {
+    supersededUrls: [
+      supersededMedia(before.logo_url, next.logoUrl),
+      supersededMedia(before.cover_url, next.coverUrl),
+    ],
+  }
 }
 
 /**

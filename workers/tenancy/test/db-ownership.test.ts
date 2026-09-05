@@ -40,7 +40,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { stripJsoncComments } from "@shared/rules/source-scan"
 
-import { checkDatabaseSizes, ourDatabases } from "../src/lib/sharding"
+import { ACCOUNT_STORAGE_ID, checkDatabaseSizes, ourDatabases } from "../src/lib/sharding"
 import type { Env } from "../src/env"
 
 const CFG = { accountId: "acct", apiToken: "tok" }
@@ -106,10 +106,22 @@ describe("the nightly watch sizes only databases we own", () => {
     const result = await checkDatabaseSizes(env(core), CFG as never)
 
     // `bind(database_id, database_name, …)` — the first parameter is the uuid.
-    const written = core.growth.map((p) => p[0])
+    // The account's own total is written under a sentinel that is not a uuid; it
+    // is subtracted here because this test is about WHOSE DATABASES we name, and
+    // that row names nobody. Its own arithmetic is pinned in db-growth.test.ts.
+    const written = core.growth.map((p) => p[0]).filter((id) => id !== ACCOUNT_STORAGE_ID)
     expect(written.sort()).toEqual([OUR_CORE, OUR_TEAM].sort())
     expect(written, "another company's database is not ours to measure").not.toContain(THEIR_TEAM)
     expect(written).not.toContain(THEIR_CORE)
+    // COUNTED, NEVER NAMED — and this is the one figure where the other
+    // companies' bytes legitimately COUNT, because D1's 1 TB ceiling is charged
+    // to the account and not to the app. So the total is over all four databases
+    // while only two of them are named anywhere.
+    expect(
+      result.accountBytes,
+      "D1's 1 TB ceiling is charged to the ACCOUNT, so their bytes fill ours"
+    ).toBe(9_000_000 + 8_000_000 + 2_000_000 + 1_000_000)
+    expect(result.ourBytes, "and our own share is reported beside it").toBe(2_000_000 + 1_000_000)
     expect(result.sampled).toBe(2)
     expect(result.checked, "and the count reports what we sized, not what the account holds").toBe(2)
   })

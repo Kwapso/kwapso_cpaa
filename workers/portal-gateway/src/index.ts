@@ -240,21 +240,25 @@ type Env = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     // The client door names its requests too, from the same seam and for the
     // same reason as the agency door — a client's failing click crosses just as
     // many workers, and "which hop broke" is the same question. The label on the
     // `error_logs` row differs; the thread joining the rows does not.
     const traced = stampTrace(request, requestId(request))
     try {
-      return await handle(traced, env)
+      return await handle(traced, env, ctx)
     } catch (e) {
       return recordGatewayCrash(traced, env.AUTH, "portal-gateway", env.INTERNAL_KEY, e)
     }
   },
 } satisfies ExportedHandler<Env>
 
-async function handle(request: Request, env: Env): Promise<Response> {
+/** `ctx` is threaded down for ONE reason: the media doors write the object
+ * they just served into the colo's cache, and that write rides the request's
+ * own lifetime rather than delaying the answer. Optional, so a test that calls
+ * the door with two arguments still exercises exactly the path it always did. */
+async function handle(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
 
     // CROSS-SITE WRITES DIE HERE, in front of the allow-list below — the SAME
@@ -285,8 +289,17 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // function, so it cannot be otherwise.
     if (pathname.startsWith("/media/") && isRead(request.method))
       // A RANGE, IF THEY ASKED FOR ONE — the same seekable, resumable serving the
-      // agency door gives, because it is the same function.
-      return serveMedia(env.MEDIA, pathname, "/media/", request.headers.get("Range"), request.method)
+      // agency door gives, because it is the same function. And the same colo
+      // cache, for the same reason: a client company's people open the same logo
+      // and the same attachment all day, and every one of them was an R2 read.
+      return serveMedia(
+        env.MEDIA,
+        pathname,
+        "/media/",
+        request.headers.get("Range"),
+        request.method,
+        ctx ? { request, waitUntil: (w: Promise<unknown>) => ctx.waitUntil(w) } : undefined
+      )
 
     // The tickets tree: /tickets/<ticketId> is ONE client-resolved screen. The
     // static export emits a single shell, so serve it for any /tickets/* depth
