@@ -31,10 +31,6 @@ export function VisibilityProvider({
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
-export function useVisibilityContext() {
-  return React.useContext(Ctx)
-}
-
 export function useIsVisible(config: Partial<BaseConfig> | undefined): boolean {
   const ctx = React.useContext(Ctx)
   if (!config) return true
