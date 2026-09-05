@@ -759,6 +759,35 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 196 -> 211 in all three on 5 Sep 2026, first-run lane, and the
+  // arithmetic is written down because R44's whole point is that a ceiling
+  // cannot move quietly. SIXTEEN new English sentences and TWO retired ones:
+  //
+  //  · eleven are the empty states a brand-new team actually reads — the two
+  //    shared defaults `CollectionEmptyState` now chooses between, and the
+  //    per-collection sentences on Members, Invites, Tickets, Contacts and the
+  //    knowledge base. They replace ONE sentence that all sixteen recipe
+  //    collections shared and that was true of exactly one of them ("Records
+  //    land here … or when a client raises a request from the portal", right on
+  //    Tickets and false on the other fifteen).
+  //  · four are the landing screen's "Start here" block, which names the first
+  //    act on a team with nothing in it — the screen previously answered "where
+  //    is everything" and never "what do I do".
+  //  · one is the onboarding line, which told everybody "your team gets created
+  //    right after" under a product where team creation is closed.
+  //
+  // TWO OF THE SIXTEEN ARE A REAL LOSS, not just an addition: the retired
+  // sentences WERE translated in all three languages, so a German reader trades
+  // a fluent-but-false sentence for an English-but-true one on those two
+  // screens. That is the right trade and it is still a debt, which is why it is
+  // recorded here rather than absorbed.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, and for the same reason as the entry
+  // below: `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before, so a translation run is his to
+  // authorise and never a lane's to trigger. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 189 -> 196 in all three on 4 Sep 2026, and the reason is recorded
   // because R44's whole point is that a ceiling cannot move quietly. R48's portal
   // search shipped seven new English sentences — the two search fields, their
@@ -771,9 +800,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 196,
-  es: 196,
-  ca: 196,
+  de: 211,
+  es: 211,
+  ca: 211,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

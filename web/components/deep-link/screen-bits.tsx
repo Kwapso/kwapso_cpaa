@@ -591,7 +591,17 @@ export function SectionWithCreate({
    * (neither `folderTabs` nor `useKitPanel`) cannot reintroduce the lone-"+"
    * bug this file's `ToolbarRow` was fixed out of. Pass the same "does this
    * collection have any rows yet" boolean `ToolbarRow`'s own `empty` prop
-   * takes. */
+   * takes.
+   *
+   * WIDENED 2026-09-05 TO THE SECOND BUTTON, which is where it was actually
+   * costing something. It only ever governed the create control, so a screen
+   * that passes `useKitPanel` — where the create control is suppressed anyway —
+   * got nothing from it, and its "Import CSV" kept floating above an empty
+   * collection while the empty body drew its own "Import a list" underneath.
+   * That was live on Brand library and Meeting purposes. `download` needs no
+   * such clause: every call site already gates Export on having rows, because
+   * exporting nothing was obviously silly in a way importing into nothing was
+   * not. */
   empty?: boolean
   children: React.ReactNode
 }) {
@@ -607,7 +617,17 @@ export function SectionWithCreate({
   // through `CollectionEmptyState`'s "Add the first" alone, never a second
   // mango in this header too.
   const showCreateInHeader = show && !useKitPanel && !folderTabs && !empty
-  const hasActions = showCreateInHeader || showSecondary || showDownload
+  // …AND R50 GOVERNS THE IMPORT BUTTON TOO, which it did not until 2026-09-05.
+  // `empty` was written for the create control alone, so a genuinely-empty
+  // collection still drew a lone "Import CSV" above it — on Brand library and
+  // Meeting purposes, every day since the empty register shipped — while
+  // `CollectionEmptyState` below drew its own "Import a list" in the body. Two
+  // controls for one act, on the one screen R50 exists to keep clear. The act
+  // is not withdrawn: `secondary` is still PUBLISHED downwards on `showSecondary`
+  // (see the provider below), so the empty body keeps its button and only the
+  // toolbar's copy of it stands down.
+  const showSecondaryInHeader = showSecondary && !empty
+  const hasActions = showCreateInHeader || showSecondaryInHeader || showDownload
   // THE ACTION BUTTONS (Export/Import/New) THEMSELVES, wherever the row below
   // ends up putting them — the buttons are decided once, here; only their ROW
   // changes shape depending on whether there is a tab strip to share it
@@ -620,7 +640,7 @@ export function SectionWithCreate({
           {download.label}
         </a>
       )}
-      {showSecondary && secondary && (
+      {showSecondaryInHeader && secondary && (
         <Button variant="secondary" onClick={secondary.onClick} className="gap-1">
           <UploadSimple className="size-4" />
           {secondary.label}

@@ -200,6 +200,7 @@ export function StoriesScreen({
   rights,
   total,
   canCreate,
+  onImport,
   onAction,
   onIntent,
 }: {
@@ -209,6 +210,15 @@ export function StoriesScreen({
   /** the exact server total (R16) — never the loaded page's length */
   total: number | undefined
   canCreate: boolean
+  /** THE CONTEXTUAL "IMPORT CSV" JUMP, the same shape the brand library and
+   * meeting purposes already take (internal-screens.tsx's own `onImport`).
+   *
+   * `stories` has been a declared import target since the importer shipped —
+   * gated, tested, planned and written through this module's own create door —
+   * and it appeared in NO file under `web/` or `web-portal/`, so the only way
+   * to reach it was to type the URL. A capability with no button in front of it
+   * is a capability the customer does not have. */
+  onImport?: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -312,6 +322,13 @@ export function StoriesScreen({
                 show={canCreate}
                 label={t("New story")}
                 icon="plus"
+                secondary={
+                  onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined
+                }
+                // R50 — see internal-screens.tsx's identical note: the toolbar
+                // draws nothing over an empty backlog, and the act reaches the
+                // reader through the empty body's own "Import a list" instead.
+                empty={data.rows.length === 0}
                 onCreate={() => setStoryOpen(true)}
                 useKitPanel
               >

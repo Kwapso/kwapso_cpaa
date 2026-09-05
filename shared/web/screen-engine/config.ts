@@ -264,6 +264,24 @@ export interface CollectionConfig extends BaseConfig {
   /** Show a live "Showing X of Y" count in the header. */
   showCount: boolean
   emptyText: string
+  /** THE SENTENCE UNDER `emptyText`, when this collection has one of its own.
+   *
+   * `CollectionEmptyState` (collection-frame.tsx) carries composition 27.21's
+   * own default — "Add the first one, or import a list you already have" — and
+   * that sentence is true of every collection somebody can add to. It is not
+   * true of all of them: Contacts has no create act at all (a person is added
+   * from the company they work at), Tickets fills from the client portal as
+   * well as from here, and Members fills from an invite. On those the default
+   * would point at a door the reader cannot open, which is worse than saying
+   * nothing.
+   *
+   * Optional, and undefined means "the default is right here" — so a recipe
+   * that sets nothing renders exactly what it rendered before. Declared in
+   * English beside the collection it belongs to and translated on the way to
+   * the screen (`t(config.emptyDescription)` below, the same seam
+   * `emptyText` already uses — R33's field-config ruling, applied to the
+   * config the engine inherited). */
+  emptyDescription?: string
   /** An OPTIONAL concept glyph above the empty sentence — a lucide name, the same
    * shape `TabItem.icon` takes as a name. Defaults to none, so a caller that sets
    * nothing renders exactly what it rendered before.
