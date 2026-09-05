@@ -3,6 +3,7 @@
 
 import type { ApiError } from "../types"
 import { isCapped } from "./count"
+import { originHeaders, type ActivityOrigin } from "./origin"
 import { traceHeaders } from "./trace"
 
 export const json = (
@@ -67,6 +68,14 @@ export async function forwardToDoor(
      * because this seam dropped the id every other internal hop carries. A
      * required field is the by-construction version of "remember to". */
     traceId: string
+    /** WHICH SURFACE IS ACTING (shared/workers/origin.ts). Required, exactly as
+     * `traceId` is required and for a sibling reason: this seam is the ONLY way
+     * the MCP surface and the assistant reach a door, so it is the only place
+     * either of them can say which it is — and a row that cannot name its
+     * surface is the one an owner asks about first after a leaked token. The
+     * door stamps it onto the config in `teamContext` and the activity writer
+     * puts it in the row. */
+    origin: ActivityOrigin
     query?: string
     body?: unknown
     /** Give up after this long. Optional because a service binding is
@@ -78,7 +87,11 @@ export async function forwardToDoor(
 ): Promise<Response> {
   const init: RequestInit = {
     method: opts.method,
-    headers: { Cookie: opts.cookie, ...traceHeaders(opts.traceId) },
+    headers: {
+      Cookie: opts.cookie,
+      ...traceHeaders(opts.traceId),
+      ...originHeaders(opts.origin),
+    },
   }
   if (opts.method === "POST") {
     ;(init.headers as Record<string, string>)["Content-Type"] = "application/json"

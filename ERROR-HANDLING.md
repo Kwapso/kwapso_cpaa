@@ -128,6 +128,19 @@ sibling of the pre-ship trio (`lean_mean_check` · `story_checks_out` ·
 1. Every `catch` either handles the error meaningfully or calls the reporter.
    Never an empty `catch {}` that hides a failure (logging-only `catch` for
    best-effort side-effects like activity writes is fine, and is commented as such).
+   **`logActivity` is that pattern's canonical case, and it records the gap** —
+   the swallow stays (a logging hiccup must never break the action it describes)
+   and the loss is durable: the catch writes an `error_logs` row naming the
+   database, the table and the row the missing line was about, which is the pair
+   somebody needs to put it back by hand. **Swallowed is not the same as
+   unrecorded.**
+   **The exception is a write where the ROW IS THE POINT**, and then the swallow
+   is wrong: `writeActivity` throws instead. Two callers — a user-authored
+   activity note (a note that fails to save must not answer 200), and
+   `deleteProcessStep`, the app's one hard delete of a business record, where the
+   activity line is the ONLY remaining record that the step existed. Losing "role
+   changed" costs a sentence; losing that one takes the record and its history
+   together.
 2. **Member-notification emails (new 2026-06-21)** are best-effort, same pattern
    as activity writes. When a role changes, a member is removed, or a pending
    invite is revoked, the **state change is the authority and commits FIRST**;

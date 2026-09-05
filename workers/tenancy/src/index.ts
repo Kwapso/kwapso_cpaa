@@ -531,7 +531,7 @@ export default {
       await recordWorkerError(env.DB, "tenancy", "cron/retention", e)
     }
     try {
-      const result = await checkDatabaseSizes(env, d1Config(env))
+      const result = await checkDatabaseSizes(env, d1Config(env, "automation"))
       console.log(
         `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s)`
       )

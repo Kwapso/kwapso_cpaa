@@ -21,7 +21,8 @@ export async function migrateTeams(request: Request, env: Env): Promise<Response
   const denied = adminGuard(request, env)
   if (denied) return denied
 
-  const cfg = d1Config(env)
+  // OPS, not a person: the migration runner is the app acting on its own.
+  const cfg = d1Config(env, "automation")
   const teams = await env.DB.prepare(
     "SELECT id, database_id, schema_version FROM teams WHERE db_status = 'ready' AND deactivated_at IS NULL"
   ).all<{ id: string; database_id: string; schema_version: string }>()
@@ -58,7 +59,7 @@ export async function dbSizes(request: Request, env: Env): Promise<Response> {
   const denied = adminGuard(request, env)
   if (denied) return denied
 
-  const result = await checkDatabaseSizes(env, d1Config(env))
+  const result = await checkDatabaseSizes(env, d1Config(env, "automation"))
   // Bounded (R14) — one alert per database, but the cap is stated rather than
   // assumed. (This read used to sit uncapped under the next query's "Bounded"
   // comment, which is worse than plainly uncapped: it READ as checked.)
@@ -119,7 +120,7 @@ export async function moveModule(request: Request, env: Env): Promise<Response> 
   // not a failure and not a partial success — it means the call spent its budget
   // and the move's progress is recorded, so POST the same body again to continue.
   // A big move is several calls; each one is safe to repeat.
-  const result = await moveModuleToOwnDatabase(env, d1Config(env), teamId, module, tables)
+  const result = await moveModuleToOwnDatabase(env, d1Config(env, "automation"), teamId, module, tables)
   return json({
     ok: true,
     ...result,
@@ -162,7 +163,10 @@ export async function adminCreateTeam(request: Request, env: Env): Promise<Respo
       name: [owner.first_name, owner.last_name].filter(Boolean).join(" ") || owner.email,
     },
     name,
-    null
+    null,
+    // OPS: the owner seeding a team through the admin door, not a person on a
+    // front door. The rows this writes are the app acting on its own behalf.
+    "automation"
   )
   return json({ ok: true, team })
 }

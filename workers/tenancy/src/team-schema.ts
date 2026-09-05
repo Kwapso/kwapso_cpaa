@@ -140,8 +140,35 @@ CREATE TABLE selectable_data (
   deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
 );
 
--- Activity log (locked rule: edits, deactivations, activations ONLY —
--- creations live on each row's own audit columns, deletes don't happen).
+-- Activity log — the team's whole change trail, birth to death, in ONE table.
+--
+-- THIS COMMENT USED TO SAY THE OPPOSITE, and said it for a year: "edits,
+-- deactivations, activations ONLY — creations live on each row's own audit
+-- columns". The code has never done that. It writes "Account created", "Ticket
+-- raised", "Story created", "Meeting arranged"; shared/workers/activity.ts has
+-- said "log everything" at the top of the file the whole time; and DATA-MODEL's
+-- Q3 resolution settled it in writing (18 Aug 2026). This was the odd one out,
+-- and it is the one a developer reads while adding a table — so it was the one
+-- sentence in the codebase that could talk somebody into starting a new module's
+-- trail at its first EDIT, deliberately, to comply with a rule nothing else
+-- follows. The trail would then be silently incomplete for that module alone,
+-- and would read as finished because every other module's does.
+--
+-- LOG EVERYTHING: creations, edits, activations, deactivations, joins, invites,
+-- import stages, milestones. Per-row audit columns answer "who made this"; they
+-- cannot answer "show me this record's life in order", which is the whole point.
+--
+-- APPEND-ONLY. Nothing in the application updates or deletes a row here, the
+-- nightly retention sweep excludes the table by name, and there is exactly one
+-- way in from outside a migration (insertActivity, private, behind logActivity
+-- and writeActivity). That was true before it was written down anywhere, which
+-- is the problem with it having been true: an invariant nobody states is one the
+-- next person can break without knowing it existed. Stated here, and asserted by
+-- shared/test/activity-verbs.test.ts, which fails on any UPDATE or DELETE
+-- against this table anywhere in the workers.
+--
+-- verb and origin arrive in 0062 and are NULL on every row older than it —
+-- see that migration for why neither is backfilled.
 CREATE TABLE activity (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -3938,6 +3965,62 @@ CREATE INDEX IF NOT EXISTS idx_work_logs_live
   ON work_logs (started_at DESC, id DESC, user_id, kind, seconds)
   WHERE discarded_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_selectable_type_value ON selectable_data (type, value);
+`,
+  },
+  {
+    // WHO, WHAT — AND, AT LAST, WHERE AND WHAT KIND. Plus the index for the one
+    // question this table could not answer.
+    //
+    // THREE THINGS, ONE MIGRATION, because they are one finding. `activity` is
+    // the app's whole audit story and an audit row has to answer three
+    // questions: who did it, what it was about, and where it came from. It
+    // answered two.
+    //
+    // 1 · `origin` — WHICH FRONT DOOR. Four surfaces act as the SAME PERSON
+    //     through the SAME gated doors: the agency app, the client portal, a
+    //     personal access token on the MCP surface, and the in-app assistant
+    //     acting as its caller. That identity is the security design and it is
+    //     right — the agent never exceeds the rights of the person it acts for —
+    //     but it made their rows byte-identical. So after a leaked token the
+    //     first question an owner asks, WHICH of these did this, had no answer
+    //     in the one table that exists to answer it. Stamped at the two public
+    //     gateways and carried by `forwardToDoor`; see shared/workers/origin.ts.
+    //
+    // 2 · `verb` — WHAT KIND OF EVENT. `type` is a human sentence and stays one:
+    //     it is what the feed shows and it is right for a reader. It is also 157
+    //     distinct free-text literals across 139 call sites, so "every archive
+    //     last quarter" was a LIKE over prose that silently missed `retired`,
+    //     `withdrawn`, `taken down`, `switched off` and `binned` — the same
+    //     event in five coats. Eight values, DERIVED from the sentence in the
+    //     one writer (shared/workers/activity-verbs.ts) so no call site had to
+    //     change and none can forget, and rot-checked so a sentence the mapping
+    //     cannot read turns the build red rather than shipping unfindable.
+    //
+    // 3 · `idx_activity_actor_feed` — WHAT HAS THIS PERSON DONE. Three indexes
+    //     stood on this table and none led with `creator_id`, so the actor-
+    //     scoped question was a full scan and a sort of what 0023 calls "the
+    //     fastest-growing table in a team's database by construction… the
+    //     tens-of-millions one". With four write surfaces acting as one person,
+    //     that is the query that matters most and it was the one shape the table
+    //     was not built for — guaranteed to time out at exactly the moment it is
+    //     first needed. Same shape as the two feed indexes beside it, for the
+    //     same keyset (`created_at DESC, id DESC`), so an actor page is an index
+    //     seek and page two is too.
+    //
+    // NULLABLE, AND THAT IS THE HONEST SHAPE. Every row written before today has
+    // no origin and no verb, and a backfill would have to INVENT the first one —
+    // there is nothing on an old row that says which surface wrote it. A NULL
+    // here reads as "written before the column existed", which is true, and is
+    // distinguishable from the string `unknown`, which means "we asked and could
+    // not tell". Two different facts, two different values, neither guessed.
+    // (The verb COULD be backfilled from `type` by the same mapping; it is not,
+    // because a mixed table where some old rows are classified and some are not
+    // is harder to reason about than one where the line is the migration date.)
+    version: "0062_an_activity_row_says_where_it_came_from",
+    sql: `
+ALTER TABLE activity ADD COLUMN verb TEXT;
+ALTER TABLE activity ADD COLUMN origin TEXT;
+CREATE INDEX IF NOT EXISTS idx_activity_actor_feed ON activity (creator_id, created_at DESC, id DESC);
 `,
   },
 ]

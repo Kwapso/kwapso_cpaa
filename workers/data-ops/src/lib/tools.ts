@@ -871,6 +871,9 @@ export async function executeTool(
     method: tool.method,
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
+    // THE ASSISTANT IS ACTING, as the person who asked it (origin.ts). Same
+    // person, same door, same rights — and now a distinguishable row.
+    origin: "assistant",
     query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
     body: tool.buildBody ? tool.buildBody(input) : {},
     // The agent's act-as-user hop was the ONE cross-worker call with no

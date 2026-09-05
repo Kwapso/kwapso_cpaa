@@ -463,6 +463,10 @@ export async function forwardTool(
       method: tool.method,
       cookie,
       traceId,
+      // THE MACHINE SURFACE SAYS SO (origin.ts). Every write a personal access
+      // token makes lands on the same doors as a click and used to leave the
+      // same row; from here the row names the token's surface.
+      origin: "mcp",
       query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
       body: tool.buildBody ? tool.buildBody(input) : {},
       timeoutMs,

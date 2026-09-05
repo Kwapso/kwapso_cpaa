@@ -23,6 +23,7 @@ import type { SessionUser } from "@shared/types"
 import { healthBody } from "@shared/workers/config-health"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
 import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
+import { readOrigin } from "@shared/workers/origin"
 import {
   INTEREST_STALE_MS,
   REALTIME_SHARDS,
@@ -622,7 +623,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
         let stamp: ScopeStamp
         try {
           const guard = await requireMember(env, user.id, teamId)
-          stamp = scopeStamp(await accountScope(d1ConfigFrom(env), guard))
+          stamp = // READ-ONLY: this config resolves the caller's account fence and writes no
+          // activity at all, so the origin never reaches a row. It is stated
+          // rather than defaulted because the builder REQUIRES a decision, which
+          // is the property that keeps a WRITING config from being built blind.
+          scopeStamp(await accountScope(d1ConfigFrom(env, readOrigin(request)), guard))
         } catch (e) {
           if (e instanceof GuardError) return fail(e.status, e.code, e.message)
           // FAIL CLOSED, and note which way: with no answer we cannot tell a

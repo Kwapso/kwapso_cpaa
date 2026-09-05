@@ -83,7 +83,7 @@ beforeEach(() => {
 describe("createTeam (the factory)", () => {
   it("creates DB, applies schema + seeds, writes membership, marks ready", async () => {
     const { db, calls } = fakeDb()
-    const result = await createTeam(envWith(db), ACTOR, "Chris's team", null)
+    const result = await createTeam(envWith(db), ACTOR, "Chris's team", null, "app")
 
     expect(result.teamId).toHaveLength(26)
     expect(d1CreateDatabase).toHaveBeenCalledWith(
@@ -110,7 +110,7 @@ describe("createTeam (the factory)", () => {
     const { db, calls } = fakeDb()
 
     await expect(
-      createTeam(envWith(db), ACTOR, "Doomed team", null)
+      createTeam(envWith(db), ACTOR, "Doomed team", null, "app")
     ).rejects.toThrow("boom")
 
     const sqls = calls.map((c) => c.sql)
@@ -123,7 +123,7 @@ describe("createTeam (the factory)", () => {
   it("refuses to run without the cloud key", async () => {
     const { db } = fakeDb()
     const env = { ...envWith(db), CF_D1_TOKEN: undefined }
-    await expect(createTeam(env, ACTOR, "X", null)).rejects.toThrow(
+    await expect(createTeam(env, ACTOR, "X", null, "app")).rejects.toThrow(
       "cloud_key_missing"
     )
   })
@@ -140,7 +140,7 @@ describe("acceptPendingInvites (locked onboarding flow)", () => {
         ],
       },
     ])
-    const accepted = await acceptPendingInvites(envWith(db), ACTOR)
+    const accepted = await acceptPendingInvites(envWith(db), ACTOR, "app")
 
     expect(accepted).toBe(2)
     const sqls = calls.map((c) => c.sql)
@@ -152,7 +152,7 @@ describe("acceptPendingInvites (locked onboarding flow)", () => {
 
   it("does nothing when there are no invites (personal team path)", async () => {
     const { db, calls } = fakeDb()
-    expect(await acceptPendingInvites(envWith(db), ACTOR)).toBe(0)
+    expect(await acceptPendingInvites(envWith(db), ACTOR, "app")).toBe(0)
     expect(calls.some((c) => c.sql.includes("INTO team_members"))).toBe(false)
   })
 
@@ -162,7 +162,7 @@ describe("acceptPendingInvites (locked onboarding flow)", () => {
   // in TypeScript would already have paid for fetching them all.
   it("reads a BOUNDED page of pending invites, oldest first", async () => {
     const { db, calls } = fakeDb([{ match: "FROM invite_index", all: [] }])
-    await acceptPendingInvites(envWith(db), ACTOR)
+    await acceptPendingInvites(envWith(db), ACTOR, "app")
     const sweep = calls.find((c) => c.sql.includes("FROM invite_index"))
     expect(sweep, "the pending-invite sweep must run").toBeDefined()
     expect(sweep?.sql, "the sweep must carry a hard cap").toContain(`LIMIT ${INVITE_SWEEP_CAP}`)
@@ -185,7 +185,7 @@ describe("the onboarding sweep claims each invite before joining", () => {
       { match: "SET status = 'accepted'", changes: 0 }, // revoked in the window
     ])
 
-    expect(await acceptPendingInvites(envWith(db), ACTOR), "nothing was accepted").toBe(0)
+    expect(await acceptPendingInvites(envWith(db), ACTOR, "app"), "nothing was accepted").toBe(0)
     const sqls = calls.map((c) => c.sql)
     expect(
       sqls.some((s) => s.includes("INTO team_members")),
@@ -198,7 +198,7 @@ describe("the onboarding sweep claims each invite before joining", () => {
     const { db, calls } = fakeDb([
       { match: "FROM invite_index", all: [{ id: "i1", team_id: "team-A", role_id: "role-1" }] },
     ])
-    await acceptPendingInvites(envWith(db), ACTOR)
+    await acceptPendingInvites(envWith(db), ACTOR, "app")
     const sqls = calls.map((c) => c.sql)
     const claim = sqls.findIndex((s) => s.includes("SET status = 'accepted'"))
     const join = sqls.findIndex((s) => s.includes("INTO team_members"))

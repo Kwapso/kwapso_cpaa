@@ -8,6 +8,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 
 import type { CoreDb } from "./error-log"
+import type { ActivityOrigin } from "./origin"
 
 export type D1Rest = {
   accountId: string
@@ -60,6 +61,20 @@ export type D1Rest = {
    * to invent a database, and a caller that has no core binding (neither gateway
    * has one) is not broken by asking for one. */
   core?: CoreDb
+  /** WHICH FRONT DOOR THIS REQUEST CAME THROUGH, for the activity row's own
+   * `origin` column (shared/workers/origin.ts says why the column exists).
+   *
+   * It rides here for the third time for the second reason: the config is the
+   * one thing already threaded to every call site in the codebase, and the
+   * writer that needs it has 139 of them. `core` won that argument first and
+   * this is the same shape — a fifth argument on every one, in five workers, is
+   * the shape that ends with half the sites never passing it.
+   *
+   * Set by `d1ConfigFrom`, which REQUIRES it, so a config cannot be built
+   * without somebody deciding. Absent only on a config assembled by hand (a
+   * test, a script), and then the row reads `unknown`, which is the honest
+   * answer rather than a guess. */
+  origin?: ActivityOrigin
   /** WHERE A NEW TEAM DATABASE IS BORN — a Cloudflare primary-location hint.
    * Set from `D1_LOCATION` where a deployment sets it; `weur` otherwise. It is
    * on the config rather than passed at the one call site because a database

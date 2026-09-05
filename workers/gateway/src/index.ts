@@ -17,6 +17,7 @@ import {
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 import { requestId, stampTrace } from "@shared/workers/trace"
+import { stampOrigin } from "@shared/workers/origin"
 
 /** The top-level module pages that are CLIENT-RESOLVED SHELLS: /stories is a real
  * static file, but /stories/<id> is the same shell with the id read off
@@ -76,7 +77,13 @@ export default {
     // and every worker behind it re-reads the same id instead of minting its
     // own, so one failing click is one query in `error_logs` rather than eight
     // rows nobody can line up. See shared/workers/trace.ts.
-    const traced = stampTrace(request, requestId(request))
+    // …AND THE SURFACE IS GIVEN HERE TOO, at the same door and for the same
+    // reason (shared/workers/origin.ts). Four surfaces act as the same person
+    // through the same gated doors, so the activity row could not say which one
+    // did — and this is the only place on the agency side that knows. It SETS
+    // rather than merges: whatever a browser put in the header is replaced
+    // before any worker behind this reads it.
+    const traced = stampOrigin(stampTrace(request, requestId(request)), "app")
     try {
       return await handle(traced, env)
     } catch (e) {
