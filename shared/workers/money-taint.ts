@@ -82,10 +82,18 @@
 //     one-turn chain, which is the shape an injected instruction has to take.
 //   • A WRITE ON AN AGENCY-ONLY DOOR WHOSE ROW A CLIENT LATER READS. The oracle
 //     is the doors a client's browser opens, not a data-flow analysis of every
-//     table a portal GET can reach. `resolve_help_ticket` and
-//     `create_deliverable` are the two worth knowing about. Widening the oracle
-//     means deriving "which writes land in a table a portal read returns", which
-//     is `PORTAL_VISIBLE_READS`' territory and a bigger law than this one.
+//     table a portal GET can reach. Widening it means deriving "which writes land
+//     in a table a portal read returns", which is `PORTAL_VISIBLE_READS`'
+//     territory and a bigger law than this one.
+//     THE TWO THAT MATTER TODAY BOTH STOP AT A PANEL, WHICH IS WHY THIS IS AN
+//     EDGE AND NOT A SECOND HOLE — checked, not assumed, on 5 Sep 2026:
+//     `resolve_help_ticket` is `confirm: true` outright (it emails the client an
+//     answer in the agency's name, and its own comment says there is no
+//     un-sending it), and a deliverable is written unconfirmed but reaches
+//     nobody until `set_deliverable_visibility` is called with `visible: true`,
+//     which confirms on exactly that input. So a person reads the words before
+//     the client can. If either of those confirms is ever relaxed, this edge
+//     becomes a hole and the oracle has to widen.
 //   • WHETHER THE MODEL WOULD HAVE COMPLIED AT ALL. Unproven, and deliberately:
 //     nobody has spent an API call to find out. The structural gap was
 //     confirmed by reading; the exploitability was not.
