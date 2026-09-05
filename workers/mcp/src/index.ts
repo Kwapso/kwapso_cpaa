@@ -23,13 +23,15 @@
 // see it), the same reviewed class as auth's session rows. Tool calls themselves
 // mutate nothing here — the REAL doors they forward to publish their own pings.
 
-import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
+import { healthBody } from "@shared/workers/config-health"
 import { GuardError, whoAmI } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
 import { dropCachedSession, sessionCookieFor } from "./lib/bridge"
@@ -181,39 +183,49 @@ async function postRevoke(request: Request, env: Env): Promise<Response> {
 /* --------------------------------- switchboard -------------------------------- */
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    // The wall clock starts here — see timing.ts. The MCP surface emitted no
+    // timing at all until 5 Sep 2026, which meant the one surface an OUTSIDE
+    // developer measures us by was the one we could not measure ourselves.
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
     try {
-      switch (route) {
-        case "POST /mcp":
-          return await handleMcp(request, env)
-        case "GET /api/mcp/tokens":
-          return await getTokens(request, env)
-        case "POST /api/mcp/tokens":
-          return await postToken(request, env)
-        case "POST /api/mcp/tokens/revoke":
-          return await postRevoke(request, env)
-        case "GET /api/mcp/health":
-          // What this worker cannot work without, answered by NAME (config-health.ts).
-          return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
-        default:
-          return fail(404, "not_found", "No such MCP action.")
-      }
+      const res = await handle(route, request, env)
+      // No ROUTES table here either, so the method decides the class: `POST /mcp`
+      // carries a whole tool call and answers to the write budget, the token
+      // reads to the read budget.
+      logIfSlow(request, route)
+      return withTiming(request, res)
     } catch (e) {
-      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
-      // answered here and never recorded — that is right for "you may not do
-      // that", and it was wrong for the ones an outside service diagnosed for us
-      // (gating.ts's `detail` says what it cost). The caller's answer is
-      // unchanged; the cause stops being console-only.
-      if (e instanceof GuardError) {
-        if (e.detail)
-          await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, new Error(e.detail), requestId(request))
-        return fail(e.status, e.code, e.message)
-      }
+      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("mcp worker error:", e)
-      await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request))
+      afterResponse(request, recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
 } satisfies ExportedHandler<Env>
+
+/** The routing switch, lifted out of `fetch` so the dispatcher can hold the
+ * answer for a moment and measure it (timing.ts) — the same shape auth uses,
+ * for the same reason. */
+async function handle(route: string, request: Request, env: Env): Promise<Response> {
+  switch (route) {
+    case "POST /mcp":
+      return await handleMcp(request, env)
+    case "GET /api/mcp/tokens":
+      return await getTokens(request, env)
+    case "POST /api/mcp/tokens":
+      return await postToken(request, env)
+    case "POST /api/mcp/tokens/revoke":
+      return await postRevoke(request, env)
+    case "GET /api/mcp/health":
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
+    default:
+      return fail(404, "not_found", "No such MCP action.")
+  }
+}

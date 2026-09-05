@@ -28,6 +28,7 @@
 // server, next to the one the thread already made.
 
 import type { DatabaseSync } from "node:sqlite"
+import { withDeferred } from "./deferred"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
@@ -70,13 +71,18 @@ function env(userId: string) {
 
 const call = (userId: string, route: string, body?: unknown, query = "") => {
   const [method, path] = route.split(" ")
-  return worker.fetch(
-    new Request(`https://content${path}${query}`, {
-      method,
-      headers: { Cookie: "session=x", "Content-Type": "application/json" },
-      body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
-    }),
-    env(userId) as never
+  // …with a waiting context, so the door's deferred work (the outbound email)
+  // has landed by the time the assertions run — see test/deferred.ts.
+  return withDeferred((ctx) =>
+    worker.fetch(
+      new Request(`https://content${path}${query}`, {
+        method,
+        headers: { Cookie: "session=x", "Content-Type": "application/json" },
+        body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
+      }),
+      env(userId) as never,
+      ctx as never
+    )
   )
 }
 
