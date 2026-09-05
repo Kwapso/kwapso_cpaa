@@ -117,7 +117,8 @@ import { configReport, healthBody } from "@shared/workers/config-health"
  * be inconvenienced to run. */
 const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
-import { logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer } from "@shared/workers/parallel"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { readOpsDigest, sendOpsDigest } from "./lib/ops-alert"
 import { identityFor } from "@shared/workers/gating"
@@ -443,9 +444,16 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    // The wall clock starts HERE, not at the first database trip: the budget in
+    // limits.ts is a promise about how long a person waits, and the work above
+    // the database (session verification, gating, JSON) is part of that wait.
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
       // What this worker cannot work without, answered by NAME (config-health.ts).
@@ -457,8 +465,10 @@ export default {
       // `Server-Timing` with no tooling, and a door slow for everybody prints a
       // line nobody has to be watching for.
       const res = await def.handler(request, env)
-      logIfSlow(request, route)
-      return withTiming(request, res)
+      // The route's OWN tag decides which budget it answers to (limits.ts) —
+      // one place a route's class is declared, and the measurement follows it.
+      logIfSlow(request, route, def.kind)
+      return withTiming(request, res, def.kind)
     } catch (e) {
       // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
       // answered here and never recorded — that is right for "you may not do
@@ -471,9 +481,11 @@ export default {
         return fail(e.status, e.code, e.message)
       }
       console.error("tenancy worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, team creation is paused.`)

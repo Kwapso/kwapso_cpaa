@@ -37,10 +37,37 @@
 // response. A timing seam that leaks a customer's name into a header would be a
 // worse defect than the slowness it was built to explain.
 
-/** One trip to the D1 REST door: what kind of statement, and how long it took. */
-export type D1Stat = { op: string; ms: number }
+import { budgetForKind, MAX_D1_TRIPS_PER_DOOR } from "./limits"
+
+/** THE TAG EVERY `ROUTES` TABLE ALREADY CARRIES. A door's class is read off the
+ * routing table rather than guessed here, so there is one place a route's kind
+ * is decided and the budget follows it. `auth` has a `switch` rather than a
+ * table, so it passes nothing and the method decides — see `classOf`. */
+export type RouteKind = "read" | "mutation" | "housekeeping"
+
+/** One trip to the D1 REST door: what kind of statement, how long it took, and
+ * how many rows came back. The ROW COUNT is what separates "this door is slow
+ * for everybody" from "this door is slow for the one team with 90,000 rows" —
+ * without it the two print identically, which is the state this file was in
+ * until 5 Sep 2026. It is a COUNT and never a value, so it is subject to the
+ * same rule as the label above: nothing a caller supplied may appear here. */
+export type D1Stat = { op: string; ms: number; rows?: number }
 
 const perRequest = new WeakMap<Request, D1Stat[]>()
+
+/** WHEN THIS REQUEST STARTED, and WHOSE it is. Two more WeakMaps keyed on the
+ * same Request, for the same reason the trip collector is (see the header note):
+ * a module-level "current request" is a race that reports one caller's numbers
+ * under another caller's name.
+ *
+ * WHY WALL CLOCK AND NOT JUST D1 TIME. Until 5 Sep 2026 this file could only see
+ * the database trips, so a worker that made none — `auth`, which every single
+ * request in the product passes through — reported nothing at all, and the
+ * 190ms of session work above the transport floor was invisible by construction.
+ * A budget is a promise about how long a PERSON waits, so the thing measured
+ * against it has to be the whole request. */
+const startedAt = new WeakMap<Request, number>()
+const tenantOf = new WeakMap<Request, string>()
 
 /** VERB + TABLE, and nothing else — see the header note above.
  *
@@ -70,6 +97,23 @@ export function beginD1Timing(request: Request): D1Stat[] {
   return stats
 }
 
+/** Start the wall clock for this request. Idempotent, and cheap enough to call
+ * unconditionally at the top of every dispatcher — one `Date.now()` and one
+ * WeakMap write. A door that is never marked simply reports no total, exactly as
+ * an unmeasured door did before. */
+export function beginRequest(request: Request): void {
+  if (!startedAt.has(request)) startedAt.set(request, Date.now())
+}
+
+/** WHOSE REQUEST THIS IS. Called where the team is first resolved, so the slow
+ * line can name the tenant without any handler having to pass it down. A team id
+ * is an opaque ulid, not a customer's name — the header rule at the top of this
+ * file still holds, which is why this rides the LOG LINE and never the response
+ * header. */
+export function noteTeam(request: Request, teamId: string): void {
+  tenantOf.set(request, teamId)
+}
+
 /** The `Server-Timing` value for a finished request — the browser's own network
  * panel understands this format, so the number lands where somebody debugging a
  * slow screen is already looking, with no tooling to install.
@@ -82,50 +126,106 @@ export function beginD1Timing(request: Request): D1Stat[] {
  *
  * Empty when nothing was collected, so an ungated or static route pays nothing
  * and says nothing. */
-function timingHeaders(request: Request): Record<string, string> {
-  const stats = perRequest.get(request)
-  if (!stats?.length) return {}
-  const total = stats.reduce((sum, s) => sum + s.ms, 0)
-  const slowest = stats.reduce((worst, s) => (s.ms > worst.ms ? s : worst), stats[0])
-  return {
-    "Server-Timing": [
-      `d1;desc="${stats.length} trips";dur=${Math.round(total)}`,
-      `d1max;desc="${slowest.op}";dur=${Math.round(slowest.ms)}`,
-    ].join(", "),
+function timingHeaders(request: Request, kind?: RouteKind): Record<string, string> {
+  const parts: string[] = []
+  const began = startedAt.get(request)
+  if (began !== undefined) {
+    // THE NUMBER THE BUDGET IS ABOUT. `app` is the whole request; `budget` is
+    // what this class of door is allowed to spend (limits.ts). Both go in the
+    // header so anybody debugging a slow screen sees the target beside the
+    // actual, in the browser's own network panel, with nothing to install —
+    // which is the entire answer to "can anyone on the team get this number
+    // today without asking you".
+    parts.push(`app;desc="total";dur=${Date.now() - began}`)
+    parts.push(`budget;desc="${classOf(request, kind)}";dur=${budgetFor(request, kind)}`)
   }
+  const stats = perRequest.get(request)
+  if (stats?.length) {
+    const total = stats.reduce((sum, s) => sum + s.ms, 0)
+    const slowest = stats.reduce((worst, s) => (s.ms > worst.ms ? s : worst), stats[0])
+    parts.push(`d1;desc="${stats.length} trips";dur=${Math.round(total)}`)
+    parts.push(`d1max;desc="${slowest.op}";dur=${Math.round(slowest.ms)}`)
+  }
+  if (!parts.length) return {}
+  return { "Server-Timing": parts.join(", ") }
 }
 
 /** Copy a finished response, adding this request's timing. A new Response
  * because a handler's own may be immutable, and because adding a header must
  * never be able to fail the request it is measuring. */
-export function withTiming(request: Request, res: Response): Response {
-  const extra = timingHeaders(request)
+export function withTiming(request: Request, res: Response, kind?: RouteKind): Response {
+  const extra = timingHeaders(request, kind)
   if (!extra["Server-Timing"]) return res
   const headers = new Headers(res.headers)
   for (const [k, v] of Object.entries(extra)) headers.set(k, v)
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
 }
 
+/** WHICH BUDGET THIS DOOR ANSWERS TO. The route's own tag when it has one; a
+ * GET with no tag is a read, and anything else with no tag is held to the WRITE
+ * budget — the stricter of the two it could be, so an untagged door is never
+ * quietly handed the minute a bulk job gets. */
+function classOf(request: Request, kind?: RouteKind): string {
+  if (kind) return kind === "mutation" ? "write" : kind === "housekeeping" ? "bulk" : "read"
+  return request.method === "GET" ? "read" : "write"
+}
+
+function budgetFor(request: Request, kind?: RouteKind): number {
+  return budgetForKind(kind ?? (request.method === "GET" ? "read" : "mutation"))
+}
+
 /** THE SLOW-DOOR LOG LINE. A header is only read by somebody already watching
  * one request; this is how a door that is slow for EVERYBODY gets noticed
- * without anybody watching. Above the threshold it prints the count, the total,
- * and the shape of the trips — which is the whole diagnosis in one line.
+ * without anybody watching. Above its class's budget it prints the total, the
+ * budget it missed, the trip count, the shape of the trips and the rows they
+ * carried — which is the whole diagnosis in one line.
+ *
+ * MEASURED AGAINST ITS OWN CLASS (limits.ts `LATENCY_BUDGET_MS`), not against
+ * one number for the whole product. The old threshold was 750ms for every door
+ * in the app, so a read that took 700ms passed the same test as a bulk import
+ * that took 700ms — which is the same as having no test. The four budgets are
+ * the owner's "snappy" tier and every class is now held to its own.
+ *
+ * IT NAMES THE TENANT. A door that is slow for the one team with ninety thousand
+ * work logs used to print identically to a door that is slow for everybody, so
+ * the first question anybody asked of this line had no answer in it.
  *
  * Logged, never thrown: a door that is slow still worked, and turning slowness
  * into a failure would be a worse bug than the slowness. */
-export function logIfSlow(request: Request, route: string, thresholdMs = 750): void {
-  const stats = perRequest.get(request)
-  if (!stats?.length) return
-  const total = stats.reduce((sum, s) => sum + s.ms, 0)
-  if (total < thresholdMs) return
+export function logIfSlow(request: Request, route: string, kind?: RouteKind): void {
+  const began = startedAt.get(request)
+  const stats = perRequest.get(request) ?? []
+  // Nothing marked the request and nothing counted a trip: an unmeasured door,
+  // exactly as before. (A door that was marked but made no database trip IS
+  // measured — that is the whole reason `auth` can be seen at all now.)
+  if (began === undefined && !stats.length) return
+  const total = began === undefined ? stats.reduce((sum, s) => sum + s.ms, 0) : Date.now() - began
+  const budget = budgetFor(request, kind)
+  // TWO BUDGETS, EITHER ONE BREACHED. Time is what a person feels; the TRIP
+  // COUNT is what causes it, and the two come apart in both directions — a door
+  // can make fourteen statements and still come in under its class's budget on a
+  // good day, and that door is one bad day from being the slow one. A count over
+  // the ceiling is worth a line whether or not it was slow this time.
+  if (total < budget && stats.length <= MAX_D1_TRIPS_PER_DOOR) return
   const byOp = new Map<string, number>()
   for (const s of stats) byOp.set(s.op, (byOp.get(s.op) ?? 0) + 1)
   const shape = [...byOp.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
-    .map(([op, n]) => (n > 1 ? `${op} ×${n}` : op))
+    .map(([op, n]) => (n > 1 ? `${op} \u00d7${n}` : op))
     .join(", ")
+  const rows = stats.reduce((sum, s) => sum + (s.rows ?? 0), 0)
+  const team = tenantOf.get(request)
+  const over =
+    total >= budget
+      ? `${total}ms over a ${budget}ms ${classOf(request, kind)} budget`
+      : `${total}ms (within its ${budget}ms ${classOf(request, kind)} budget)`
+  const trips =
+    stats.length > MAX_D1_TRIPS_PER_DOOR
+      ? `${stats.length} D1 trips, over the ${MAX_D1_TRIPS_PER_DOOR} ceiling`
+      : `${stats.length} D1 trips`
   console.warn(
-    `SLOW DOOR ${route}: ${stats.length} D1 trips, ${Math.round(total)}ms total — ${shape}`
+    `SLOW DOOR ${route}${team ? ` team=${team}` : ""}: ${over}, ${trips}, ${rows} rows` +
+      (shape ? ` \u2014 ${shape}` : "")
   )
 }

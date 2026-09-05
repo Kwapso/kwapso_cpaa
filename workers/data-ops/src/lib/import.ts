@@ -38,15 +38,22 @@ export type CatalogTarget = {
  * anyone must remember. */
 export async function reconcileCatalog(env: Env): Promise<void> {
   const now = new Date().toISOString()
-  for (const t of Object.values(TARGETS)) {
-    await env.DB.prepare(
+  // ONE BATCH, NOT ONE STATEMENT PER TARGET. This runs on every read of the
+  // catalogue — the import screen, the agent's own capability brief — and it was
+  // a `for` loop awaiting each insert in turn, which is one round to the
+  // database per TargetDef whether or not a single row is missing. `batch()`
+  // sends the lot in one transaction, which is what a self-heal always meant:
+  // the catalogue is consistent with the code afterwards or it is untouched and
+  // the next read tries again. Same statements, same `ON CONFLICT DO NOTHING`,
+  // same "an owner's OFF stays off" (R13) — one trip instead of seven.
+  const inserts = Object.values(TARGETS).map((t) =>
+    env.DB.prepare(
       `INSERT INTO importable_databases (id, table_key, display_name, description, required_columns_json, is_active, created_at, creator_id, creator_email, creator_name)
        VALUES (?, ?, ?, ?, ?, 1, ?, 'system', 'system', 'System')
        ON CONFLICT(table_key) DO NOTHING`
-    )
-      .bind(ulid(), t.tableKey, t.displayName, t.description, JSON.stringify(t.columns), now)
-      .run()
-  }
+    ).bind(ulid(), t.tableKey, t.displayName, t.description, JSON.stringify(t.columns), now)
+  )
+  if (inserts.length) await env.DB.batch(inserts)
 }
 
 /** The active, code-supported import targets (catalog rows whose table_key has a

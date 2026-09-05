@@ -3901,6 +3901,45 @@ CREATE UNIQUE INDEX idx_waves_ref ON waves (ref) WHERE ref IS NOT NULL;
 DROP TABLE ref_counters;
 `,
   },
+  {
+    // THE TWO READS THAT HAD NO INDEX TO USE.
+    //
+    // Measured 5 Sep 2026 with EXPLAIN QUERY PLAN: `SCAN w | USE TEMP B-TREE FOR
+    // ORDER BY` on the team-wide time view, and `SCAN selectable_data` on the
+    // dropdown read that nearly every screen in the app makes. Both are
+    // milliseconds today (240 work logs, 125 dropdown values) and both are
+    // SHAPES that get slower exactly as the product gets used.
+    //
+    // WORK LOGS — a PARTIAL index, because `w.discarded_at IS NULL` is the one
+    // predicate `logWhere` always emits and the three existing indexes all lead
+    // with something optional (`user_id`, `target_table`, `account_id`). So the
+    // team-wide view — no person filter — had no usable index at all, and the
+    // time screen asks that same WHERE SEVEN times in one load: the paged list,
+    // a bounded COUNT, an exact unbounded SUM(seconds), a DISTINCT people count,
+    // a group by person, a group by kind, and eight conditional week sums.
+    //
+    // The column order is those seven reads, not a guess. `started_at DESC, id
+    // DESC` is the list's own keyset ORDER BY (so the temp b-tree goes) and the
+    // period filter's range; `user_id`, `kind` and `seconds` ride along so the
+    // counts, the sums and both group-bys are answered out of the index without
+    // touching the table. Discarded rows are left out of the index entirely,
+    // which is also why it stays small: a bin that grows never costs a read.
+    //
+    // DROPDOWN VALUES — `selectable_data` had NO index of any kind beyond its
+    // primary key, and five call sites across three workers filter it by `type`,
+    // four of those pairing `type` with `value`. `(type, value)` serves all of
+    // them and both of the unfiltered `ORDER BY type, value` list/export reads.
+    // NOT unique, deliberately: this table has carried duplicate (type, value)
+    // rows before and a unique index would REFUSE TO BUILD on any team that
+    // still holds one. A speed change may not become a migration that fails.
+    version: "0061_reads_that_can_use_an_index",
+    sql: `
+CREATE INDEX IF NOT EXISTS idx_work_logs_live
+  ON work_logs (started_at DESC, id DESC, user_id, kind, seconds)
+  WHERE discarded_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_selectable_type_value ON selectable_data (type, value);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

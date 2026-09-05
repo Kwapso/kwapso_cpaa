@@ -18,6 +18,7 @@ import { analyzeBatch, type AnalyzeFile } from "./import-agent"
 import { writeRow } from "./import"
 import { forwardToDoor } from "@shared/workers/http"
 import { requestId } from "@shared/workers/trace"
+import { BULK_CONCURRENCY } from "@shared/workers/limits"
 
 const MAX_FILES = 8
 const MAX_ROWS_PER_FILE = 1000
@@ -232,24 +233,83 @@ export async function confirmBatch(
     // The SAME scan the plan predicted with (missing required / duplicate rows) —
     // so the review screen and the run can never disagree.
     const scans = scanRows(def, step.mapping, step.transforms, file.headers, file.rows)
-    for (let i = 0; i < scans.length; i++) {
-      const { mapped, reject } = scans[i]
-      if (reject) {
-        tally.skipped++
-        report.rejections.push({ file: file.name, row: i + 1, reason: reject })
-        continue
-      }
-      const { refs, error } = resolveRow(mapped, def.references ?? [], resolved)
-      if (error) {
-        tally.skipped++
-        report.rejections.push({ file: file.name, row: i + 1, reason: error })
-        continue
-      }
-      const out = await writeRow(env, request, def, def.buildBody(mapped, refs))
-      if (out.ok) tally.created++
-      else {
-        tally.failed++
-        report.rejections.push({ file: file.name, row: i + 1, reason: out.error ?? "Write failed." })
+
+    // IN WAVES, NOT ONE ROW AT A TIME — the same shape and the same reasoning as
+    // `bulkSetStatus` in workers/content/src/lib/help.ts, which is where
+    // BULK_CONCURRENCY was written and, until now, its ONLY call site. This is
+    // the biggest bulk path in the product and it was still the serial loop that
+    // constant exists to replace.
+    //
+    // THE ARITHMETIC, MEASURED — 5 Sep 2026, scripts/speed-bench.mjs, against
+    // staging's own team database. A gated create costs 1,799ms one at a time
+    // and 190ms twelve at a time, so a 1,000-row file is THIRTY MINUTES serial
+    // and 3.2 minutes in waves. `MAX_ROWS_PER_FILE` is 1,000 and `MAX_FILES` is
+    // 8, so one confirmed batch can ask for 8,000 of them.
+    //
+    // WHAT ACTUALLY BREAKS FIRST, checked against Cloudflare's own limits page
+    // rather than assumed: it is NOT the subrequest ceiling (10,000 per request
+    // on the paid plan, so 8,000 door hops is inside it, if barely) and it is
+    // not wall clock (unlimited while the client stays connected). It is the
+    // client: a person on a form, a browser, and the gateway in between, none of
+    // which wait half an hour. A thirty-minute import is one nobody ever sees
+    // finish, and there is no resume — the claim below is one-way.
+    //
+    // THE HONEST CEILING ON THIS WAVE. A Worker may hold only SIX outgoing
+    // connections open at once waiting for response headers (the same limit
+    // `SEND_CONCURRENCY` in content/lib/notify.ts was written for). Whether a
+    // service-binding hop counts against that is not something Cloudflare's page
+    // settles, and the bench measured direct database calls rather than door
+    // hops — so twelve may in practice be six. Six is still six times the loop
+    // this replaces, and the number stays `BULK_CONCURRENCY` because one wave
+    // size for the product beats two that can drift apart.
+    //
+    // WHY THE ROWS OF ONE FILE MAY GO TOGETHER. Nothing in the row loop reads
+    // anything another row of the same file wrote: `resolveRow` is pure and
+    // consults only `resolved`, which is filled between TARGETS (below) and
+    // never inside this loop; duplicate detection is decided by `scanRows` in
+    // one synchronous pass before the first write. Ordering BETWEEN targets is
+    // still strictly sequential — `plan.order` is a topological sort and the
+    // outer loop still awaits each target fully before starting the next.
+    //
+    // …EXCEPT WHERE A ROW CAN CREATE A VOCABULARY VALUE. A reference declared
+    // `onMissing: "create"` lands on `ensureSelectableValue`, which is a SELECT
+    // followed by an INSERT with no unique constraint underneath it. Serially
+    // that is safe; twelve rows naming the same NEW dropdown value at once would
+    // each miss the SELECT and insert their own copy. Those targets keep the
+    // serial loop they have always had — derived from the target's own
+    // references, so a target that gains such a reference tomorrow is covered
+    // without anybody remembering this paragraph.
+    const createsVocabulary = (def.references ?? []).some((r) => r.onMissing === "create")
+    const wavefront = createsVocabulary ? 1 : BULK_CONCURRENCY
+    for (let i = 0; i < scans.length; i += wavefront) {
+      const wave = scans.slice(i, i + wavefront)
+      const results = await Promise.all(
+        wave.map(async (scan, n) => {
+          const row = i + n + 1
+          const { mapped, reject } = scan
+          if (reject) return { row, skipped: true as const, reason: reject }
+          const { refs, error } = resolveRow(mapped, def.references ?? [], resolved)
+          if (error) return { row, skipped: true as const, reason: error }
+          const out = await writeRow(env, request, def, def.buildBody(mapped, refs))
+          if (out.ok) return { row, skipped: false as const, reason: null }
+          return { row, skipped: false as const, reason: out.error ?? "Write failed." }
+        })
+      )
+      // FOLDED AFTER THE WAVE, never inside the callback. The rejection list is
+      // what a person downloads to fix their file, so it has to stay in ROW
+      // order — and a counter incremented from twelve concurrent callbacks is a
+      // counter nobody can reason about. `bulkSetStatus` folds for the same two
+      // reasons.
+      for (const r of results) {
+        if (r.skipped) {
+          tally.skipped++
+          report.rejections.push({ file: file.name, row: r.row, reason: r.reason })
+        } else if (r.reason === null) {
+          tally.created++
+        } else {
+          tally.failed++
+          report.rejections.push({ file: file.name, row: r.row, reason: r.reason })
+        }
       }
     }
 
@@ -260,6 +320,31 @@ export async function confirmBatch(
     report.created += tally.created
     report.skipped += tally.skipped
     report.failed += tally.failed
+
+    // WHAT HAS HAPPENED SO FAR, WHILE IT IS STILL HAPPENING. The report used to
+    // be written exactly once, at the very end, so for the whole of a run —
+    // minutes, and before the waves above, half an hour — the batch row said
+    // `running` and nothing else. A person could not tell a working import from
+    // a hung one, and when one DID die the rows it had written were unaccounted
+    // for: the claim is one-way (`planned` → `running`, never back), so a
+    // crashed run left no record of which tables it had got through.
+    //
+    // PER TARGET, not per row: a table is the unit the plan is ordered in and
+    // the unit the report is grouped by, so it is the only checkpoint that can
+    // be written without inventing a shape. Eight writes at the very most, on a
+    // job measured in minutes.
+    //
+    // NOTHING ON A SCREEN CHANGES. The import screen renders the report the
+    // CONFIRM call hands back and never polls the batch row, so this is written
+    // for whoever goes looking — the batch door, and the person reading it after
+    // a run that did not come home.
+    await d1ExecScript(
+      cfg,
+      guard.databaseId,
+      `UPDATE data_import_batches SET report_json = ${sqlString(JSON.stringify(report))},
+         updated_at = ${sqlString(new Date().toISOString())}
+       WHERE id = ${sqlString(batchId)};`
+    )
   }
 
   const now = new Date().toISOString()

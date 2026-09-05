@@ -44,7 +44,7 @@ export type D1Rest = {
    * is the one thing already threaded to every call site in the codebase. No
    * handler had to change to be measured. Absent = nobody asked, and the door
    * pays nothing. */
-  stats?: { op: string; ms: number }[]
+  stats?: { op: string; ms: number; rows?: number }[]
   /** WHERE A FAILURE ON THIS DOOR IS RECORDED — the global core database, so the
    * one seam that swallows by contract (`logActivity`) can still leave a row.
    *
@@ -90,17 +90,28 @@ async function cf<T>(
   cfg: D1Rest,
   path: string,
   body?: unknown,
-  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST"
+  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST",
+  /** HOW MANY ROWS THIS TRIP CARRIED, read off the answer by the one caller that
+   * has an answer shaped like rows. A count, never a value — the timing seam's
+   * standing rule (timing.ts's header) is that nothing a caller supplied may
+   * ride these numbers, and a cardinality is not data. It is a callback rather
+   * than a second pass over `cfg.stats` because parallel statements interleave:
+   * "annotate the most recent stat" is exact only while nothing else is in
+   * flight, and this file is about to be used with `Promise.all`. */
+  rowsOf?: (result: T) => number
 ): Promise<T> {
   if (!cfg.stats) return cfRaw<T>(cfg, path, body, method)
   const started = Date.now()
   const sql = (body as { sql?: string } | undefined)?.sql
+  let rows: number | undefined
   try {
-    return await cfRaw<T>(cfg, path, body, method)
+    const out = await cfRaw<T>(cfg, path, body, method)
+    rows = rowsOf?.(out)
+    return out
   } finally {
     // In a `finally`, so a statement that THREW is still counted. A failing
     // query is usually the slow one, and leaving it out would hide it.
-    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started })
+    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started, rows })
   }
 }
 
@@ -280,7 +291,9 @@ export async function d1Query<Row = Record<string, unknown>>(
   const result = await cf<{ results: Row[] }[]>(
     cfg,
     `/d1/database/${databaseId}/query`,
-    { sql, params }
+    { sql, params },
+    undefined,
+    (r) => r[0]?.results?.length ?? 0
   )
   return result[0]?.results ?? []
 }
@@ -296,10 +309,12 @@ async function nativeQuery<Row>(
 ): Promise<Row[]> {
   if (!cfg.stats) return runNative<Row>(db, sql, params)
   const started = Date.now()
+  let rows: Row[] = []
   try {
-    return await runNative<Row>(db, sql, params)
+    rows = await runNative<Row>(db, sql, params)
+    return rows
   } finally {
-    cfg.stats.push({ op: labelFor(sql), ms: Date.now() - started })
+    cfg.stats.push({ op: labelFor(sql), ms: Date.now() - started, rows: rows.length })
   }
 }
 

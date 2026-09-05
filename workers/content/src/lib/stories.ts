@@ -50,6 +50,7 @@ import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shar
 import type { Env } from "../env"
 import { teamMemberNames } from "./notify"
 import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { inOrder } from "@shared/workers/parallel"
 
 export { STORY_STATUSES, type StoryStatus }
 
@@ -611,12 +612,23 @@ export async function createStory(
   // against today's three would refuse a fourth the moment somebody added one.
   const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
 
-  const accountId = await resolveAccount(cfg, guard, named, ticketId, appId)
-  const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
-  // 6.6 — the work goes to somebody who is on this app, or nowhere.
-  await refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person")
-  const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
-  const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
+  // ONE WAVE, NOT SIX TRIPS (shared/workers/parallel.ts). Every one of these
+  // reads only the INPUT — not each other — so the six `await`s were sequential
+  // by layout rather than by dependency, and each was its own ~150ms round trip
+  // to the team database (measured 25 Aug 2026). `inOrder` throws the first
+  // failure IN ARRAY ORDER, so a story naming a dead client and a dead app is
+  // still refused with the client's message, exactly as it was.
+  //
+  // 6.6 — the work goes to somebody who is on this app, or nowhere. That check
+  // returns nothing and throws; riding the wave does not change either.
+  const [accountId, processIds, , assignee, reviewer, rank] = await inOrder([
+    resolveAccount(cfg, guard, named, ticketId, appId),
+    resolveProcesses(cfg, guard, input.processIds, changesNoStep),
+    refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person"),
+    assigneeId ? memberOrThrow(env, guard, assigneeId, "Assignee") : Promise.resolve(null),
+    reviewerId ? memberOrThrow(env, guard, reviewerId, "Reviewer") : Promise.resolve(null),
+    topRank(cfg, guard),
+  ])
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -626,8 +638,11 @@ export async function createStory(
   //
   // TEAM-wide now (shared/workers/refs.ts), gated on `accountId` the same way
   // a ticket's is: internal work with nobody to quote it gets no number.
+  //
+  // AFTER the wave and on its own line, because minting is a WRITE: run beside a
+  // check that fails and it burns a number out of the sequence a client quotes
+  // (the rule parallel.ts states for exactly this call).
   const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.story) : null
-  const rank = await topRank(cfg, guard)
 
   await d1ExecScript(
     cfg,

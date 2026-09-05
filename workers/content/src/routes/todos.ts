@@ -12,6 +12,7 @@
 // PORTAL_VISIBLE_* tables in shared/rules/registry.ts.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { afterResponse } from "@shared/workers/parallel"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
@@ -169,8 +170,9 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   })
   await publishChange(env, guard.teamId, "todos", created.id, "add", created.accountId)
   // Best-effort, and after the write: a failed email must never fail the to-do
-  // that triggered it. The row is already saved and already on their screen.
-  await notifyTodoRaised(env, cfg, guard, created.id)
+  // that triggered it. The row is already saved and already on their screen —
+  // and the send no longer sits between the write and the answer (parallel.ts).
+  afterResponse(request, notifyTodoRaised(env, cfg, guard, created.id))
   return todoPage(cfg, guard, scope, { view: "open" }, null)
 }
 
