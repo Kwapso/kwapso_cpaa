@@ -20,10 +20,33 @@ import type { Theme } from "./types"
 
 export const DEVICE_WIDTHS = { desktop: 1280, phone: 390 } as const
 
+/* THE PAGE'S OWN GUTTER, WHICH THE PREVIEW USED TO SPEND NOTHING ON.
+ *
+ * The owner, 5 September 2026: "There is no correct padding on mobile
+ * screens, desktop screens, etc." He is right and the cause was literal — the
+ * frame wrote `body{margin:0}` and dropped the parts straight against the
+ * viewport edge, at BOTH widths, so a desktop preview and a phone preview
+ * had the same padding as each other and it was zero. A part flush to the
+ * glass is not what any screen in either front door looks like.
+ *
+ * The two numbers are the kit's own, taken from the token scale's own
+ * comments rather than chosen here: `--space-7` is annotated "page pad" and
+ * `--space-5` is annotated "side padding, narrow". A phone gets the narrow
+ * one, a desktop gets the page one. Nothing is invented and nothing is a
+ * pixel value.
+ *
+ * THE BLOCK GAP BETWEEN PARTS IS THE THIRD NUMBER and it belongs here for the
+ * same reason: `--space-6` is annotated "card inset, panel inset", which is
+ * the measure a page of stacked panels breathes at. It used to be
+ * `--space-3` — a control gap — which is why a stack of five parts read as
+ * one dense block. */
+export const DEVICE_PAD = { desktop: "var(--space-7)", phone: "var(--space-5)" } as const
+
 export type DropIntent = { kind: "add"; part: string; index: number } | { kind: "move"; id: string; index: number }
 
 export function PreviewFrame({
   width,
+  pad,
   scale,
   theme,
   css,
@@ -31,6 +54,7 @@ export function PreviewFrame({
   onDrop,
 }: {
   width: number
+  pad: string
   scale: number
   theme: Theme | null
   css: string
@@ -48,7 +72,7 @@ export function PreviewFrame({
     if (!doc) return
     doc.open()
     doc.write(
-      `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style><style>html,body{margin:0;min-height:100%}</style></head><body class="bg-background text-foreground"><div id="root"></div></body></html>`,
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}</style><style>html,body{margin:0;min-height:100%}#root{padding:var(--preview-pad)}</style></head><body class="bg-background text-foreground"><div id="root"></div></body></html>`,
     )
     doc.close()
     setRoot(doc.getElementById("root"))
@@ -89,6 +113,12 @@ export function PreviewFrame({
   }, [css])
 
   useEffect(() => {
+    // A custom property rather than a rewrite of the document: the frame's
+    // whole tree would remount if `css` changed, and the padding is not css.
+    root?.style.setProperty("--preview-pad", pad)
+  }, [root, pad])
+
+  useEffect(() => {
     const html = root?.ownerDocument.documentElement
     if (!html) return
     // null = "system": no attribute, and tokens.css's own media query decides.
@@ -102,7 +132,12 @@ export function PreviewFrame({
         ref={ref}
         title={`preview at ${width}px`}
         style={{ width, height, transform: `scale(${scale})`, transformOrigin: "top left" }}
-        className="absolute top-0 left-0 border-0 bg-background"
+        /* A HAIRLINE, SO THE PAGE HAS AN EDGE. The card behind the preview
+           and the preview's own ground are both light, so a screen drawn on
+           it had no visible boundary at all — you could not see where the
+           page being designed stopped. The stroke is the kit's own `border`
+           token and the radius is the kit's one box radius; nothing new. */
+        className="absolute top-0 left-0 rounded-[var(--radius)] border border-border bg-background"
       />
       {root && createPortal(children, root)}
     </div>

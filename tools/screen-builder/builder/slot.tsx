@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "../../../shared/ui/componen
 import { Badge } from "../../../shared/ui/components/badge/badge"
 import { Button } from "../../../shared/ui/components/button/button"
 import { Text } from "../../../shared/ui/components/typography/typography"
-import { ArrowDown, ArrowUp, X } from "../../../shared/ui/foundations/icons"
+import { ArrowDown, ArrowUp, CopySimple, X } from "../../../shared/ui/foundations/icons"
 import type { PartProps, Sample } from "../samples/index"
 import type { PlacedPart } from "./types"
 
@@ -28,6 +28,7 @@ export function Slot({
   count,
   onSelect,
   onMove,
+  onDuplicate,
   onRemove,
   onWired,
 }: {
@@ -38,6 +39,7 @@ export function Slot({
   count: number
   onSelect: () => void
   onMove: (delta: number) => void
+  onDuplicate: () => void
   onRemove: () => void
   onWired: (exports: string[]) => void
 }) {
@@ -72,17 +74,35 @@ export function Slot({
       style={{ background: placed.sandbox.background }}
       className={`group relative rounded-[var(--radius)] ${selected ? "outline-2 outline-offset-4 outline-primary" : "hover:outline-1 hover:outline-offset-4 hover:outline-border"}`}
     >
-      <div className={`absolute -top-[var(--space-4)] right-[var(--space-3)] z-10 flex items-center gap-[var(--space-1)] ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}>
+      {/* THE STRIP IS ALWAYS THERE, AND QUIET UNTIL IT IS WANTED. It used to
+          be `opacity-0 group-hover:opacity-100` — fully absent — so every edit
+          of a placed part began with a hunt: hover the right region, wait for
+          four controls to fade in, then aim. The owner's words were "very
+          difficult to manage, very difficult to adjust", and a control you
+          cannot see is not a control.
+
+          It is not drawn at full strength either, and that is the other half
+          of the same complaint ("not clean"): four buttons and a black chip on
+          every part, at full contrast, is louder than the wireframe under it —
+          the thing the tool exists to show. So the strip rests at 40% and
+          comes to full on hover or selection. Visible enough to find, quiet
+          enough to screenshot. */}
+      <div
+        className={`absolute -top-[var(--space-4)] right-[var(--space-3)] z-10 flex items-center gap-[var(--space-1)] transition-opacity ${selected ? "opacity-100" : "opacity-40 group-hover:opacity-100"}`}
+      >
         <Badge variant="inverse" size="pill">
           {placed.part}
         </Badge>
-        <Button variant="secondary" size="sm" aria-label="Move up" title="Move up" disabled={index === 0} onClick={stop(() => onMove(-1))}>
+        <Button variant="secondary" size="sm" aria-label={`Move ${placed.part} up`} title="Move up" disabled={index === 0} onClick={stop(() => onMove(-1))}>
           <ArrowUp />
         </Button>
-        <Button variant="secondary" size="sm" aria-label="Move down" title="Move down" disabled={index === count - 1} onClick={stop(() => onMove(1))}>
+        <Button variant="secondary" size="sm" aria-label={`Move ${placed.part} down`} title="Move down" disabled={index === count - 1} onClick={stop(() => onMove(1))}>
           <ArrowDown />
         </Button>
-        <Button variant="destructive" size="sm" aria-label="Remove" title="Remove" onClick={stop(onRemove)}>
+        <Button variant="secondary" size="sm" aria-label={`Duplicate ${placed.part}`} title="Duplicate" onClick={stop(onDuplicate)}>
+          <CopySimple />
+        </Button>
+        <Button variant="destructive" size="sm" aria-label={`Remove ${placed.part}`} title="Remove" onClick={stop(onRemove)}>
           <X />
         </Button>
       </div>

@@ -45,6 +45,8 @@ the page prints the kit tag, sha and generation time it was built from.
 ## Files
 
 - `builder/` — the tool's own chrome (palette, canvas, properties, save).
+  `builder/thumb.tsx` is why the palette is worth looking at: every tile draws
+  the part's own sample, scaled to fit, mounted only as it scrolls into view.
 - `samples/` — dummy data per part, split alphabetically. A sample draws the
   real kit export with made-up content and spreads `p.of("<Export>")` onto
   every export the panel offers options for. It may not add a `className` or
@@ -72,7 +74,7 @@ the reskin.
 | a three-region frame: a parts column, a body, an options column | `compositions/templates/screen-shell` — its rail, body card and assistant column, relabelled "Parts" and "Options"; density, widths, handles and the ground are the shell's |
 | the header line naming the kit tag, sync date and catalogue date | the shell's `eyebrow`, with `title` and `meta` for the name and the GitHub note |
 | a search box | `search-input` |
-| the list of parts | `list` (`variant="rows"`), the option count on each row's second line |
+| the palette's part tiles | `card` (`variant="well"`, `interactive`, with the `role`/`tabIndex` its own docblock tells a call site to pass), one per part, each drawing that part's own sample as a live thumbnail |
 | a toolbar: name field, width switch, theme switch, load/save | `field` + `input`, `toggle-group`, `mode-toggle`, `button` with Phosphor icons |
 | an empty canvas | `collection-frame`'s `CollectionRegister` |
 | a part's options | `field` + `select`, `choice` + `checkbox`, `separator variant="section"` per export, `badge` for "not wired" |
@@ -86,11 +88,14 @@ the reskin.
 
 | The tool needed | What the kit lacks | Used instead |
 |---|---|---|
-| a workbench composition (palette / canvas / inspector) | every composition is a product screen; none is a tool. `screen-shell` fits because its assistant column is generic, but its rail is named and sized for a navbar (13rem), so long part names truncate and the search box is what compensates | the shell, relabelled |
-| a rail that holds something other than navigation when collapsed | the icon register belongs to `rail`; a palette has none | the palette publishes `data-rail-collapsed` (the shell reads that to narrow the column) and draws nothing until the handle reopens it |
-| a draggable list row | `list` rows are the kit's own buttons and take no per-row DOM props | a kit `button` in the row's `action` slot is the drag handle; the row's click still adds |
+| a workbench composition (palette / canvas / inspector) | every composition is a product screen; none is a tool. `screen-shell` fits because its assistant column is generic | the shell, relabelled |
+| **a rail that states its own width** | `screen-shell` fixes the rail at `RAIL_WIDTH` = 13rem, the navbar's measure. A palette of named parts needs more: at 208px every name past ten characters was cut (`activity-f…`, `alert-dial…`), which the owner called out on 5 Sep 2026. The kit states one hatch and this uses it rather than overriding a class — a rail publishing `data-rail-collapsed` makes the column `w-auto`, and the shell's own words are "the column takes its content's width instead … a rail that collapses itself is still seated correctly". **A `railWidth` prop is what the kit actually owes here** | the palette publishes that attribute in both states and declares its own 320px; shut by the shell's handle it draws nothing and the same rule narrows the column to zero |
+| a rail that holds something other than navigation when collapsed | the icon register belongs to `rail`; a palette has none | see the row above — collapsed, the palette draws nothing until the handle reopens it |
+| a picker tile that is a target | `card` is explicit that it "does NOT make the card focusable or clickable: the call site still wraps it in an `a` or a `button`, or passes `role` and `tabIndex`" — and a `button` cannot hold a block picture, a wrapping name and a caption | `card interactive` plus `role="button"`, `tabIndex` and a keyboard handler, exactly as that docblock instructs |
+| a thumbnail of a component | not a kit concern, and it should not be: a kit part draws itself, and this tool scales that drawing down (`builder/thumb.tsx`) rather than asking the kit for a picture of it | a clipped box with a `transform: scale()` wrapper, `pointer-events-none` for the mouse and `inert` for the keyboard and the screen reader |
 | a colour picker for the sandbox background | no colour input in the kit, by design — the palette is closed | the browser's `<input type="color">`, inside the warning `alert` |
 | a floating strip over a selected element, and a selection outline | no "selected region" chrome; the kit selects records, not regions | one positioned wrapper `<div>` per placed part, with the kit's own `outline` colour tokens |
 | a monospace register for a class string or a file path | no code component; `article-body` styles `<code>` only inside prose | a bare `<code>` inside `hint` / `text` |
 | a file-open button | `button` has no `asChild` and cannot wrap a file input | a kit `button` whose click forwards to a hidden `<input type="file">` |
 | a viewport for the preview | not a kit concern | an `<iframe>` (see `builder/frame.tsx`: the kit's breakpoints answer to a viewport, so a phone frame has to BE one). Radix overlays portal to the outer document, so overlay samples render closed with a note |
+| a chapter or category per part, to group the palette by | `docs/ARTIFACT-MAP.md` files parts by chapter and it names **55 of the 116**; the other 61 have no chapter anywhere in the kit. Grouping half and calling the rest "other" would be inventing a category, which the one rule above forbids | no grouping at all — one searchable set. A complete per-part chapter in the kit's own docs is what would replace this |
