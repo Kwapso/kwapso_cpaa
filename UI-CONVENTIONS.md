@@ -47,26 +47,39 @@ The old library's config-driven BEHAVIOUR survived the swap by moving app-side:
 rules engine, the config-driven TabsView) plus the seams `shared/web/field.tsx`,
 `list-compat.tsx` and `notes-editor/`, all drawing through kit parts.
 
-The host imports kit parts by tier — `controls/` (primitives), `structures/`
-(assemblies), `icons/`, and for future screens `compositions/`:
+The host imports kit parts by folder. **The kit's layout changed at v1.1.0 and
+the app moved to it on 2026-08-27:** `controls/` and `structures/` are now ONE
+`components/`; `tokens/`, `icons/` and `motion/` sit under `foundations/`;
+whole-screen templates stay in `compositions/`. Nothing inside those folders was
+renamed, so the move was purely an address change — but the old addresses do not
+resolve, and copying one gets you a module-not-found:
 
 ```ts
-// web/components/app-shell.tsx
-import { Breadcrumbs } from "@shared/ui/controls/breadcrumbs/breadcrumbs"
-import { ModeToggle }  from "@shared/ui/controls/mode-toggle/mode-toggle"
-import { toast }       from "@shared/ui/controls/sonner/sonner"
-import { Timer }       from "@shared/ui/icons"
+// web/components/app-shell.tsx — real imports, copied from the file
+import { Separator } from "@shared/ui/components/separator/separator"
+import { toast }     from "@shared/ui/components/sonner/sonner"
+import { Timer }     from "@shared/ui/foundations/icons"
+import { Rail }      from "@shared/ui/compositions/templates/rail"
 ```
 
 The theme itself is imported, not copied, `web/app/globals.css`:
 
 ```css
 /* THE theme — the tokens, both palettes and the motion utilities. ONE master
- * copy, in this repo at shared/ui/styles.css; this app never carries its own.
- * It also carries the @source line that tells Tailwind to scan the component
- * source, so this import is load-bearing twice over. */
-@import "../../shared/ui/styles.css";
+ * copy, in the kit under foundations/; this app never carries its own.
+ * tokens.css ALSO ships the kit's own Tailwind scan (@source over components/
+ * and compositions/), so importing it is what makes the kit's classes compile.
+ * Neither front door lists POSITIVE @source lines any more — the hand-kept list
+ * that used to sit here had silently omitted compositions/. Each door still
+ * carries `@source not` EXCLUSIONS, which keep Tailwind out of the files that
+ * quote a class in order to FORBID it. */
+@import "../../shared/ui/foundations/tokens/tokens.css";
+@import "../../shared/ui/foundations/motion/motion.css";
 ```
+
+*(Both front doors do exactly this — `web/app/globals.css` and
+`web-portal/app/globals.css`. There is no `shared/ui/styles.css`; that was the
+pre-v1.1.0 address and several documents named it long after it went.)*
 
 **The rule:** `web/` **assembles** recipes from library lego. It does **not**
 re-implement a primitive locally because one is awkward, and it does not keep a second
@@ -515,20 +528,28 @@ to add a UI law is fixed: **RULES.md row ⇄ `registry.ts` entry ⇄ a real chec
 
 ## 4. The action-icon mapping
 
-Action buttons carry an icon (from `@shared/ui/icons`), placed **before** the label, sized **`size-3.5`**
-on inline action buttons. Keep the icon-for-action mapping identical across the app.
+Action buttons carry an icon from **`@shared/ui/foundations/icons`** — the kit
+draws Phosphor glyphs under Phosphor's own names, and **nothing else in this repo
+supplies an icon** (R39) — placed **before** the label, sized **`size-3.5`** on
+inline action buttons. Keep the icon-for-action mapping identical across the app.
 Add a concept to the vocabulary, never a one-off icon at a call site.
+
+**These are Phosphor names, and they are exact.** The table below used to name
+`Pencil`, `Ban`, `Upload` and `Mail`; `Ban` and `Mail` do not exist in the kit at
+all, and the other two are not what the app draws. Copy a name from this table,
+not from memory — if it is not a file under `shared/ui/foundations/icons/`, it is
+not a glyph.
 
 | Action | Icon | Notes |
 |--------|------|-------|
-| Edit | `Pencil` | e.g. "Edit", "Edit details", wired (`role-detail`, `help-detail`, `knowledge-detail`) |
+| Edit | `PencilSimple` | e.g. "Edit", "Edit details", wired (`role-detail`, `help-detail`, `knowledge-detail`) |
 | Deactivate / switch off | `Power` | our deactivate-only model. Never "delete", wired |
 | Remove (from team) | `UserMinus` | the canonical icon for a remove action |
-| Revoke (an invite) | `Ban` | the canonical icon for a revoke action |
+| Revoke (an invite) | `Prohibit` | the canonical icon for a revoke action |
 | Create / add | `Plus` | "New role", "New account", "Raise ticket", "Add a source", wired (`screen-bits`) |
-| Import | `Upload` | "Import CSV", wired (`screen-bits`) |
+| Import | `UploadSimple` | "Import CSV", wired (`screen-bits`) |
 | Export | `Download` | "Export CSV", wired (`screen-bits`) |
-| Invite | `Mail` | the one create action with its own concept icon, wired |
+| Invite | `Envelope` | the one create action with its own concept icon, wired |
 
 ### Action-button rows never clip (responsive rule)
 
@@ -564,7 +585,7 @@ row in both front ends.
 
 Remove and Revoke currently run through the engine's `?confirm=` route (a `destructive`
 text button, not yet an icon button); when they *do* carry an icon, use `UserMinus` and
-`Ban` respectively. The mapping is the law regardless of whether a given action is wired
+`Prohibit` respectively. The mapping is the law regardless of whether a given action is wired
 with its icon yet. Do not pick a different icon at a call site.
 
 Real usage (`role-detail.tsx`, `knowledge-detail.tsx`):
@@ -653,6 +674,29 @@ plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
 
 When in doubt, read `shared/glossary.ts` and copy its tone.
 
+### And every sentence you write is translated
+
+**The app speaks four languages, and English is the KEY, not a translation.** So a
+sentence that never reaches the catalogue does not error — it ships in English to
+somebody who chose German, on a screen that looks finished. Three things are
+required of every user-visible sentence, and all three are machine-checked:
+
+1. **Wrap it.** `const t = useT()` (`shared/web/language.tsx`), then `t("Save")`.
+   Write the WHOLE sentence with a `{hole}` in it — `t("Page {page} of
+   {total}")`, never `t("of")`, which is a fragment `isUserVisible` refuses and
+   is therefore translated nowhere and flagged by nothing (R33).
+   A field config's `label:`/`helpText:` is the one exception: `t` is a hook and
+   a field config is a module-level constant, so those words are translated on
+   the way to the screen by `shared/web/field.tsx`.
+2. **Catalogue it.** Run `npm run lang` before you commit. Both deploy commands
+   refuse on a stale catalogue (R28).
+3. **Use the glossary's word**, never a synonym for it — R34 reads the
+   catalogue for known synonyms.
+
+**[LANGUAGES.md](LANGUAGES.md) is the owner of this mechanism** — the four
+languages, the seven positions, `appFiles()`, the ceiling that can only fall.
+Read it before you write copy, not after the build goes red.
+
 ---
 
 ## 6. Cards, one-row collection headers, and dynamic search/filters
@@ -708,7 +752,7 @@ Every screen renders over the library's **`AmbientBackground`**, mounted once in
 
 ```tsx
 // web/app/layout.tsx
-import { AmbientBackground } from "@shared/ui/controls/ambient-background/ambient-background"
+import { AmbientBackground } from "@shared/ui/components/ambient-background/ambient-background"
 // …
 <AmbientBackground />
 ```
@@ -717,7 +761,7 @@ Because the living background shows through, floating surfaces have
 to be readable over a moving field — and that is settled **in the component**, not
 by a host override: all eight floating surfaces (`dialog`, `sheet`, `alert-dialog`,
 `popover`, `dropdown-menu`, `hover-card`, `select`, `command`) carry an opaque
-`bg-card` or `bg-popover` in `shared/ui/controls/` (the kit's own rule is paper,
+`bg-card` or `bg-popover` in `shared/ui/components/` (the kit's own rule is paper,
 not glass — the frosted `.glass` this paragraph used to describe is gone from kit
 and host alike). The host override that
 used to stand in for this is gone too; §1 and the header of
@@ -775,12 +819,19 @@ alive underneath, that's the "immovable, contentless page" feel.
 - [ ] Action buttons carry the **right icon** (Pencil / Power / UserMinus / Ban / Plus /
       Upload), `size-3.5` inline; destructive = red + confirm.
 - [ ] Copy is warm, plain, sentence case, no jargon, no emoji.
+- [ ] **Every new sentence is inside `t("…")`** (or is a field-config label going
+      through `shared/web/field.tsx`), the whole sentence with a `{hole}` rather
+      than a fragment — and **`npm run lang` has been run and its catalogue change
+      committed** (R28/R33/R34). [LANGUAGES.md](LANGUAGES.md) is the how.
 - [ ] Search/filters are wired through `listCollection` + `withDataDrivenCollection` so
       they **hide when empty**.
 - [ ] **The screen is inside the glance budget** (§9): no band over 4 units (6 in a
       table), no more than 3 blocks before the primary content, and no width of its own.
 - [ ] **Every gap is one of the five** (`gap-1` / `gap-2` / `gap-4` / `gap-6` /
-      `gap-10`), every radius is `rounded-xl` or `rounded-full`, every colour is a token.
+      `gap-10`), every radius is `rounded-[var(--radius)]` or `rounded-pill` (R31 —
+      the spelling became the kit's on 2026-08-27; `rounded-xl` and `rounded-full`
+      render at the same value and are no longer accepted), every colour is a
+      token and never a Tailwind ramp or a hex (R32).
 - [ ] `npm run check` is green (TypeScript + the full test suite, including
       `web/test/rules.test.ts`).
 

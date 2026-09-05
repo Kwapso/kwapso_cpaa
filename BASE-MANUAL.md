@@ -107,8 +107,10 @@ worker reads and writes team data through that one layer. Never ad-hoc.
 `web/` is a Next.js app exported to **static** assets, served by the gateway
 alongside `/api/*` on the same origin. It is "lego assembled from a library": all
 UI primitives and collections come from `shared/ui/`, imported as
-`@shared/ui/controls/button/button` (primitives are `controls/`, assemblies are
-`structures/`); `web/` only composes *recipes*
+`@shared/ui/components/button/button` — since the kit's v1.1.0 layout move, which
+this app adopted on 2026-08-27, controls and assemblies are ONE `components/`
+folder, `tokens/`, `icons/` and `motion/` sit under `foundations/`, and
+whole-screen templates stay in `compositions/`; `web/` only composes *recipes*
 from them. The library was the npm package `@kwapso/ui`, installed from a
 separate repo, until it was **vendored into this repo on 2026-08-22**, because
 the re-theme needs to change what a component IS and not only what colour it is —

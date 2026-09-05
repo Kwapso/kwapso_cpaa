@@ -232,6 +232,7 @@ job after repeated test logins, not a fault. Wait it out.
 | The migration robot answers `{"teamsMigrated":0}` and nothing changes | it applies the list bundled into the **deployed** tenancy worker, so it cannot roll out a migration that only exists in your working tree. Deploy tenancy first — `npm run deploy:<env>` sequences this correctly on its own. Pressing it again will not help |
 | A worker "not found" on a first deploy | the cold-start binding cycle. OPERATIONS.md § deploy order has the one-time fix |
 | The import target picker looks wrong | it self-heals on read; a target an owner switched off stays off on purpose |
+| **The knowledge base 500s on every question**, while every other screen is fine | Vectorize. `searchVectors` (`workers/content/src/lib/knowledge-vectors.ts`) does not catch its own rejection, so an index outage propagates to the content worker's central catch and the caller gets `500 internal` — the keyword arm is never reached. Look in `error_logs` for `content` rows on the knowledge route, then check the Vectorize index (`kwapso-knowledge` / `kwapso-knowledge-staging`) in the Cloudflare dashboard. **If the binding is missing rather than erroring, the symptom is different**: answers keep working, keyword-only, because `hasVectorStore` is false and the seam returns no hits instead of throwing. SEARCH.md § *When the index itself is unavailable* has both shapes |
 
 ---
 

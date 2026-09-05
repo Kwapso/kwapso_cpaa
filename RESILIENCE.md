@@ -168,12 +168,28 @@ resolves.
 
 ### When the restore was last tested
 
-> **2026-08-14, rehearsed, partially.** All 20 core migrations were replayed
-> into a scratch SQLite database, filled with rows, dumped, and reloaded into an
-> empty database. Verified: 18 tables, 44 indexes and every row survived the
-> round trip, byte-identical values included. **What this did NOT test:** the
-> `wrangler d1 export` / `--remote` half against live Cloudflare, and Time Travel.
-> Those need a real environment and are the next rehearsal.
+> **STALE — the rehearsal is 8 migrations behind the schema. Do not read the
+> line below as "the current core schema round-trips".**
+>
+> **2026-08-14, rehearsed, partially.** The 20 core migrations that existed
+> *then* (`0001`–`0020`) were replayed into a scratch SQLite database, filled
+> with rows, dumped, and reloaded into an empty database. Verified: 18 tables,
+> 44 indexes and every row survived the round trip, byte-identical values
+> included. **What this did NOT test:** the `wrangler d1 export` / `--remote`
+> half against live Cloudflare, and Time Travel. Those need a real environment
+> and are the next rehearsal.
+>
+> **`db/core/` now holds 28.** `0021`–`0028` landed after that date —
+> `0021_retention_scan_indexes`, `0022_db_growth`, `0023_module_moves`,
+> `0024_user_language`, `0025_team_legal`, `0026_user_scale`,
+> `0027_usage_tokens`, `0028_user_spine` — several of them adding tables or
+> columns. **Nothing in that range has been round-tripped.** Re-run the
+> rehearsal, then replace this whole block with the new date and the new figures.
 
 **An untested restore is not a restore.** Re-run the rehearsal against staging
 after any migration that changes a table's shape, and update the date above.
+
+**And that rule is enforced by nobody, which is how it came to be broken eight
+times.** Until it has a check, the honest thing is the stale banner above: the
+count is derivable with `ls db/core/*.sql | wc -l`, so whoever next reads this
+can tell in one command whether the rehearsal still covers the schema.

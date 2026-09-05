@@ -20,8 +20,8 @@ the repository knows exactly what to go and ask for.
 | **GitHub** | `github.com/Kwapso/kwapso_system` (renamed from `kwapso_cpaa` on 2026-08-26; the old URL still redirects), a **private** repository in the `Kwapso` organisation, and since 2026-08-22 that is the only repository the app needs. The UI component library used to be installed from its own public repo, which is why this row once said `npm install` works for anyone who can clone this one; it is now vendored at `shared/ui/`, so the component source arrives with the clone and lives inside the **private** repo. Access to this one repository is access to everything | no source at all. Org access must be granted by an owner |
 | **Resend** | EU region, sending domain `kwapso.app`, from `kwapso <alerts@kwapso.app>` | no sign-in emails, so nobody can log in |
 | **Google Cloud** | **Two** OAuth clients in the project (see §3) | the "Continue with Google" button and every Drive/Gmail/Calendar/Chat connection |
-| **Anthropic** | Optional. Only sets which model the assistant thinks with | the assistant falls back to Cloudflare Workers AI and keeps working |
-| **Domain registrar for `kwapso.app`** | The zone is on Cloudflare; **where the domain is registered, and who holds that login, is not recorded anywhere** | you cannot move or renew the domain |
+| **Anthropic** | **NOT needed to run or deploy anything.** No worker reads `ANTHROPIC_API_KEY` — the secret was removed from both environments on 29 Aug 2026 and the transport deleted (§4), so the only mentions left in `workers/` are historical comments. Two *optional local scripts* read it from the operator's own shell: `scripts/i18n-translate.mjs` and `scripts/kb-bench.mjs` | nothing in the deployment changes. The assistant runs on Workers AI over the `AI` binding either way. You lose only those two local scripts: translate with `scripts/i18n-translate-workers-ai.mjs` instead |
+| **Domain registrar for `kwapso.app`** | The zone is on Cloudflare; **where the domain is registered, and who holds that login, is still not recorded here — and it is one of only two open questions in this document.** **HOW TO ANSWER IT WITHOUT THE OWNER:** run `whois kwapso.app` and read the `Registrar:` line, then check whether Cloudflare Registrar holds it (Cloudflare dashboard → the `kwapso.app` zone → *Domain Registration*; if the zone was transferred in, it says so). If it is Cloudflare Registrar, the account in §1 IS the registrar login and this gap closes. **Whoever confirms it: write the registrar's name into this cell and delete this instruction.** | you cannot move or renew the domain — and DNS keeps working, so the first symptom is an expiry notice nobody receives |
 | **Glide** | Business plan or above (that is the tier that issues an API token). Legacy only. See §6 | no route back to the pre-kwapso history |
 
 **Owner and first point of contact for all of the above:**
@@ -174,8 +174,16 @@ source ~/.config/kwapso/keys.env && node scripts/glide-pull.mjs
 plan. `glide/files/`, roughly 79 MB of clients' own logos, photos, PDFs and video,
 was copied off Google's storage before the Glide account lapses, and once that
 account is closed `scripts/glide-files.mjs` returns nothing. **Where that 79 MB is
-backed up is not recorded anywhere.** If it exists in only one place, it is one
-laptop away from gone.
+backed up is the second of this document's two open questions.** If it exists in
+only one place, it is one laptop away from gone.
+
+**HOW TO ANSWER IT:** it is not in this repository (`glide/files/` is git-ignored
+and correctly absent from every clone) and it is not in R2 — `scripts/backup.mjs`
+copies the buckets this deployment owns, and these files were never uploaded to
+one. So the copy is on the owner's own machine or in the owner's own cloud
+storage, and only the owner can say which. **Whoever finds out: name the location
+here, and if it turns out to be one machine, put a second copy somewhere before
+you write the sentence.**
 
 ---
 
@@ -189,7 +197,15 @@ no document currently gives:
 2. **An off-Cloudflare copy of the databases.** D1 Time Travel covers 30 days
    *inside* the account. Nothing guards against losing the account itself.
    RUNBOOK.md § 2 has the one-line export if this becomes a decision.
-3. **The R2 buckets.** No versioning, no point-in-time restore.
+3. ~~**The R2 buckets.**~~ **Covered — run the backup.** R2 still has no
+   versioning and no point-in-time restore of its own, but `scripts/backup.mjs`
+   copies every object in every bucket this environment owns, alongside the
+   database dumps, and `web/test/backup-covers-r2.test.ts` derives the coverage
+   from the source so a new bucket cannot be silently missed. What remains true:
+   **the backup is the only copy**, so a bucket deleted between two runs is gone
+   for the window between them. [RESILIENCE.md](RESILIENCE.md) § *What is NOT
+   backed up* is the owner of this fact and has the detail; if the two ever
+   disagree again, RESILIENCE is right and this line is stale.
 4. **The rescued Glide files.** 79 MB, one copy known, source expiring.
 5. **The domain registrar login for `kwapso.app`.**
 6. **A second git remote.** `origin` is the only copy off this machine.

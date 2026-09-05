@@ -182,6 +182,32 @@ for "how does search work" leaves knowing it exists:
 DATA-MODEL.md § *THE KNOWLEDGE BASE* is the owning reference (the four tables, the
 compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index up.
 
+### When the index itself is unavailable
+
+R23 covers the EMPTY result honestly — no citation means no passage and a sentence
+the assistant must say instead of inventing one. That is the case where retrieval
+worked and found nothing. This is the other one, and it is the one a person meets
+during an incident: **the retrieval layer being down.** R11's fetch timeout does
+not apply, because Vectorize is a binding rather than a fetch.
+
+There are two shapes, and they behave differently:
+
+| shape | what happens | what the person sees |
+|---|---|---|
+| **The index is NOT BOUND** — a fresh environment before `KNOWLEDGE_INDEX` exists, or a deployment without it | `hasVectorStore(env)` is false, `searchVectors` returns `[]` without calling anything, and the answer path falls through to its other arm — the per-team FTS5 terms search | a working, keyword-only answer. Degraded silently, which is the intended behaviour: a half-configured environment still answers from the words it has |
+| **The index IS BOUND and the query REJECTS** — Vectorize erroring mid-answer | `searchVectors` has no `try`/`catch` of its own, so the rejection propagates to the content worker's central catch. It is recorded in `error_logs` by `recordWorkerError`, and the caller gets `500 internal` | *"Something went wrong on our side. Try again."* **The keyword arm is NOT tried** — the two arms sit side by side and neither narrows the other, but a throw from the first one ends the request before the second is read |
+
+**So an outage of Vectorize is a 500 on the knowledge answer, not a degraded
+answer**, and it is visible in the central error log rather than silent. That
+asymmetry is deliberate to the extent that it is honest — the app never invents a
+citation it does not have — but it is worth knowing before you diagnose it as a
+knowledge-base bug. RUNBOOK.md § 3 carries the symptom row.
+
+**If you change this:** making the query fall back to the terms arm on a throw
+would turn an outage into a quietly worse answer, which is the opposite of what
+R23 was written for. Whoever proposes it should say how the person is told the
+answer was drawn from words alone.
+
 ## The third question: SORTING (BUILT 2026-08-18)
 
 A collection is asked three things — **which rows** (the filters), **which of

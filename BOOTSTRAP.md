@@ -77,16 +77,25 @@ npx wrangler whoami    # CHECK IT. See the warning below before you go further
 
 `npm run check` green on a clean clone proves the code is intact before you touch
 any cloud resource. **What green looks like: exit code 0**, ten workspaces, every
-suite passing, roughly 149 test files and 1,600-odd tests at the time of writing,
-but check the exit code, not the count, because the suite grows. Nothing in this
-step contacts Cloudflare, so it works before you have an account at all, which
-makes it the one step you can use to prove the code arrived intact.
+suite passing, roughly 315 test files and 4,000-odd tests at the time of writing,
+but check the **exit code**, not the count, because the suite grows — and never
+read the run by grepping its log, because a suite that fails to LOAD prints
+nothing that looks like a failure. Nothing in this step contacts Cloudflare, so it
+works before you have an account at all, which makes it the one step you can use
+to prove the code arrived intact.
 
-**One suite will report itself skipped, and on your machine that is correct.**
-`workers/content/test/knowledge-backfill.test.ts` measures retrieval over the
-agency's real Glide history, which is git-ignored customer data and is in no clone
-(INVENTORY.md § 6), so the content worker ends `32 passed | 1 skipped`. Don't go
-looking for the missing file. A skip in any *other* suite is a real one.
+**Two things will report themselves skipped, and on a fresh clone both are
+correct.** A skip anywhere *else* is a real one.
+
+- `workers/content/test/knowledge-backfill.test.ts` measures retrieval over the
+  agency's real Glide history, which is git-ignored customer data and is in no
+  clone (INVENTORY.md § 6), so the content worker ends `Test Files 70 passed |
+  1 skipped`, `Tests 933 passed | 3 skipped`. Don't go looking for the missing
+  file. This is the only whole FILE that skips.
+- `web/test/splash.test.ts` holds eight rows that compare each front door against
+  its built static export. `npm run check` does not build, so they skip and the
+  web workspace ends `Tests 849 passed | 8 skipped`. `npm run check:built` builds
+  first and runs them for real.
 
 > **WHICH ACCOUNT AM I ABOUT TO BUILD IN?** `wrangler` acts on whatever account
 > the machine is logged into, and **no worker in this repo pins `account_id`**.
