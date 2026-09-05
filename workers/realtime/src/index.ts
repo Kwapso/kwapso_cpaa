@@ -565,7 +565,27 @@ async function handle(request: Request, env: Env): Promise<Response> {
         // Identity channel: you may only join your OWN.
         if (userId !== user.id)
           return fail(403, "forbidden", "That isn't your channel.")
-        return env.CHANNELS.getByName(`user:${userId}`).fetch(request)
+        // AND IT GOES THROUGH `stamped` LIKE THE OTHER BRANCH, which is the whole
+        // fix here: this line used to hand the DO the caller's RAW request.
+        //
+        // `stamped`'s own header says "a header the CALLER sent is never allowed to
+        // survive", and it was true of the team branch and of nothing else. An
+        // identity channel needs no fence, no shard and no subscription — the
+        // object name IS the fence, and the line above proves the caller owns it —
+        // so all three arguments are null and `stamped` DELETES all three headers.
+        //
+        // What it cost while it was missing: `x-listener-shard` is parsed inside
+        // the DO into `{team, shard}` and used to address another team's interest
+        // registry, so any signed-in person could open their OWN identity channel
+        // with `x-listener-shard: <someone else's team>:0` and write into it —
+        // no membership of that team involved anywhere. The registry decides which
+        // shards a ping is sent to, so the result is a team's live layer going
+        // quiet. Not a read of anything private; a write into somebody else's.
+        //
+        // It stayed green because nothing exercised this branch at all: the suite
+        // beside this file covered `?team=` and the DO, never `?user=`. That is the
+        // second half of the fix — see realtime/test/identity-channel.test.ts.
+        return env.CHANNELS.getByName(`user:${userId}`).fetch(stamped(request, null, null))
       }
 
       const teamId = queryText(url.searchParams.get("team"), "Team", TEXT_LIMITS.short)
