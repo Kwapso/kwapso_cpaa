@@ -7,6 +7,7 @@
 // itself is re-verified on EVERY request, so revocation bites immediately.
 
 import { AUTH_UNAVAILABLE_MS, GuardError } from "@shared/workers/gating"
+import { traceHeaders } from "@shared/workers/trace"
 import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
@@ -81,6 +82,18 @@ export async function sessionCookieFor(env: Env, token: McpTokenRow, traceId: st
       headers: {
         "Content-Type": "application/json",
         "x-internal-key": env.INTERNAL_KEY ?? "",
+        // THE ID THIS FUNCTION WAS ALREADY HOLDING. `traceId` arrived as a
+        // parameter, was passed on to `requireStaff` below, and was never put on
+        // the ONE hop that leaves this worker — so a failure inside auth's
+        // mcp-session door landed in `error_logs` under a fresh ULID with nothing
+        // joining it to the tool call that caused it.
+        //
+        // It is the sharpest case of the three seams that dropped it, because an
+        // MCP request is the hardest one to reproduce by hand: there is no
+        // browser to open, no screen to revisit, and the person who saw the
+        // failure is an outside developer's tool. The id was in scope the whole
+        // time; the header was the missing line.
+        ...traceHeaders(traceId),
       },
       body: JSON.stringify({ userId: token.user_id, teamId: token.team_id }),
       // The same ceiling the gating seam puts on the identity read, because this

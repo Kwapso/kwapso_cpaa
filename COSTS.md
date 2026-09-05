@@ -244,13 +244,33 @@ downloading a ticket attachment, a staff member opening a knowledge document —
 Class B operation and the Worker request, and nothing for the bytes. This is the single
 most load-bearing fact in this section and the project had never stated it.
 
-### Nothing ever deletes a byte, and that is a decision nobody has made
+### Superseded bytes are reclaimed; retired ones are kept on purpose
 
-There is **no `.delete(` and no `.list(` on any R2 bucket in the codebase**, and no
-lifecycle rule anywhere. (Canary: the same search finds 10+ `.put(` and `.get(` sites, so
-the pattern works — the zero is real.) Combined with deactivate-never-delete,
-`KNOWLEDGE_FILE_MAX_BYTES = 25 MB` and `TICKET_FILE_MAX_BYTES = 10 MB`, **every byte ever
-uploaded stays forever.**
+**Updated 5 Sep 2026.** The paragraph this replaces said there was no `.delete(` on
+any bucket and no lifecycle rule anywhere. Both halves have moved, and the
+distinction that replaced them is the useful one:
+
+- **SUPERSEDED — reclaimed.** A picture or a file that a write stopped pointing at
+  is deleted after the row moves, fail-soft, through `reclaimMedia`
+  (`shared/workers/image.ts`). Nine columns do this now: the profile photo, the
+  team logo, an account's logo and cover, an app's logo, a brand asset's file, a
+  deliverable's link file and picture, a staff photo and a certificate. Before
+  this, changing a client's logo left the old object in R2 for ever with no row
+  pointing at it and no way to find it again — the key was in the column that had
+  just been overwritten.
+- **RETIRED — kept.** Archiving a record reclaims nothing, deliberately: a row
+  that is deactivated can be restored, and deleting its bytes would hand back an
+  asset whose file 404s. `setBrandAssetActive` states this in the source and it is
+  the rule for every module.
+- **LIFECYCLE — set, and never by age.** `scripts/r2-lifecycle.mjs` applies rules
+  to every bucket (OPERATIONS.md). It aborts incomplete multipart uploads and can
+  transition old objects to Infrequent Access; it does not and will not expire an
+  object by age, because age says nothing about whether a row points at it.
+
+What remains, and it is still an owner's decision: a RETIRED record's bytes are
+kept for ever, and there is no tenant-delete path at all. Combined with
+`KNOWLEDGE_FILE_MAX_BYTES = 25 MB` and `TICKET_FILE_MAX_BYTES = 10 MB`, **a
+deactivated record's file stays for ever.**
 
 Today that is 1.3% of an allowance, so it is not urgent — it is *undecided*, which is
 different and worse, because the moment it matters the objects are already there.
@@ -261,10 +281,11 @@ Ten such teams pass the 10 GB allowance inside a year and then bill
 `13 GB × $0.015 = $0.20/month`, rising. The money is small; the fact that nobody can say
 which objects are safe to remove is the real cost.
 
-**This is the owner's call and is deliberately not taken here.** The two questions are:
-does a deactivated record's file survive (deactivate-never-delete says the ROW does —
-it says nothing about the bytes), and does a hard-deleted team take its bucket prefix with
-it? Until they are answered, `wrangler r2 bucket info <name>` twice a week apart is the
+**This is the owner's call and is deliberately not taken here.** One of the two
+questions has been answered by the reclaim above — a SUPERSEDED file goes, and it
+is the common case. The two that remain are: does a DEACTIVATED record's file
+survive (deactivate-never-delete says the ROW does — it says nothing about the
+bytes), and does a hard-deleted team take its bucket prefix with it? Until they are answered, `wrangler r2 bucket info <name>` twice a week apart is the
 measurement, and the numbers above are the first reading.
 
 ### Retention that DOES exist

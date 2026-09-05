@@ -75,6 +75,24 @@ and nothing else**:
   through the door, or address a shard. *(Fact updated 26 Aug 2026: this bullet
   said "one instance per channel" from the day the doc was locked until the
   split, and for twelve days after it.)*
+- **And the shard count now has an instrument under it (5 Sep 2026).** The
+  ceiling `REALTIME_SHARDS` implies — "~12–20k concurrent listeners per team,
+  which clears the yardstick's 25,000 only once combined with subscription
+  scoping" — was a comment, and nothing measured either half. A Durable Object
+  is single-threaded and a broadcast is a serial loop, so past a few thousand
+  sockets every publish on that team queues behind the last, and the first
+  symptom is "the app feels slow" pointing at nothing.
+
+  The broadcast loop now COUNTS, and past `REALTIME_SHARD_WATCH_SOCKETS` (3,000
+  — the low end of one object's own range, deliberately, because raising
+  `REALTIME_SHARDS` re-shards every listener and wants a maintenance window) it
+  writes one row an hour to `error_logs` naming the team, the shard, how many
+  sockets it is holding **and how many the ping actually reached**. That second
+  number is the measurement the whole arithmetic rests on and that nobody had:
+  what subscription scoping removes from a real broadcast. A shard at 3,000
+  sending to 40 is healthy and wants a bigger shard count eventually; one sending
+  to 2,900 is doing the work the interest registry exists to avoid, and that is a
+  different conversation.
 - **It holds open WebSockets, not data.** The DO stores **no application data**;
   the databases (global core D1 + per-team D1) stay the single source of truth
   (`index.ts` header: *"Stores NO app data"*). It keeps a set of sockets and

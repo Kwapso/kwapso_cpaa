@@ -270,6 +270,31 @@ export async function d1DeleteDatabase(
 export async function d1ListDatabases(
   cfg: D1Rest
 ): Promise<{ uuid: string; name: string; file_size: number | null }[]> {
+  return (await d1ListAllDatabases(cfg)).databases
+}
+
+/** THE SAME LISTING, PLUS WHETHER IT IS THE WHOLE OF IT.
+ *
+ * `d1ListDatabases` has always stopped at `D1_LIST_PAGE_CAP` and said so — to the
+ * CONSOLE. That is the right amount of signal for a caller asking "which of these
+ * are over 80%", because a database the listing never reached is simply found on
+ * a later night.
+ *
+ * It is the wrong amount for a caller that SUMS the answer. D1 caps total storage
+ * per ACCOUNT (1 TB), and a truncated listing under-counts that total — silently,
+ * and in the one direction that matters: the number comes back reassuringly small
+ * on exactly the night the estate got big enough to truncate the listing. "We are
+ * at 40% of the account cap" and "we are at 40% of the part of the account we
+ * managed to look at" are different sentences and only one of them is safe to act
+ * on, so the completeness rides back with the rows rather than being left in a
+ * log line nobody joins to the figure.
+ *
+ * Kept as a second export rather than a changed return type: the alarm caller
+ * genuinely does not need it, and widening one function's contract to serve the
+ * other's question is how a value ends up ignored at three call sites. */
+export async function d1ListAllDatabases(
+  cfg: D1Rest
+): Promise<{ databases: { uuid: string; name: string; file_size: number | null }[]; complete: boolean }> {
   const all: { uuid: string; name: string; file_size: number | null }[] = []
   // BOUNDED: the loop used to be `for (;;)` with only "a short page" to stop it —
   // an upstream that keeps answering with a full page (a paging bug, a `page`
@@ -280,12 +305,12 @@ export async function d1ListDatabases(
       { uuid: string; name: string; file_size: number | null }[]
     >(cfg, `/d1/database?page=${page}&per_page=100`)
     all.push(...batch)
-    if (batch.length < 100) return all
+    if (batch.length < 100) return { databases: all, complete: true }
   }
   console.error(
     `d1ListDatabases: stopped at the ${D1_LIST_PAGE_CAP}-page ceiling (${all.length} databases), the list is INCOMPLETE.`
   )
-  return all
+  return { databases: all, complete: false }
 }
 
 /** Run ONE parameterized statement; returns its rows.

@@ -193,3 +193,171 @@ describe("safeMediaKey — the door validates the key at the boundary", () => {
     expect(doors, "the two gateways ship four media doors between them").toBe(4)
   })
 })
+
+// A RECLAIM THAT CANNOT FIRE IS WORSE THAN NO RECLAIM.
+//
+// `ownedMediaKey` answers null for anything it cannot prove — a foreign prefix, a
+// pasted external link, a deeper path — and `reclaimMedia` skips a null without a
+// murmur. That is exactly right for a hostile input and exactly wrong for a
+// DEVELOPER MISTAKE, because the two are indistinguishable at runtime: give the
+// reclaim `/media/` where the module writes to `/media/internal/`, or the owners
+// list of a neighbouring module, and every call returns null, nothing is ever
+// deleted, and the code reads as if the leak were closed. Ten of the app's upload
+// doors write to the internal shelf and six to the public one, so this is not a
+// hypothetical.
+//
+// So the pairing is checked rather than trusted: every reclaim's owners list must
+// be one some door actually MINTS with, and its base must be the one that door's
+// bucket is served under.
+describe("a reclaim is proved against the key some door actually mints", () => {
+  /** `ownedMediaKey(<stored>, "<base>", <owners…>)` — the base and the owners, as
+   * written. Text, deliberately: the point is that the two call sites say the
+   * SAME thing, and normalising them apart is how they would be allowed to
+   * differ. */
+  const RECLAIM = /ownedMediaKey\(\s*[^,]+,\s*"([^"]+)"\s*,\s*([^)]*)\)/g
+  /** `mediaKey(<owners…>)` — the mint. */
+  const MINT = /mediaKey\(\s*([^)]*)\)/g
+  const tidy = (owners: string) => owners.replace(/\s+/g, " ").trim()
+
+  /** Which base a file's uploads are served under, from the bucket it writes to.
+   * `INTERNAL_MEDIA` is the agency-only shelf and is served at
+   * `/media/internal/` by the agency gateway alone; everything else is
+   * `/media/`. Derived from the source rather than listed, so a module that
+   * changes shelves cannot leave a stale base behind in its reclaim. */
+  function baseOf(src: string): string | null {
+    if (/INTERNAL_MEDIA\.put\(/.test(src)) return "/media/internal/"
+    if (/MEDIA\.put\(|storeImageDataUrl\(\s*env\.MEDIA/.test(src)) return "/media/"
+    return null
+  }
+
+  it("every owners list a reclaim proves against is one a door mints with", () => {
+    const mints = new Map<string, string[]>() // owners → the files that mint them
+    for (const [path, src] of workerSources())
+      for (const m of src.matchAll(MINT)) {
+        const owners = tidy(m[1])
+        mints.set(owners, [...(mints.get(owners) ?? []), path])
+      }
+    // The tripwire: a scan that found no mints would pass every assertion below.
+    expect(mints.size, "expected to find the upload doors' key mints").toBeGreaterThan(5)
+
+    let reclaims = 0
+    for (const [path, src] of workerSources())
+      for (const m of src.matchAll(RECLAIM)) {
+        reclaims++
+        const [, base, ownersRaw] = m
+        const owners = tidy(ownersRaw)
+        const minters = mints.get(owners)
+        expect(
+          minters,
+          `${path} reclaims keys under \`${owners}\` and no upload door mints that — a prefix nothing wrote matches nothing, so this deletes NOTHING and looks like it works`
+        ).toBeTruthy()
+        // …and the shelf has to agree, which is the half a reader's eye slides
+        // over: `/media/` against an INTERNAL_MEDIA key fails `startsWith` and
+        // silently reclaims nothing.
+        for (const minter of minters ?? []) {
+          const want = baseOf(readFileSync(join(ROOT, minter), "utf8"))
+          if (!want) continue // the mint and the put are in different files
+          expect(
+            base,
+            `${path} reclaims \`${owners}\` at "${base}", but ${minter} writes those objects to the shelf served at "${want}" — every key would fail the prefix test and nothing would ever be deleted`
+          ).toBe(want)
+        }
+      }
+    expect(
+      reclaims,
+      "expected the reclaims: profile photo, team logo, account logo+cover, app logo, brand file, deliverable link+picture, staff photo, certificate file"
+    ).toBeGreaterThanOrEqual(7)
+  })
+
+  it("no two modules mint into the same owners prefix", () => {
+    // THE BUG THIS CLOSES, MEASURED 5 SEP 2026: knowledge, brand assets, staff and
+    // deliverables all minted `mediaKey(guard.teamId)` into the SAME bucket, so
+    // `ownedMediaKey(url, base, teamId)` proved "this team" and could never prove
+    // "this module". A brand asset's URL pasted into a staff certificate's file
+    // field passes that proof — and the staff door's reclaim would then destroy the
+    // brand library's file. One more segment makes it impossible by construction;
+    // this keeps it that way.
+    const byOwners = new Map<string, Set<string>>()
+    for (const [path, src] of workerSources()) {
+      if (!/\.put\(|storeImageDataUrl\(/.test(src)) continue
+      for (const m of src.matchAll(MINT)) {
+        const owners = tidy(m[1])
+        byOwners.set(owners, (byOwners.get(owners) ?? new Set()).add(path))
+      }
+    }
+    expect(byOwners.size, "expected to find the upload doors").toBeGreaterThan(5)
+    for (const [owners, files] of byOwners)
+      expect(
+        [...files],
+        `\`mediaKey(${owners})\` is minted by more than one module, so no reclaim on either can prove which module an object belongs to`
+      ).toHaveLength(1)
+  })
+})
+
+// "FIND, COUNT, MOVE OR DELETE ONE TENANT'S OBJECTS" HAS TO BE ANSWERABLE.
+//
+// R2 has no folders — a prefix is whatever the keys happen to start with — so the
+// set of prefixes a tenant's objects live under IS the answer to that question,
+// and it was never written down. Nine different shapes were live at once across
+// three incompatible conventions (kind-first `story/<team>`, team-first
+// `<team>/apps`, and a bare `<team>` shared by four modules), one of which
+// (`users/<id>`) carries no team at all.
+//
+// A key cannot be renamed once it is written, so the fix is not one shape: it is
+// that the SET is derived off disk, pinned with a reason each, and cannot grow by
+// accident. It fails both ways — a new shape nobody listed, and a listed shape
+// nothing mints any more — so the table is a description of the bucket rather
+// than a record of what the bucket used to look like.
+//
+// There is no tenant-DELETE path today (deactivate, never delete), so this is
+// latent. It becomes real the first time a client asks for erasure, and that is
+// the worst possible moment to be discovering the shapes.
+describe("every object prefix a tenant's files live under is written down", () => {
+  const PREFIXES: Record<string, string> = {
+    '"users", user.id': "a person's profile photo — the ONE shape with no team in it, because a photo belongs to the person and follows them between teams (workers/auth/src/lib/profile.ts)",
+    '"teams", teamId': "the team's own logo, keyed by the team it IS rather than by a team it belongs to (workers/tenancy/src/lib/teams.ts)",
+    '"ticket", guard.teamId': "a ticket's attachments — kind-first, from before the team-first convention (workers/content/src/routes/help.ts)",
+    '"story", guard.teamId': "a story's attachments — kind-first, same vintage (workers/content/src/routes/stories.ts)",
+    '"todo", guard.teamId': "the file a CLIENT sends back through the portal to close a to-do — kind-first, same vintage (workers/content/src/routes/todos.ts)",
+    'guard.teamId, "accounts"': "a client's logo and cover (workers/tenancy/src/routes/accounts.ts)",
+    'guard.teamId, "apps"': "an app's logo (workers/tenancy/src/routes/processes.ts)",
+    'guard.teamId, "tasks"': "the photo of the letter on a piece of our own admin (workers/content/src/routes/todos.ts)",
+    'guard.teamId, "knowledge"': "the material behind a knowledge source (workers/content/src/routes/knowledge.ts)",
+    'guard.teamId, "brand"': "the brand library's files (workers/content/src/routes/brand-assets.ts)",
+    'guard.teamId, "staff"': "staff photos and certificates — one generic upload door, two destination columns (workers/content/src/routes/staff.ts)",
+    'guard.teamId, "deliverables"': "what we handed over on an app (workers/content/src/routes/deliverables.ts)",
+  }
+
+  const minted = () => {
+    const found = new Set<string>()
+    for (const [, src] of workerSources())
+      for (const m of src.matchAll(/mediaKey\(\s*([^)]*)\)/g))
+        found.add(m[1].replace(/\s+/g, " ").trim())
+    return found
+  }
+
+  it("finds the mints at all", () => {
+    // The tripwire: both assertions below are set differences, and a scan that
+    // found nothing would satisfy the first one.
+    expect(minted().size, "expected to find the upload doors' key mints").toBeGreaterThan(8)
+  })
+
+  it("no upload writes under a prefix nobody has described", () => {
+    const undescribed = [...minted()].filter((o) => !PREFIXES[o])
+    expect(
+      undescribed,
+      "these mint object keys under a prefix this table does not describe, so 'which objects belong " +
+        "to this tenant' has an answer nobody has written down. Add a line naming what lives there " +
+        `and which door writes it: ${undescribed.map((o) => `mediaKey(${o})`).join(", ")}`
+    ).toEqual([])
+  })
+
+  it("…and no line describes a prefix nothing writes any more", () => {
+    const stale = Object.keys(PREFIXES).filter((o) => !minted().has(o))
+    expect(
+      stale,
+      `this table describes prefixes no door mints: ${stale.join(", ")}. Delete the line — a description ` +
+        "of a bucket that no longer exists is worse than none, because it is read as current."
+    ).toEqual([])
+  })
+})

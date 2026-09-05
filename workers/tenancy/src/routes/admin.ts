@@ -4,7 +4,14 @@
 
 import { fail, json } from "@shared/workers/http"
 import { d1Query } from "@shared/workers/d1-rest"
-import { checkDatabaseSizes, daysUntilFull, moveModuleToOwnDatabase } from "../lib/sharding"
+import {
+  ACCOUNT_STORAGE_NAME,
+  checkDatabaseSizes,
+  D1_MAX_ACCOUNT_BYTES,
+  daysUntilFull,
+  moveModuleToOwnDatabase,
+  SPLIT_READS_WIRED,
+} from "../lib/sharding"
 import { applyMigration, createTeam, d1Config } from "../lib/teams"
 import { CRON_GROWTH_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -86,7 +93,16 @@ export async function dbSizes(request: Request, env: Env): Promise<Response> {
       sizeBytes: r.size_bytes,
       // null = not answerable yet (one reading, or it is not growing). Reported as
       // null rather than as a very large number, which would read as a measurement.
-      daysUntilFull: daysUntilFull(r),
+      //
+      // THE ACCOUNT ROW SHARES THIS TABLE AND NOT ITS CEILING. `db_growth` now
+      // carries one row for every D1 byte on the Cloudflare account, and reading
+      // it against the 10 GB per-database cap would report a total already 100×
+      // past "full" — the most alarming possible way to be wrong about the one
+      // reading that matters most.
+      daysUntilFull: daysUntilFull(
+        r,
+        r.database_name === ACCOUNT_STORAGE_NAME ? D1_MAX_ACCOUNT_BYTES : undefined
+      ),
     }))
     // The soonest first — the shortlist's whole purpose. Un-answerable rows go last
     // rather than being dropped: "we have no trend for this one yet" is information.
@@ -104,6 +120,26 @@ export async function moveModule(request: Request, env: Env): Promise<Response> 
     module?: string
     tables?: string[]
   }
+  // THE RELIEF VALVE IS LOCKED, AND IT SAYS SO BEFORE IT TOUCHES ANYTHING.
+  //
+  // Ahead of the validation on purpose, because a 400 about a table name would be
+  // a smaller lie than the 200 this door used to answer. The mover copies a
+  // module's tables into a new database, flips the routing row and DRAINS the old
+  // home — on the understanding that reads then merge across both. Nothing in the
+  // app consults `team_module_databases`: `requireMember` resolves one
+  // `guard.databaseId` from `teams.database_id` and every module lib reads it. So
+  // the drain empties the database the app is still querying and the door reports
+  // `done`, and the module goes to zero rows on both front doors while the data
+  // sits safe in a database nothing asks.
+  //
+  // `SPLIT_READS_WIRED` is DERIVED, not asserted: merged-read-guard.test.ts
+  // censuses the read path's production callers and fails if the flag disagrees.
+  if (!SPLIT_READS_WIRED)
+    return fail(
+      503,
+      "module_move_unavailable",
+      "The module mover is not available: a module's reads still go to the team's one database, so moving it would empty it out of the app. See SPLIT_READS_WIRED in workers/tenancy/src/lib/sharding.ts."
+    )
   const teamId = requireText(body.teamId, "Team", TEXT_LIMITS.short)
   const module = requireText(body.module, "Module", TEXT_LIMITS.short)
   if (!Array.isArray(body.tables) || !body.tables.length)

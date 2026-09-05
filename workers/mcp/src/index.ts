@@ -202,7 +202,14 @@ export default {
       return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("mcp worker error:", e)
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`mcp worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
       afterResponse(request, recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }

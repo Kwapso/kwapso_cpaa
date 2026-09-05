@@ -6,14 +6,16 @@
 //              row + screams into the worker logs.
 //  2. MOVER  — relocates one module's tables out of a team's database into a
 //              dedicated database, recorded in team_module_databases.
-//  3. SPLIT  — reads for a (team, module) can span several databases via
-//              resolveModuleDatabases() + d1QueryAcross() (the merged-read
-//              path modules will use).
+//  3. SPLIT  — reads for a (team, module) COULD span several databases via
+//              resolveModuleDatabases() + d1QueryAcross(). NOT WIRED: neither has
+//              a caller outside this file, so valve 2 is refused at its door
+//              (SPLIT_READS_WIRED, below) rather than left able to empty a module
+//              out of the app while reporting success.
 
 import {
   d1CreateDatabase,
   d1ExecScript,
-  d1ListDatabases,
+  d1ListAllDatabases,
   d1Query,
   d1QueryAcross,
   sqlValue,
@@ -39,6 +41,55 @@ export const D1_MAX_DATABASE_BYTES = 10 * 1024 * 1024 * 1024
 
 /** 80% of D1's 10GB per-database cap. */
 export const ALERT_THRESHOLD_BYTES = 8 * 1024 * 1024 * 1024
+
+/** D1's TOTAL STORAGE PER ACCOUNT — the ceiling nothing here was watching.
+ * (Cloudflare's published D1 limits, checked live 5 Sep 2026: "Maximum storage
+ * per account — 1 TB (Workers Paid)".)
+ *
+ * ── WHY THE PER-DATABASE WATCH IS NOT THIS WATCH ────────────────────────────
+ *
+ * `ALERT_THRESHOLD_BYTES` answers "is one tenant nearly full", and the estate can
+ * be in serious trouble while every single one of those answers is a comfortable
+ * no. At 8.5 GB each — under the per-database alarm line — about 120 databases
+ * are 1.02 TB and the account is over. Every individual alarm would read "one
+ * database at 85%, run the mover"; the thing that actually stops working is D1
+ * refusing new writes and new database creation across EVERY tenant at once,
+ * including `d1CreateDatabase` — which is the mover's own first step. The named
+ * remedy for the per-database alarm SPENDS the resource this one measures.
+ *
+ * ── AND THE ACCOUNT IS SHARED, WHICH CUTS BOTH WAYS ─────────────────────────
+ *
+ * `ourDatabases` subtracts the other two products' databases so we never alarm on
+ * their data, and that subtraction is right for every other reader. It is WRONG
+ * here: the 1 TB is charged to the ACCOUNT, so their bytes fill our ceiling.
+ * So this one figure is measured over the WHOLE listing — counted, never named,
+ * the same bargain the skipped-count log line already makes. Our own share is
+ * reported beside it, because "we are at 30% and the account is at 90%" and "we
+ * are at 90%" need completely different phone calls. */
+export const D1_MAX_ACCOUNT_BYTES = 1024 * 1024 * 1024 * 1024
+
+/** 80% of the account ceiling — the same fraction as the per-database line, for
+ * the same reason: the mover takes a while and needs a person, and at an account
+ * level the relief (an owner deciding what to archive, or a second Cloudflare
+ * account) takes longer than that. */
+export const ACCOUNT_ALERT_THRESHOLD_BYTES = Math.floor(D1_MAX_ACCOUNT_BYTES * 0.8)
+
+/** THE ACCOUNT'S OWN ROW in `db_alerts` and `db_growth`, so the estate-wide
+ * ceiling is watched by the mechanism that already exists rather than by a second
+ * one built beside it.
+ *
+ * Both tables key on a database id, and this is deliberately not one: a D1 uuid is
+ * 36 hex-and-dashes, so a colon cannot collide with a real database however the
+ * account grows. What it buys is everything those tables already do — the
+ * open-alert suppression that stops a standing problem mailing every night, the
+ * current/previous shift that makes `daysUntilFull` answerable, and the admin
+ * read's shortlist — for one sentinel row instead of a migration and a second
+ * cron. "A column, not a table" (CLAUDE.md), one level up. */
+export const ACCOUNT_STORAGE_ID = "account:d1-storage"
+/** What a person reads in the alarm mail and on the admin screen. It sits in the
+ * same `database_name` column as a real name, so it has to be a phrase nobody
+ * could mistake for one. */
+export const ACCOUNT_STORAGE_NAME = "ALL D1 STORAGE ON THIS CLOUDFLARE ACCOUNT"
 const COPY_BATCH = 250
 
 /** Bounded DELETEs the mover will run to empty ONE moved table in the old home.
@@ -122,8 +173,19 @@ const MOVE_CLAIM_STALE_MS = 10 * 60 * 1000
 export async function checkDatabaseSizes(
   env: Env,
   cfg: D1Rest
-): Promise<{ checked: number; alerted: string[]; capped: boolean; sampled: number }> {
-  const everything = await d1ListDatabases(cfg)
+): Promise<{
+  checked: number
+  alerted: string[]
+  capped: boolean
+  sampled: number
+  /** Every byte D1 is holding for this Cloudflare ACCOUNT — ours and the other
+   * two products' — against `D1_MAX_ACCOUNT_BYTES`. `complete` is false when the
+   * listing itself was truncated, which makes `accountBytes` a LOWER BOUND. */
+  accountBytes: number
+  ourBytes: number
+  accountComplete: boolean
+}> {
+  const { databases: everything, complete: accountComplete } = await d1ListAllDatabases(cfg)
   // OURS ONLY, AND BEFORE ANYTHING READS A SIZE. The subtraction sits here, above
   // both the growth write and the alarm loop, so neither can be given a database
   // we do not own — rather than in each of them, where a third reader added later
@@ -139,9 +201,73 @@ export async function checkDatabaseSizes(
     )
   const alerted: string[] = []
   let capped = false
+  // THE WHOLE ACCOUNT'S BYTES, measured over the UNFILTERED listing on purpose —
+  // `databases` is the set we may alarm ABOUT, `everything` is the set that fills
+  // the account's 1 TB. Summed before the growth write so the account's own trend
+  // row is recorded on the same night as everybody else's.
+  const accountBytes = everything.reduce((n, d) => n + (d.file_size ?? 0), 0)
+  const ourBytes = databases.reduce((n, d) => n + (d.file_size ?? 0), 0)
   // The trend first, because it is what turns a POSITION into a WARNING — and
   // because it must be recorded even on a night when nothing alarms.
-  const sampled = await recordGrowth(env, databases)
+  const sampled = await recordGrowth(
+    env,
+    databases,
+    // THE ACCOUNT RIDES IN THE SAME TABLE, so "how long have I got" is answerable
+    // about the ceiling that takes every tenant down at once and not only about
+    // the ones that take a single tenant down. It is not one of `databases` and
+    // must not become one, for two reasons: `ourDatabases` decides what we may
+    // NAME and this row names nobody, and it is by construction the LARGEST
+    // reading of the night — so appending it to the list would let it take a slot
+    // out of `CRON_GROWTH_CAP` and quietly narrow the estate's own trend coverage
+    // by one database, for ever.
+    { uuid: ACCOUNT_STORAGE_ID, name: ACCOUNT_STORAGE_NAME, file_size: accountBytes }
+  )
+
+  // ── THE ACCOUNT-LEVEL ALARM ───────────────────────────────────────────────
+  // Raised BEFORE the per-database loop, because it outranks every row in it: a
+  // database at 85% is one tenant's problem with a known remedy, and an account
+  // at 80% is every tenant's problem whose remedy is the opposite of that one.
+  // Same suppression rule as below (an open alert is not re-raised), so a
+  // standing account problem mails once and not nightly.
+  if (accountBytes >= ACCOUNT_ALERT_THRESHOLD_BYTES) {
+    const openAccount = await env.DB.prepare(
+      "SELECT id FROM db_alerts WHERE database_id = ? AND resolved_at IS NULL"
+    )
+      .bind(ACCOUNT_STORAGE_ID)
+      .first<{ id: string }>()
+    if (!openAccount) {
+      await env.DB.prepare(
+        `INSERT INTO db_alerts (id, database_id, database_name, size_bytes, threshold_bytes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          ulid(),
+          ACCOUNT_STORAGE_ID,
+          ACCOUNT_STORAGE_NAME,
+          accountBytes,
+          ACCOUNT_ALERT_THRESHOLD_BYTES,
+          new Date().toISOString()
+        )
+        .run()
+      console.error(
+        `D1 ACCOUNT STORAGE ALARM: ${accountBytes} of ${D1_MAX_ACCOUNT_BYTES} bytes used across the whole Cloudflare account (${ourBytes} of them ours). Running the module mover CREATES another database and makes this worse.`
+      )
+      alerted.push(ACCOUNT_STORAGE_NAME)
+    }
+  } else if (!accountComplete) {
+    // THE UNDER-COUNT, SAID OUT LOUD. A truncated listing sums to a number that is
+    // too small, so "under the threshold" may mean "under the part we could see".
+    // Recorded rather than logged, because the reassuring branch is the one nobody
+    // re-reads.
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      "cron/size-check (account storage)",
+      new Error(
+        `the database listing was truncated, so tonight's account-storage total (${accountBytes} bytes) is a LOWER BOUND and the account may be over ${ACCOUNT_ALERT_THRESHOLD_BYTES} without this alarming.`
+      )
+    )
+  }
 
   for (const db of databases) {
     if ((db.file_size ?? 0) < ALERT_THRESHOLD_BYTES) continue
@@ -178,7 +304,7 @@ export async function checkDatabaseSizes(
     )
     alerted.push(db.name)
   }
-  return { checked: databases.length, alerted, capped, sampled }
+  return { checked: databases.length, alerted, capped, sampled, accountBytes, ourBytes, accountComplete }
 }
 
 /**
@@ -265,11 +391,17 @@ export async function ourDatabases<T extends { uuid: string }>(
  * must not cost somebody the alert that a database is nearly full. */
 async function recordGrowth(
   env: Env,
-  databases: { uuid: string; name: string; file_size: number | null }[]
+  databases: { uuid: string; name: string; file_size: number | null }[],
+  /** A reading that is NOT one of the databases and is written unconditionally —
+   * today, the account's own total. Outside the cap on purpose (see the call
+   * site): it is always the largest number of the night, so inside the list it
+   * would silently cost the estate one trend slot. */
+  extra?: { uuid: string; name: string; file_size: number }
 ): Promise<number> {
   const biggest = [...databases]
     .sort((a, b) => (b.file_size ?? 0) - (a.file_size ?? 0))
     .slice(0, CRON_GROWTH_CAP)
+  if (extra) biggest.push(extra)
   const now = new Date().toISOString()
   let written = 0
   for (const db of biggest) {
@@ -291,7 +423,11 @@ async function recordGrowth(
       )
         .bind(db.uuid, db.name, db.file_size ?? 0, now)
         .run()
-      written++
+      // `sampled` is HOW MANY DATABASES got a trend reading, and the account's own
+      // row is not a database. Counting it would inflate the number the cron log
+      // prints by exactly one, for ever — the kind of drift that turns a count
+      // into a thing nobody trusts.
+      if (db.uuid !== ACCOUNT_STORAGE_ID) written++
     } catch (e) {
       // A HOLE IN ONE DATABASE'S TREND LINE. Not fatal — the alarm itself does
       // not depend on it — but `daysUntilFull` answers "no growth reading yet,
@@ -372,8 +508,27 @@ export async function alertNewAlarms(
     }>()
   const byName = new Map((trend.results ?? []).map((r) => [r.database_name, r]))
 
+  // THE ACCOUNT LINE IS NOT A DATABASE LINE, and the difference is the whole
+  // point of raising it: every other line's remedy is "run the module mover",
+  // and the mover's first step is `d1CreateDatabase` — it SPENDS the resource
+  // this one is about. A single mail carrying both sentences would tell somebody
+  // to make the worse problem worse, so the account row is lifted out of the
+  // per-database wording rather than sharing it.
+  const accountAlarmed = alerted.includes(ACCOUNT_STORAGE_NAME)
+
   const lines = alerted.map((name) => {
     const row = byName.get(name)
+    if (name === ACCOUNT_STORAGE_NAME) {
+      const days = row ? daysUntilFull(row, D1_MAX_ACCOUNT_BYTES) : null
+      const gb = row ? (row.size_bytes / (1024 * 1024 * 1024)).toFixed(0) : "?"
+      const when =
+        days === null
+          ? "no growth reading yet, or it is not growing"
+          : days < 1
+            ? "FULL WITHIN A DAY at the current rate"
+            : `about ${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} left at the current rate`
+      return `EVERY D1 DATABASE ON THIS CLOUDFLARE ACCOUNT together, ${gb} GB of 1024 GB, ${when}. This account is shared with other products, so some of those bytes are not ours and are not ours to reclaim.`
+    }
     const days = row ? daysUntilFull(row) : null
     const gb = row ? (row.size_bytes / (1024 * 1024 * 1024)).toFixed(1) : "?"
     // "Not answerable" is said in words rather than as a number, for the same
@@ -389,14 +544,26 @@ export async function alertNewAlarms(
 
   let mailed = 0
   for (const address of to) {
-    const ok = await sendBrandedEmail(env, address, `${brand.name}: a database is filling up`, {
-      heading: alerted.length === 1 ? "A database crossed 80%" : `${alerted.length} databases crossed 80%`,
-      intro: lines.join("\n"),
-      // The action, not just the fact — the same rule the console line has always
-      // followed. OPERATIONS.md § Growth watch is the runbook it points at.
-      footnote:
-        "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). If the team is also SLOW rather than just big, that is the moment to put its database on a native binding (OPERATIONS.md, the native-binding runbook) — the two fixes are independent. There is about 2 GB of headroom left above the alarm line.",
-    })
+    const ok = await sendBrandedEmail(
+      env,
+      address,
+      accountAlarmed
+        ? `${brand.name}: the Cloudflare account's D1 storage is filling up`
+        : `${brand.name}: a database is filling up`,
+      {
+        heading: accountAlarmed
+          ? "The whole account's D1 storage crossed 80%"
+          : alerted.length === 1
+            ? "A database crossed 80%"
+            : `${alerted.length} databases crossed 80%`,
+        intro: lines.join("\n"),
+        // The action, not just the fact — the same rule the console line has always
+        // followed. OPERATIONS.md § Growth watch is the runbook it points at.
+        footnote: accountAlarmed
+          ? "DO NOT RUN THE MODULE MOVER for this one. The mover's first step is creating another database, and the ceiling here is the account's TOTAL D1 storage (1 TB), so moving a module spends the very thing that is running out — and when it is gone, D1 refuses new writes and new databases across every tenant at once. The levers that actually work are archiving or deleting data (OPERATIONS.md, Growth watch), asking whether the other products sharing this account can reclaim theirs, or moving to a second Cloudflare account. Any per-database line above is a separate problem with its own, opposite remedy."
+          : "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). If the team is also SLOW rather than just big, that is the moment to put its database on a native binding (OPERATIONS.md, the native-binding runbook) — the two fixes are independent. There is about 2 GB of headroom left above the alarm line.",
+      }
+    )
     if (ok) mailed++
   }
   if (!mailed)
@@ -416,18 +583,27 @@ export async function alertNewAlarms(
  *
  * Exported for the admin read and its own test — the arithmetic lives beside the
  * rows it reads, so nobody has to re-derive it at a call site. */
-export function daysUntilFull(row: {
-  size_bytes: number
-  at: string
-  prev_size_bytes: number | null
-  prev_at: string | null
-}): number | null {
+export function daysUntilFull(
+  row: {
+    size_bytes: number
+    at: string
+    prev_size_bytes: number | null
+    prev_at: string | null
+  },
+  /** WHICH CEILING this reading is heading for. Defaults to the per-database one,
+   * because that is what every existing caller means; the account row measures
+   * against `D1_MAX_ACCOUNT_BYTES` instead. A parameter rather than a second
+   * function, so the arithmetic that says "how long have I got" exists once —
+   * and defaulted, so the ceiling is never silently the wrong one at a call site
+   * that predates the account watch. */
+  ceilingBytes: number = D1_MAX_DATABASE_BYTES
+): number | null {
   if (row.prev_size_bytes === null || row.prev_at === null) return null
   const grew = row.size_bytes - row.prev_size_bytes
   if (grew <= 0) return null
   const days = (new Date(row.at).getTime() - new Date(row.prev_at).getTime()) / 86_400_000
   if (!(days > 0)) return null
-  const headroom = D1_MAX_DATABASE_BYTES - row.size_bytes
+  const headroom = ceilingBytes - row.size_bytes
   return Math.max(0, headroom / (grew / days))
 }
 
@@ -551,6 +727,59 @@ async function saveMove(
     .bind(...params, id)
     .run()
 }
+
+/** IS THE MERGED READ PATH ACTUALLY WIRED TO THE APP? — the question the mover
+ * never asked, and the reason it must refuse to run.
+ *
+ * ── WHAT THE MOVER DOES, AND WHAT THE APP DOES ──────────────────────────────
+ *
+ * The mover copies a module's tables into a dedicated database, verifies the
+ * counts, writes the routing row into `team_module_databases`, and then DRAINS
+ * the old home — on the stated understanding that "routing has already flipped:
+ * `resolveModuleDatabases` now returns both databases and every read is a MERGED
+ * read over them" (its own comment, at the drain step).
+ *
+ * It does not. `requireMember` resolves `guard.databaseId` from `teams.database_id`
+ * and consults `team_module_databases` nowhere; every module lib reads that one
+ * id. `resolveModuleDatabases` and `queryModule` have no callers outside this
+ * file. So the drain empties the database the app is still reading, the mover
+ * reports `status: "done"`, the rows are intact in a database nothing queries,
+ * and every screen, count, export, agent answer and MCP tool for that module
+ * shows zero. On BOTH front doors, for every member of that team.
+ *
+ * Three documents stated the merged read as present fact (ARCHITECTURE.md,
+ * BASE-MANUAL.md, and the mover's own comments); one test already knew better
+ * and framed it as a tripwire for the future rather than as the relief valve
+ * being unusable now. This is the correction, in the one form that cannot rot:
+ * a REFUSAL, and a check that derives the flag's value from whether the read
+ * path has production callers (`workers/tenancy/test/merged-read-guard.test.ts`).
+ * Wire the reads and the census flips the flag; flip the flag without wiring the
+ * reads and the build goes red.
+ *
+ * THE REFUSAL LIVES AT THE DOOR (`routes/admin.ts`, `moveModule`), not here, and
+ * that is not laziness: the mechanics below — the resumable copy, the claim, the
+ * OR IGNORE batches, the verify, the bounded drain — are correct and are covered
+ * by `mover-resume.test.ts`, and locking the function would make the only proof
+ * that they work unrunnable. What is broken is the app's half of the bargain, so
+ * the refusal sits where the app is asked to perform it. The door is the mover's
+ * ONLY caller, and a census in the guard test asserts that it stays so.
+ *
+ * ── WHY THE HONEST ANSWER IS "REFUSE", NOT "WIRE IT QUICKLY" ────────────────
+ *
+ * Because the wiring is not the whole job. `d1QueryAcross` deliberately REFUSES
+ * `LIMIT`, `ORDER BY` and `COUNT` once more than one database is involved — a
+ * concatenation cannot answer them — and every collection read in this app is
+ * paged (R14), sorted at the door, and counted exactly (R16), usually all three.
+ * So a merged read that "works" would throw on the first list request after a
+ * move. Cross-shard paging is a cursor that encodes a position per shard, a
+ * merged sort and a summed count: an architecture decision with an owner's name
+ * on it, not a patch. Until that decision is taken, the relief valve is a
+ * foot-gun and the safe state is a locked one. */
+// Annotated `boolean` rather than left to infer `false`: an inferred literal
+// makes the door's refusal a constant condition and the code after it
+// unreachable to TypeScript, which is a lie about a branch that is meant to come
+// back.
+export const SPLIT_READS_WIRED: boolean = false
 
 /**
  * MOVE A MODULE'S TABLES INTO A DATABASE OF THEIR OWN — resumably.
@@ -781,9 +1010,15 @@ export async function moveModuleToOwnDatabase(
   await saveMove(env, move.id, { status: "routed" })
 
   // THE OLD HOME IS EMPTIED IN BOUNDED BITES, and it MUST empty, because routing
-  // has already flipped: `resolveModuleDatabases` now returns both databases and
-  // every read is a MERGED read over them. A row left behind here is a row
-  // returned twice — a doubled list, a doubled count, doubled money.
+  // has already flipped — WHEN THE READ PATH IS WIRED. This comment used to state
+  // that as present fact ("`resolveModuleDatabases` now returns both databases and
+  // every read is a MERGED read over them"), and it was the sentence that made the
+  // whole mover unsafe: nothing consults `team_module_databases`, so this step
+  // empties the database the app is still querying. The door refuses the mover for
+  // exactly that reason (`SPLIT_READS_WIRED`), which is why this code is reachable
+  // only from its own tests today. Once the reads ARE merged, the sentence below is
+  // true again and a row left behind here is a row returned twice — a doubled
+  // list, a doubled count, doubled money.
   //
   // `DELETE FROM <table>;` was one statement over a table this function only runs
   // on when it has grown too big for its database. D1 refuses a statement past 30

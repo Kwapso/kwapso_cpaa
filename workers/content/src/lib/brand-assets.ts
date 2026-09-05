@@ -10,6 +10,7 @@
 // library is curated, not accumulated — see the note in marketing.ts).
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -147,7 +148,7 @@ export async function updateBrandAsset(
   actor: Actor,
   id: string,
   input: BrandAssetInput
-): Promise<void> {
+): Promise<{ supersededUrls: (string | null)[] }> {
   const before = await assetOrThrow(cfg, guard, id)
   const v = await clean(cfg, guard, actor, input)
   const now = new Date().toISOString()
@@ -169,6 +170,14 @@ export async function updateBrandAsset(
     relatedTable: "brand_assets",
     relatedRowId: id,
   })
+  // THE OTHER HALF OF THE SENTENCE `setBrandAssetActive` ALREADY WROTE, six lines
+  // down: "an edit SUPERSEDES a file (nothing points at it, so it is garbage),
+  // while retiring a row is a reversible decision about a row that survives on
+  // purpose." The archive half was reasoned and honoured; the edit half was
+  // reasoned and then not done, so every replaced logo, font and template stayed
+  // in R2 for ever — and a brand file is one of the largest things this app
+  // stores. The reclaim runs at the DOOR, where the key was minted.
+  return { supersededUrls: [supersededMedia(before.file_url, v.fileUrl)] }
 }
 
 /** Archive or restore an asset. R17: the predicate rides the UPDATE.

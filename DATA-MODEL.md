@@ -348,6 +348,34 @@ repeatable core write now carries a per-caller ceiling that rides its INSERT
 watches **every** database in the account, core included, it used to filter
 `team-*`, so `kwapso-core` could never raise one.
 
+### Where a tenant's FILES live — the object-key prefixes
+
+R2 has no folders; a prefix is whatever the keys happen to start with. So "find,
+count, move or delete one tenant's objects" is answered by the SET of prefixes its
+uploads are minted under, and that set is pinned with a reason each in
+`workers/content/test/media-keys.test.ts` (`PREFIXES`), derived off the doors' own
+`mediaKey(...)` calls and failing both ways — a shape nobody described, and a
+described shape nothing mints.
+
+Three conventions are live at once and a key cannot be renamed once written, so
+the set is documented rather than unified: kind-first (`ticket/<team>/`,
+`story/<team>/`, `todo/<team>/`, from before the team-first convention),
+team-first (`<team>/accounts/`, `<team>/apps/`, `<team>/tasks/`,
+`<team>/knowledge/`, `<team>/brand/`, `<team>/staff/`, `<team>/deliverables/`),
+and two that are keyed by the thing they belong to rather than by a team
+(`teams/<team>/` for the team's own logo, `users/<user>/` for a profile photo —
+the one shape with no team in it at all, because a photo follows a person between
+teams).
+
+Four of the team-first segments were added on 5 Sep 2026. Those modules shared a
+bare `<team>/` prefix into one bucket, which meant an ownership proof could say
+"this team's" and never "this module's" — enough for a read, not enough for a
+delete. Objects already written under the bare shape stay where they are and are
+never reclaimed.
+
+There is no tenant-DELETE path today (deactivate, never delete), so this is
+latent — it becomes real the first time a client asks for erasure.
+
 ### team_module_databases + team_module_moves. KEEP (BUILT: routing `db/core/0004`, the resumable ledger `db/core/0023`). WHERE A MODULE LIVES, AND HOW IT GETS THERE
 *(Sections added 26 Aug 2026 — both tables predate them, and "the canonical
 data-model reference" was carrying two core tables it never named.)*
@@ -356,10 +384,33 @@ data-model reference" was carrying two core tables it never named.)*
 team's data lives in its one database (`teams.database_id`), and when a module gets
 heavy the mover relocates that module's tables to a dedicated database and records
 it here — `team_id`, `module`, `database_id`, `created_at`, `UNIQUE (team_id,
-module)`. The data door consults this table to know where a (team, module) lives,
-which is why the mover flips it LAST: no row, no re-routing, no doubled read.
+module)`. The mover flips it LAST, so an interrupted move is never a doubled read.
+
+**IT IS WRITTEN AND NOT YET READ (measured 5 Sep 2026).** No data door consults
+this table: `requireMember` resolves one `guard.databaseId` from
+`teams.database_id`, and `resolveModuleDatabases`/`queryModule` — the merged-read
+entry points — have no callers outside `workers/tenancy/src/lib/sharding.ts`. So
+the mover is refused at its own door (`SPLIT_READS_WIRED`) rather than left able to
+empty a module out of the app while reporting success. ARCHITECTURE §7 and
+BASE-MANUAL §"What's built today" carry the full argument, including why wiring the
+reads is not the whole job (a merged read cannot page, sort or count).
 `0004` also creates `db_alerts`, the 80%-of-10-GB size alarms `db_growth` above
 turns into a rate.
+
+**AND ONE ROW IN EACH IS NOT A DATABASE (5 Sep 2026).** D1 caps TOTAL storage per
+ACCOUNT at 1 TB, and nothing watched that: about 120 databases at 8.5 GB each are
+over the ceiling while every single per-database alarm reads a comfortable no, and
+the named remedy for those alarms — run the module mover — CREATES another
+database and spends the very thing that has run out. So the nightly check sums the
+whole account listing and writes it to both tables under the sentinel id
+`account:d1-storage` (`ACCOUNT_STORAGE_ID`), named
+`ALL D1 STORAGE ON THIS CLOUDFLARE ACCOUNT` for a human reading the row. A D1 uuid
+is 36 hex-and-dashes, so a colon cannot collide with one. The sum covers the
+WHOLE listing including the other two products sharing this account — counted,
+never named — because the 1 TB is charged to the account and not to the app; our
+own share rides back beside it as `ourBytes`. A reader of `db_growth` must measure
+that row against `D1_MAX_ACCOUNT_BYTES` and not the 10 GB per-database cap, which
+is what `daysUntilFull`'s `ceilingBytes` parameter exists for.
 
 **`team_module_moves`** (`0023_module_moves`) is what makes a killed move a
 CONTINUATION rather than an orphaned second database (ARCHITECTURE §7 marks the

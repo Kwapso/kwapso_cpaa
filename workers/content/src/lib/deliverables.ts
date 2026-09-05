@@ -27,6 +27,7 @@
 // and its exact total beside it, and there is no cursor to spend.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -263,7 +264,7 @@ export async function updateDeliverable(
   id: string,
   appId: string,
   input: DeliverableInput
-): Promise<WroteDeliverable> {
+): Promise<WroteDeliverable & { supersededUrls: (string | null)[] }> {
   const before = await deliverableOrThrow(cfg, guard, id, appId)
   const v = await clean(cfg, guard, actor, input)
   const now = new Date().toISOString()
@@ -285,7 +286,18 @@ export async function updateDeliverable(
     relatedTable: "deliverables",
     relatedRowId: id,
   })
-  return { accountId: before.account_id }
+  // BOTH COLUMNS, because a deliverable carries two references and the update
+  // statement rewrites them together — the only row in the base where one edit
+  // can abandon two objects at once. Archiving still reclaims nothing (see
+  // setDeliverableActive below); superseding is the case where nothing points at
+  // the bytes any more, which is a different sentence.
+  return {
+    accountId: before.account_id,
+    supersededUrls: [
+      supersededMedia(before.url, v.url),
+      supersededMedia(before.image_url, v.imageUrl),
+    ],
+  }
 }
 
 /** Archive or restore. R17: the current-status predicate rides the UPDATE, so a

@@ -34,10 +34,29 @@ if (!KEY) {
 
 // DERIVED FROM THE NAV, not hand-listed: every sidebar destination the app
 // offers. A page added to the rail tomorrow is walked tomorrow.
-const { TEAM_SECTIONS } = await import("../web/lib/pages.ts").catch(() => ({ TEAM_SECTIONS: null }))
-const SEGMENTS = TEAM_SECTIONS
-  ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => s.segment)
-  : ["accounts", "knowledge", "tickets", "stories", "tasks", "time", "meetings", "apps", "waves", "sprints"]
+//
+// AND IT REFUSES RATHER THAN FALLING BACK. This used to end
+// `.catch(() => ({ TEAM_SECTIONS: null }))` with a hand-typed array of ten
+// segments behind it, which made the comment above true only on the happy path:
+// `pages.ts` declares twelve sidebar placements, the fallback listed ten, and
+// `processes` and `contacts` were missing from it. A `.mjs` importing a `.ts`
+// leans on Node's type stripping, so the day that stops working — a Node
+// upgrade, a syntax the stripper does not know, a moved file — this smoke walks
+// a SHORTER list and still reports PASS. A gate that narrows its own coverage
+// and calls it success is worse than no gate: nothing to notice, and a green
+// tick over the pages it stopped visiting.
+let TEAM_SECTIONS
+try {
+  ;({ TEAM_SECTIONS } = await import("../web/lib/pages.ts"))
+} catch (err) {
+  console.log(`FAIL could not read web/lib/pages.ts, so the walk list cannot be derived: ${err.message}`)
+  process.exit(1)
+}
+const SEGMENTS = TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => s.segment)
+if (!SEGMENTS.length) {
+  console.log("FAIL web/lib/pages.ts declares no sidebar sections — the walk would visit nothing and pass")
+  process.exit(1)
+}
 
 async function signIn(email) {
   const s = await fetch(`${API}/api/auth/admin/test-login`, {

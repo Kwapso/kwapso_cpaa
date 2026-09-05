@@ -17,6 +17,8 @@
 
 import type { Fetcher } from "@cloudflare/workers-types"
 
+import { logError, type CoreDb } from "./error-log"
+
 /** HOW MANY OBJECTS ONE TEAM'S CHANNEL IS SPREAD ACROSS.
  *
  * A Durable Object is single-threaded and a broadcast is a serial loop over its
@@ -46,6 +48,28 @@ import type { Fetcher } from "@cloudflare/workers-types"
  * (an idle object is evicted). Raising it is a one-line change; the number is here
  * rather than inline so the client and the fan-out can never disagree about it. */
 export const REALTIME_SHARDS = 4
+
+/** HOW MANY SOCKETS ONE SHARD MAY HOLD BEFORE SOMEBODY IS TOLD.
+ *
+ * The paragraph above states a ceiling — four shards take a team from ~3–5k
+ * concurrent listeners to ~12–20k — and then says the yardstick's 25,000 is
+ * cleared "only once combined with subscription scoping". Both halves were
+ * comments. Nothing measured a real team's listener count, nothing measured what
+ * scoping actually removes from a broadcast, and nothing would have said a word
+ * as a team approached the number: the first symptom of crossing it is every
+ * publish on that team queueing behind a serial loop, which reads as "the app
+ * feels slow" and points at nothing.
+ *
+ * 3,000 is the LOW end of one object's own range, deliberately — the point of a
+ * watch is to fire while there is still time to raise `REALTIME_SHARDS`, and
+ * raising it re-shards every listener (`shardFor` is a modulo of the count), so
+ * it wants a maintenance window rather than an emergency.
+ *
+ * The row it writes carries the two numbers nobody has: how many sockets that
+ * shard is holding, and how many of them the ping was actually sent to. The
+ * second is the measurement of subscription scoping — the thing the ceiling
+ * arithmetic depends on and that has never been observed on a real tenant. */
+export const REALTIME_SHARD_WATCH_SOCKETS = 3_000
 
 /** WHICH shard a listener joins — stable per person, so their own devices land
  * together and a reconnect returns to the same object.
@@ -112,7 +136,24 @@ export type ShardInterest = { resources: string[]; all: boolean; at: number }
  * worker checks. Taking the whole env (rather than just the binding) is what
  * lets the key travel with the call — a publisher that forgets it is a type
  * error here instead of a silent 403 at runtime. */
-export type RealtimeEnv = { REALTIME: Fetcher; INTERNAL_KEY?: string }
+export type RealtimeEnv = {
+  REALTIME: Fetcher
+  INTERNAL_KEY?: string
+  /** THE CORE DATABASE, so a swallowed failure leaves a row and not just a line.
+   *
+   * OPTIONAL, and that is the whole design. There are 175 `publishChange` call
+   * sites; a required argument would be 175 chances to write it differently, and
+   * an optional PARAMETER would be 175 chances to forget it. Every worker's `env`
+   * already carries `DB`, and every one of those calls already passes `env` — so
+   * widening the TYPE gives all of them a durable record without a single call
+   * site changing, which is the same reasoning `REALTIME_SHARDS` uses one screen
+   * up for why the fan-out is not written at the publisher.
+   *
+   * `?` rather than required because the two GATEWAYS bind no database and the
+   * web workspaces compile this file. Where it is absent the behaviour is exactly
+   * what it always was. */
+  DB?: CoreDb
+}
 
 /** One change ping. `op` is advisory; the client re-pulls the row and decides
  * whether it still belongs in the collection (keep-or-drop), so "edit" vs
@@ -158,10 +199,46 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
   } as unknown as Parameters<typeof env.REALTIME.fetch>[1]
 
   try {
-    await env.REALTIME.fetch("https://realtime/publish", init)
+    const res = await env.REALTIME.fetch("https://realtime/publish", init)
+    // A NON-OK ANSWER WAS THE HALF NOBODY SAW. The catch below only ever fired on
+    // a thrown fetch — a 403 from a wrong internal key, or a 500 from the
+    // switchboard, came back as a resolved Response and was dropped on the floor
+    // without so much as a console line. Every screen on that team then went
+    // quietly out of date, which is the single failure the live layer exists to
+    // prevent, arriving silently.
+    if (!res.ok) await note(env, channel, event, `the live layer answered ${res.status}`)
   } catch (e) {
-    console.error("realtime publish failed:", e)
+    await note(env, channel, event, e instanceof Error ? e.message : String(e))
   }
+}
+
+/** RECORD THE PING THAT DID NOT GO OUT.
+ *
+ * This hop is best-effort BY DESIGN — the write it describes has already
+ * committed, the client is cache-first, and a live-layer hiccup must never fail
+ * the action. None of that is an argument for being unable to answer "was the
+ * live layer down last Tuesday, and for whom?", and until this landed neither
+ * surface could: `error_logs` had no row, and the console line carried no team,
+ * no resource and no id to group by, so the two best-effort hops in the whole
+ * system were the two with no durable record. R12's principle ("unattended work
+ * records its failures") applied to crons and not to the places that fail
+ * silently on purpose.
+ *
+ * Still swallowed, still never thrown: `logError` cannot throw (its own contract)
+ * and carries an hourly ceiling per bucket, so a live layer that is down for an
+ * hour writes a bounded number of rows and not one per mutation. */
+async function note(env: RealtimeEnv, channel: string, event: ChangeEvent, why: string): Promise<void> {
+  const what = `${channel} ${event.resource}${event.id ? `/${event.id}` : ""}${event.op ? ` (${event.op})` : ""}`
+  console.error("realtime publish failed:", what, why)
+  if (env.DB)
+    await logError(env.DB, {
+      source: "realtime-publish",
+      place: what,
+      message: `a change ping was not delivered, so every open screen on this channel is showing yesterday until it remounts: ${why}`,
+      // The CHANNEL carries the team, so "whose screens went stale" is answerable
+      // from the row rather than from the message text.
+      teamId: channel.startsWith("team:") ? channel.slice("team:".length) : undefined,
+    })
 }
 
 /** Tell a TEAM's channel that one row in `resource` changed. `scope` is the

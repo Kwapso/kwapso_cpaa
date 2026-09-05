@@ -168,28 +168,46 @@ resolves.
 
 ### When the restore was last tested
 
-> **STALE — the rehearsal is 8 migrations behind the schema. Do not read the
-> line below as "the current core schema round-trips".**
+> **EVERY BUILD, AND AGAINST EVERY MIGRATION ON DISK.** The rehearsal is no
+> longer a date somebody has to keep current — it is
+> `workers/auth/test/restore-rehearsal.test.ts`, and it runs in `npm run check`.
 >
-> **2026-08-14, rehearsed, partially.** The 20 core migrations that existed
-> *then* (`0001`–`0020`) were replayed into a scratch SQLite database, filled
-> with rows, dumped, and reloaded into an empty database. Verified: 18 tables,
-> 44 indexes and every row survived the round trip, byte-identical values
-> included. **What this did NOT test:** the `wrangler d1 export` / `--remote`
-> half against live Cloudflare, and Time Travel. Those need a real environment
-> and are the next rehearsal.
+> **What it does, on every run:** replays every file in `db/core/` in order into
+> a scratch SQLite database (D1 *is* SQLite), fills every table with a row typed
+> off that table's own `PRAGMA table_info`, dumps schema + data in the shape
+> `wrangler d1 export` produces, reloads it into an EMPTY database, and compares
+> both sides as the databases describe themselves — `sqlite_master` for the
+> schema, row-for-row for the values.
 >
-> **`db/core/` now holds 28.** `0021`–`0028` landed after that date —
-> `0021_retention_scan_indexes`, `0022_db_growth`, `0023_module_moves`,
-> `0024_user_language`, `0025_team_legal`, `0026_user_scale`,
-> `0027_usage_tokens`, `0028_user_spine` — several of them adding tables or
-> columns. **Nothing in that range has been round-tripped.** Re-run the
-> rehearsal, then replace this whole block with the new date and the new figures.
+> **Measured 2026-09-05, at 28 migrations: 20 tables, 25 named indexes (51
+> including the ones a UNIQUE constraint creates), every row byte-identical
+> after the round trip.** The 2026-08-14 figures — 20 migrations, 18 tables, 44
+> indexes — were a hand-run of the same procedure; the index counts differ
+> because that one counted auto-indexes too.
+>
+> **The four things it would catch:** a migration that will not apply to an empty
+> database (a restore starts from nothing); a schema a dump cannot reload; an
+> index lost in the round trip (the half a naive dumper forgets, and invisible
+> until a query that needed it runs on a full table); and a value that comes back
+> changed. It carries its own canary — a dump that wrote no INSERTs at all would
+> satisfy every equality in it, so the number of rows compared is asserted too.
+>
+> **What it still does NOT test:** `wrangler d1 export --remote` against live
+> Cloudflare, and Time Travel. Both need a real environment and stay a manual
+> rehearsal — run one against staging when you can, and record the date HERE
+> rather than in a commit message. That half, and only that half, can still go
+> stale.
 
-**An untested restore is not a restore.** Re-run the rehearsal against staging
-after any migration that changes a table's shape, and update the date above.
+**An untested restore is not a restore**, and until 2026-09-05 that rule was
+enforced by nobody — which is how the recorded rehearsal came to be eight
+migrations behind the schema it was reassuring people about. It is enforced now,
+for the local half: the suite reads `db/core/` at the moment it runs, so
+"20 of 28" cannot happen again, and a migration that breaks the round trip turns
+the build red on the commit that adds it rather than on the day somebody needs a
+restore.
 
-**And that rule is enforced by nobody, which is how it came to be broken eight
-times.** Until it has a check, the honest thing is the stale banner above: the
-count is derivable with `ls db/core/*.sql | wc -l`, so whoever next reads this
-can tell in one command whether the rehearsal still covers the schema.
+The REMOTE half is still a manual rehearsal, and it is still the half that runs
+on the bad day. When you next have a staging window: export a database with
+`wrangler d1 export --remote`, create a scratch database, load the dump into it,
+and restore a Time Travel bookmark on a third — then write the date and the
+figures into the block above.

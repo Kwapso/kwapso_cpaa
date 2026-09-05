@@ -595,14 +595,29 @@ out, not the day writes fail. When an alarm fires, this is the path, in order:
    consumer of the app never sees it.
 
 **What's built today vs what's a documented path:** the alarm cron, `db_alerts`,
-`d1QueryAcross`, ULID time-ordering, the single-door discipline AND stage 1 itself
-are BUILT and tested: `POST /api/tenancy/admin/move-module` (x-admin-key; table and
-module names validated as strict SQL identifiers at the boundary) copies a module's
-tables to a fresh database, verifies row counts BEFORE touching the source, records
-the routing override in `team_module_databases`, empties the old home, and resolves
-the alarm; `databaseIdsFor(teamId, module)` then answers override-first + main so
-merged reads see both homes. Only the stage-2 same-table cutover script stays a
-documented path until a single module outgrows a whole database (Prime Directive 1).
+`db_growth`, `d1QueryAcross`, ULID time-ordering and the single-door discipline are
+BUILT, tested and running. Stage 1 — the mover — is built and **switched off at its
+door** (`SPLIT_READS_WIRED`, `workers/tenancy/src/lib/sharding.ts`).
+
+This paragraph used to end "`databaseIdsFor(teamId, module)` then answers
+override-first + main so merged reads see both homes", and that sentence was the
+gap. Nothing in the app asks that question: `requireMember` resolves one
+`guard.databaseId` out of `teams.database_id`, every module lib reads it, and
+`resolveModuleDatabases`/`queryModule` have no callers outside the sharding lib. So
+the mover would copy a module's tables to a fresh database, verify the counts, flip
+the routing row, empty the old home — and every ticket screen, count, export, agent
+answer and MCP tool for that module would then read the database it had just
+emptied, on both front doors, while the door answered `status: "done"` and resolved
+the size alarm.
+
+Two things have to land before the valve opens, and the second is the larger:
+(1) the read path has to consult `team_module_databases`, and (2) a merged read has
+to be able to PAGE, SORT and COUNT — `d1QueryAcross` deliberately refuses all three
+across more than one database, because a concatenation cannot answer them, and
+every collection in this base does all three (R14, R16). That is a cross-shard
+cursor, a merged sort and a summed count: an architecture decision, not a patch.
+Until it is taken, a full team database is relieved by archiving or by moving the
+TEAM, and stage 2's same-table cutover stays a documented path (Prime Directive 1).
 
 **Organizing many apps in Cloudflare:** Cloudflare has no folders. The base's
 convention is (a) a name prefix per product, every worker, database and bucket

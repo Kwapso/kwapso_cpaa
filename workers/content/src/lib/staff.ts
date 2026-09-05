@@ -20,6 +20,7 @@
 // bad at" is the clearest possible case of the agency's own material.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -118,7 +119,7 @@ export async function saveStaffProfile(
   guard: MemberGuard,
   actor: Actor,
   input: StaffProfileInput
-): Promise<{ id: string; created: boolean }> {
+): Promise<{ id: string; created: boolean; supersededUrls: (string | null)[] }> {
   const userId = requireText(input.userId, "Member", TEXT_LIMITS.short)
   const v = {
     headline: optionalText(input.headline, "Headline", TEXT_LIMITS.short) ?? null,
@@ -175,7 +176,10 @@ ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
     relatedTable: "staff_profiles",
     relatedRowId: id,
   })
-  return { id, created: !before }
+  // The photo an upsert has just overwritten IN PLACE — the shape `updateProfile`
+  // and `updateTeam` already reclaim, arriving late on a third column. `before` is
+  // null on a create, and `supersededMedia` answers null for that too.
+  return { id, created: !before, supersededUrls: [supersededMedia(before?.photo_url, v.photoUrl)] }
 }
 
 /** Deactivate or activate a profile. R17: the predicate rides the UPDATE.
@@ -348,7 +352,7 @@ export async function updateStaffCertificate(
   actor: Actor,
   id: string,
   input: StaffCertificateInput
-): Promise<void> {
+): Promise<{ supersededUrls: (string | null)[] }> {
   const before = await certOrThrow(cfg, guard, id)
   const v = cleanCert(input)
   const now = new Date().toISOString()
@@ -370,6 +374,7 @@ export async function updateStaffCertificate(
     relatedTable: "staff_certificates",
     relatedRowId: id,
   })
+  return { supersededUrls: [supersededMedia(before.file_url, v.fileUrl)] }
 }
 
 /** Archive or restore a certificate. R17: the predicate rides the UPDATE. */

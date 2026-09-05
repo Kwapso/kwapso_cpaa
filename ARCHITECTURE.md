@@ -133,12 +133,25 @@ sequenceDiagram
   For which tier any given table lives in, read DATA-MODEL.md; a second
   step-by-step list here is exactly what §2 of this file already apologises for.
   The count on disk is derivable: `grep -h "CREATE TABLE" db/core/*.sql`.
-- **Sharding machinery: BUILT (2026-06-12)** per the locked build-everything
-  call: a nightly cron sizes every team database and alarms at 80% of D1's
-  10GB cap (`db_alerts`); the **mover** relocates a heavy module to its own
-  database (`team_module_databases` routing); reads merge across locations
-  via `d1QueryAcross` + `resolveModuleDatabases`, the splitter read-path
-  modules will use. Maintenance via x-admin-key endpoints.
+- **Sharding machinery: PART-BUILT (2026-06-12), and the mover is LOCKED
+  (2026-09-05).** A nightly cron sizes every database on the account and alarms
+  at 80% of D1's 10 GB per-database cap AND at 80% of its 1 TB per-ACCOUNT cap
+  (`db_alerts`, `db_growth`) — built, running, and the part to rely on. The
+  **mover** relocates a heavy module's tables to its own database
+  (`team_module_databases` routing) and its mechanics are correct and tested,
+  but **its door refuses to run it** (`SPLIT_READS_WIRED` in
+  `workers/tenancy/src/lib/sharding.ts`). This line used to say "reads merge
+  across locations via `d1QueryAcross` + `resolveModuleDatabases`" as present
+  fact. They do not: `requireMember` resolves ONE `guard.databaseId` from
+  `teams.database_id`, nothing consults `team_module_databases`, and those two
+  functions have no callers outside the sharding lib — so the mover's drain would
+  empty the database the app is still reading and report success. And wiring them
+  is not the whole job: `d1QueryAcross` refuses `LIMIT`, `ORDER BY` and `COUNT`
+  across more than one database (a concatenation cannot answer them), while every
+  collection here pages (R14), sorts and counts exactly (R16). Cross-shard paging
+  is an owner-level decision, not a patch. The refusal and the flag are held
+  together by a census in `workers/tenancy/test/merged-read-guard.test.ts`.
+  Maintenance via x-admin-key endpoints.
 - Every row: globally-unique, team-stamped IDs (rows can move homes without
   collisions). Every worker reads/writes through ONE data-access layer.
 
