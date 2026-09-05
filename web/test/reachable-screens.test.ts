@@ -34,8 +34,50 @@
 //      the two doors had no caller anywhere in the front end. Nothing was
 //      broken — the tests passed, the machine surface worked, and the
 //      capability did not exist for the people the app is for. So every
-//      non-GET route on the two workers the agency app talks to must be CALLED
-//      from web/ or web-portal/, or be a named line saying who it is for.
+//      non-GET route on the three workers the agency app talks to must be
+//      CALLED from web/ or web-portal/, or be a named line saying who it is
+//      for.
+//
+//      THREE SINCE 5 SEP 2026, and the third one paid for itself immediately.
+//      data-ops was outside this law until a tidiness review asked why; adding
+//      it turned the build red on `POST /api/data-ops/agent/chat` and
+//      `/agent/confirm` — the two most-pressed write doors in the product,
+//      reported as having no control at all. Neither was a gap. `streamSse`
+//      holds its own `method: "POST"`, so the matcher could not see the verb
+//      (the third helper to hide it from this check, after `post()` and
+//      `sendFile`), and the Send button's actual call lives in
+//      `web/lib/use-agent-chat.tsx`, one directory outside the screen walk. A
+//      law that has never been pointed at a module is not a law that module
+//      passes.
+//
+//      auth, mcp and realtime are still outside it, and not by choice: they
+//      answer from a `switch` rather than an `export const ROUTES` table, and
+//      every seam scan in this repo finds its subject by parsing that table.
+//
+// WHAT THE THIRD INVARIANT DOES NOT REACH, said plainly, because a law that
+// overstates its cover is worse than one that admits a gap. It skips GET —
+// "a read is pressed by opening the screen" — and that is right for the reads a
+// screen makes, and wrong for a read that no screen makes. FOUR SUCH DOORS ARE
+// KNOWN, all on the content worker's Google lane and all found by a dead-end
+// review on 5 Sep 2026: `GET /api/content/google/drive/file`,
+// `/gmail/message`, `/calendar/event/transcript` and `/chat/spaces`. Each is
+// gated, tested and documented; none is called by either front door and none is
+// exposed as an MCP tool. Their PLURAL siblings (`/drive/files`,
+// `/gmail/messages`) are wired to web/lib/api/content.ts, which is exactly why
+// the gap is invisible — the lane looks finished. The only caller is
+// `scripts/google-sweep.mjs`, a hand-run probe, and scripts/README.md now says
+// so beside it.
+//
+// They are NOT listed in NO_CONTROL: that register is consulted only for
+// non-GET doors, so a line there would be reported stale by the ratchet below
+// on the very next run. Closing this properly means either widening the census
+// to reads — which needs a matcher that can tell a read caller from a write
+// one, since the present `WRITES` test is write-shaped on purpose, and an
+// adjudication of roughly thirty more GET doors on content and tenancy that no
+// api method appears to name — or giving the four doors MCP tools, which is
+// where R43 would put them. Both are a piece of work rather than a line, and
+// naming them here is what stops the next reader concluding the census already
+// covers them.
 
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -217,11 +259,18 @@ describe("the screens are reachable", () => {
      * it holds the `method: "POST"` itself, so the CALLER's body carries the path
      * and no write marker, and all four streamed doors read as unpressed while
      * being wired to real file pickers. A helper that hides the verb is exactly the
-     * shape this matcher has been wrong about twice.
+     * shape this matcher has been wrong about twice — and `streamSse` is the
+     * THIRD, found on 5 Sep 2026 the moment data-ops came into this census.
+     * It holds `method: "POST"` inside web/lib/api/stream.ts exactly as
+     * `sendFile` does, so the assistant's own two doors — `agent/chat` and
+     * `agent/confirm`, the most-pressed write doors in the product — read as
+     * having no control at all. A helper that hides the verb is not an
+     * accident this matcher will stop meeting; it is what an api layer does
+     * when a call needs more than `fetch` and a body.
      *
      * Between them these two holes hid BOTH rate cards' create doors — delete the
      * "New rate" button and this check said fine. */
-    const WRITES = /\bpost\(|\bsendFile[<(]|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
+    const WRITES = /\bpost\(|\bsendFile[<(]|\bstreamSse\(|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
     /** Does this function body call THIS door — the whole path, and as a write?
      * Two holes lived here. A path was matched as a PREFIX, so
      * `/api/content/knowledge/sync-google` counted as a call to
@@ -259,12 +308,24 @@ describe("the screens are reachable", () => {
       // `activity.addNote`, which is this file's own `tenancy.addNote(` call —
       // a control passed by REFERENCE (`onAddNote={... ? activity.addNote :
       // undefined}`) presses the door exactly as a named dispatch does.
-      read(join(WEB, "lib", "use-record-activity.ts"))
+      read(join(WEB, "lib", "use-record-activity.ts")) +
+      // And the assistant's own state machine, extracted from agent-panel.tsx so
+      // the panel stays a render shell (its own header says so). The Send button
+      // is in the panel; the call is here. Added 5 Sep 2026 with data-ops, for
+      // the same reason as the two above: a screen's write layer living one
+      // directory over is still that screen's button.
+      read(join(WEB, "lib", "use-agent-chat.tsx"))
     expect(screens.length, "the screen scan read nothing — it has gone blind").toBeGreaterThan(10000)
 
     const unpressed: string[] = []
     let doors = 0
-    for (const worker of ["content", "tenancy"]) {
+    // THREE WORKERS SINCE 5 SEP 2026, not two. data-ops was outside the law
+    // entirely, so a write door could ship there with no button, no menu item
+    // and no line below it, in a green build — the exact shape the header's
+    // third invariant was written for. It is in now because it has a ROUTES
+    // table to read; auth and mcp answer from a `switch` and cannot be walked
+    // by any seam scan in this repo until they gain one.
+    for (const worker of ["content", "tenancy", "data-ops"]) {
       const index = read(join(ROOT, "workers", worker, "src", "index.ts"))
       const table = /export const ROUTES[^=]*=\s*\{([\s\S]*?)\n\}/.exec(index)
       expect(table, `workers/${worker} has no ROUTES table — did it move?`).toBeTruthy()
@@ -276,7 +337,7 @@ describe("the screens are reachable", () => {
         // there is no screen they could have and no person to give a button to.
         // They are run from scripts with the owner's key — a different kind of
         // caller, not a missing control.
-        if (path.startsWith("/api/tenancy/admin/")) continue
+        if (/^\/api\/[a-z-]+\/admin\//.test(path)) continue
         doors++
         // Which api method posts to this door, and is that method called from a
         // screen? Either hop missing is the same failure with two faces: no
@@ -296,7 +357,10 @@ describe("the screens are reachable", () => {
           unpressed.push(`${method} ${path}`)
       }
     }
-    expect(doors, "the write-door census found almost nothing — it has gone blind").toBeGreaterThan(30)
+    expect(
+      doors,
+      "the write-door census found almost nothing — it has gone blind"
+    ).toBeGreaterThan(30)
 
     const unlisted = unpressed.filter((d) => !(d in NO_CONTROL))
     expect(

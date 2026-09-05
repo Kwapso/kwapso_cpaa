@@ -31,6 +31,30 @@
 // email template (mail clients strip custom properties), plus the per-door
 // manifest colours, which are two values rather than one.
 
+// ── AND THE NAME IS READ, NOT SPELLED OUT (5 Sep 2026) ─────────────────────
+//
+// Twenty-three files read this seam and sixteen user-visible SENTENCES did not:
+// they had the word typed into them, in the catalogue, in four languages. A
+// rebrand — or a fork of this base for the next product, which §5 of
+// BASE-MANUAL says is what it is FOR — would have left every one of them saying
+// the old name on a screen that looked finished, and nothing would have gone red.
+//
+// Fourteen of them now carry a `{brand}` hole filled from `brand.name`
+// (`shared/i18n.ts`, `fill`) — a hole rather than a concatenation, because it is
+// the only shape a translator can reorder. Every existing translation was
+// carried to the new key rather than re-requested, so all 56 renderings are
+// byte-identical to what they were.
+//
+// TWO KEEP THE LITERAL, ON PURPOSE, and they are named here so nobody
+// "finishes the rename" and changes what a screen says:
+//
+//   • `t("Kwapso")` — the nav destination, TITLE CASE by design
+//     (web/components/app-shell.tsx says so where the team name is drawn beside
+//     it). `brand.name` is lower case, so reading the seam here would quietly
+//     change the label.
+//   • `t("e.g. Kwapso GmbH")` — the legal-name field's placeholder. That is an
+//     EXAMPLE of a company name, not the app naming itself; a fork would want a
+//     different example, not this seam's value.
 export const brand = {
   name: "kwapso",
   description: "Tailored digital operating systems for mature businesses.",

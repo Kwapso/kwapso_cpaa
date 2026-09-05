@@ -56,6 +56,7 @@ import { fileURLToPath } from "node:url"
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
 import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 // The REAL hostname, not the workers.dev alias: the Google sign-in door
@@ -63,7 +64,7 @@ const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.de
 // be one of the two configured front doors (an open-redirect defence), so at
 // the alias it answers 400 BY DESIGN — and this smoke's job is the door a
 // client actually uses.
-const PORTAL = process.env.SMOKE_PORTAL_BASE ?? "https://staging-client.kwapso.app"
+const PORTAL = process.env.SMOKE_PORTAL_BASE ?? FRONT_DOORS.staging.portal
 const REPO = fileURLToPath(new URL("..", import.meta.url))
 
 // Resend's test inbox: a real send path that always "delivers" and never

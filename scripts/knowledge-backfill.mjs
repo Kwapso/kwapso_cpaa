@@ -23,11 +23,12 @@
 // it halfway and the next run — or the next cron tick — carries on from there.
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const ENV = process.argv[2]
 const BASE =
   ENV === "production"
-    ? (process.env.PRODUCTION_BASE ?? "https://agency.kwapso.app")
+    ? (process.env.PRODUCTION_BASE ?? FRONT_DOORS.production.agency)
     : (process.env.STAGING_BASE ?? "https://kwapso-staging.kwapso.workers.dev")
 
 if (!["staging", "production"].includes(ENV)) {

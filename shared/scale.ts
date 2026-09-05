@@ -85,10 +85,6 @@ export const SCALE_STEPS: ScaleStep[] = [
   { value: "large", agencyPx: 18, portalPx: 19 },
 ]
 
-/** What a person has never chosen. Named rather than repeated, so the column's
- * NULL, the door's fallback and the picker's initial state are one decision. */
-export const DEFAULT_SCALE = "comfortable"
-
 /** Is this a step the code knows? The door's allow-list, and the reason the
  * column carries no CHECK — see db/core/0026_user_scale.sql. */
 export function isScale(value: unknown): boolean {

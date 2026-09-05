@@ -60,6 +60,17 @@ import { ApiFailure, content } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
+import { brand } from "@shared/brand"
+
+/** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
+ * itself "THE one place to brand this app" and twenty-three files read it; the
+ * sentences below used to spell the name out instead, which meant a rebrand — or
+ * a fork of this base for the next product — would have left them saying the old
+ * one, in four languages, on a screen that looked finished. Written as a `{brand}`
+ * hole rather than concatenated, because a hole is the only shape a translator
+ * can reorder (shared/i18n.ts, `fill`). */
+const BRAND = { brand: brand.name }
+
 
 export type GoogleScopeValues = {
   mode: GoogleScopeMode
@@ -109,7 +120,7 @@ const MODES: Record<
       value: "only",
       title: "Only the calendars you name",
       description:
-        "This can ADD calendars kwapso cannot see today, as well as leaving your main one out. Name none and no calendar is read at all.",
+        "This can ADD calendars {brand} cannot see today, as well as leaving your main one out. Name none and no calendar is read at all.",
     },
   ],
 }
@@ -243,12 +254,14 @@ export function GoogleScopeDialog({
       onSubmit={submit}
       title={
         <DialogTitle>
-          {service === "gmail" ? t("What kwapso may read in your mail") : t("What kwapso may read in your calendar")}
+          {service === "gmail"
+            ? t("What {brand} may read in your mail", BRAND)
+            : t("What {brand} may read in your calendar", BRAND)}
         </DialogTitle>
       }
       subtitle={
         <DialogDescription>
-          {t("Whatever you leave out is never fetched at all, so it never reaches kwapso even for a moment.")}
+          {t("Whatever you leave out is never fetched at all, so it never reaches {brand} even for a moment.", BRAND)}
         </DialogDescription>
       }
       submit={{ busy: busy, disabled: !ready, icon: <Check className="size-4" /> }}
@@ -268,7 +281,7 @@ export function GoogleScopeDialog({
               }`}
             >
               <span className="text-sm font-medium">{t(m.title)}</span>
-              <span className="text-muted-foreground text-xs">{t(m.description)}</span>
+              <span className="text-muted-foreground text-xs">{t(m.description, BRAND)}</span>
             </button>
           ))}
         </div>
@@ -419,7 +432,7 @@ export function GoogleScopeDialog({
           />
         </Choice>
         <p className="text-muted-foreground mt-1.5 text-xs">
-          {t("Leave it off and what kwapso already read stays answerable. Only what it reads from now on follows the new answer.")}
+          {t("Leave it off and what {brand} already read stays answerable. Only what it reads from now on follows the new answer.", BRAND)}
         </p>
       </Field>
     </FormShellDialog>

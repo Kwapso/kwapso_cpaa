@@ -134,20 +134,3 @@ export function Field({
     </KitField>
   )
 }
-
-/** Map a FieldConfig to native HTML validation attributes. Spread onto the
- * input inside a Field; the browser ignores attributes that don't apply to its
- * type. The old library exported this beside Field; the kit has no config
- * layer, so the helper lives here now — it reads no words at all. */
-export function fieldProps(config: FieldConfig) {
-  const v = config.validation
-  return {
-    required: config.required || undefined,
-    disabled: config.disabled || undefined,
-    min: v.min ?? undefined,
-    max: v.max ?? undefined,
-    minLength: v.minLength ?? undefined,
-    maxLength: v.maxLength ?? undefined,
-    pattern: v.pattern || undefined,
-  }
-}
