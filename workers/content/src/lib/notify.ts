@@ -11,6 +11,7 @@
 
 import { brand } from "@shared/brand"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { recordWorkerError } from "@shared/workers/error-log"
 import type { MemberGuard } from "@shared/workers/gating"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import { audienceOf, clientUserIds, frontDoorOrigin, recordLink } from "@shared/workers/record-link"
@@ -99,6 +100,42 @@ async function sendToMany(
     )
   for (let i = 0; i < list.length; i += SEND_CONCURRENCY)
     await Promise.all(list.slice(i, i + SEND_CONCURRENCY).map(one))
+}
+
+/** A NOTICE THAT WAS NEVER DELIVERED, WRITTEN DOWN.
+ *
+ * Every send in this file fails soft, and it should: a ticket is resolved
+ * whether or not the mail about it left the building, and turning a Resend
+ * hiccup into a failed request would be the wrong trade every time. What was
+ * wrong is that it failed soft into `console.error` ALONE — so "the client was
+ * never told their ticket was answered" was something that happened to a real
+ * person and left no trace past the end of the log tail.
+ *
+ * That is the shape ERROR-HANDLING.md calls never-swallow, and it costs one line
+ * to close, because `recordWorkerError` cannot throw and cannot flood
+ * (error-log.ts caps every field and rides an hourly budget on the INSERT's own
+ * WHERE). The send still fails soft; the failure is now durable.
+ *
+ * `who` names the RECIPIENT where there is one, because "an email failed" and
+ * "this person's email failed" are different rows to be woken up by — and the
+ * per-recipient catch is the one that matters, since `sendToMany` fans out and
+ * one bad address must not read as a whole send that worked. */
+async function recordSendFailure(
+  env: Env,
+  teamId: string,
+  place: string,
+  e: unknown,
+  who?: string
+): Promise<void> {
+  const said = e instanceof Error ? e.message : String(e)
+  await recordWorkerError(
+    env.DB,
+    "content",
+    `notify/${place}${who ? ` \u2192 ${who}` : ""}`,
+    new Error(`the ${place} email was NOT delivered${who ? ` to ${who}` : ""}: ${said}`),
+    undefined,
+    { teamId }
+  )
 }
 
 /** A short, safe preview of a body for the email itself.
@@ -195,11 +232,15 @@ export async function notifyReplyAndMentions(
         // this email names the agency's hostname nowhere at all — not in a link,
         // and not in an image source either.
         frontDoorOrigin(env, audience)
-        ).catch((e) => console.error("help reply notice failed:", e))
+        ).catch(async (e) => {
+          console.error("help reply notice failed:", e)
+          await recordSendFailure(env, teamId, "ticket-reply", e, u.email)
+        })
       })
     )
   } catch (e) {
     console.error("help notify failed:", e)
+    await recordSendFailure(env, teamId, "ticket-reply", e)
   }
 }
 
@@ -417,10 +458,14 @@ export async function notifyTodoRaised(
         ctaLabel: link?.label,
         ctaUrl: link?.url,
         footnote: `${todo.ref ? `${todo.ref}. ` : ""}Mark it done in your ${name} portal, and send the file with it if there is one.`,
-      }, frontDoorOrigin(env, "portal")).catch((e) => console.error("to-do notice failed:", e))
+      }, frontDoorOrigin(env, "portal")).catch(async (e) => {
+        console.error("to-do notice failed:", e)
+        await recordSendFailure(env, guard.teamId, "todo-raised", e, p.email)
+      })
     )
   } catch (e) {
     console.error("to-do notify failed:", e)
+    await recordSendFailure(env, guard.teamId, "todo-raised", e)
   }
 }
 
@@ -503,10 +548,14 @@ export async function sendTriageDigest(
           footnote: digest.onDutyName
             ? undefined
           : "Put somebody on triage duty in Tickets, a backlog with no owner is the one nobody clears.",
-      }).catch((e) => console.error("triage digest failed:", e))
+      }).catch(async (e) => {
+        console.error("triage digest failed:", e)
+        await recordSendFailure(env, teamId, "triage-digest", e, p.email)
+      })
     )
   } catch (e) {
     console.error("triage digest failed:", e)
+    await recordSendFailure(env, teamId, "triage-digest", e)
   }
 }
 
@@ -567,9 +616,13 @@ export async function notifyTicketResolved(
         ctaLabel: link?.label,
         ctaUrl: link?.url,
         footnote: "The whole conversation is on the ticket, if you want to reply.",
-      }, frontDoorOrigin(env, "portal")).catch((e) => console.error("resolution notice failed:", e))
+      }, frontDoorOrigin(env, "portal")).catch(async (e) => {
+        console.error("resolution notice failed:", e)
+        await recordSendFailure(env, guard.teamId, "ticket-resolved", e, p.email)
+      })
     )
   } catch (e) {
     console.error("resolution notify failed:", e)
+    await recordSendFailure(env, guard.teamId, "ticket-resolved", e)
   }
 }

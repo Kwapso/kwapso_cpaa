@@ -4,6 +4,7 @@
 // changed row by a generic (related_table, related_row_id) pair.
 
 import { d1ExecScript, sqlString, type D1Rest } from "./d1-rest"
+import { logError } from "./error-log"
 import { ulid } from "./id"
 
 export type Actor = { id: string; email: string; name: string }
@@ -77,7 +78,20 @@ async function insertActivity(
  * Right for every caller so far: each one logs a SIDE EFFECT of a mutation that
  * already succeeded ("member role changed"), so losing the log line is an
  * acceptable, silent loss. See `writeActivity` below for the caller it is wrong
- * for. */
+ * for.
+ *
+ * SWALLOWED IS NOT THE SAME AS UNRECORDED, and for a year it was. The console
+ * line above was the whole of it, which meant a team database having a bad
+ * minute left a HOLE in the one table R18's entire audit story rests on, and the
+ * only trace expired with the log tail. The action succeeded, the feed is
+ * missing a line, and nobody can tell the difference between "nothing happened"
+ * and "we failed to write that it did".
+ *
+ * So the swallow stays — the contract is right and this must never break the
+ * action it describes — and the loss is now DURABLE: `logError` cannot throw
+ * (error-log.ts's own contract), so recording here costs the caller nothing it
+ * was not already paying. `cfg.core` is absent only where nobody wired one, and
+ * then this behaves exactly as it did before. */
 export async function logActivity(
   cfg: D1Rest,
   databaseId: string,
@@ -88,6 +102,17 @@ export async function logActivity(
     await insertActivity(cfg, databaseId, actor, entry)
   } catch (e) {
     console.error("activity log failed:", e)
+    if (cfg.core)
+      await logError(cfg.core, {
+        source: "activity",
+        // The database and the ROW the missing line was about — which is the
+        // pair somebody needs to put it back by hand, and the pair the feed
+        // itself is keyed on.
+        place: `activity/${databaseId} ${entry.relatedTable ?? "?"}/${entry.relatedRowId ?? "?"}`,
+        message: `activity row NOT written ("${entry.type}"): ${e instanceof Error ? e.message : String(e)}. The action it describes SUCCEEDED; the record's history is missing this line.`,
+        stack: e instanceof Error ? e.stack : undefined,
+        userId: actor.id,
+      })
   }
 }
 

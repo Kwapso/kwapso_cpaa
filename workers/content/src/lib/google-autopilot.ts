@@ -47,7 +47,7 @@
 
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { Actor } from "@shared/workers/activity"
-import type { MemberGuard } from "@shared/workers/gating"
+import { causeOf, type MemberGuard } from "@shared/workers/gating"
 import {
   GOOGLE_SWEEP_PEOPLE_PER_TICK,
   TRANSCRIPT_ATTEMPT_CAP,
@@ -138,7 +138,7 @@ export async function googleAutopilot(
   try {
     people = await peopleToSweep(cfg, { ...base, userId: "system:google-autopilot" } as MemberGuard)
   } catch (e) {
-    errors.push({ userId: "-", where: "list connections", message: String(e) })
+    errors.push({ userId: "-", where: "list connections", message: causeOf(e) })
     return { people: 0, captured, errors }
   }
 
@@ -155,7 +155,7 @@ export async function googleAutopilot(
       // has nothing to be protected from.
       await sweepGoogle(env, cfg, guard)
     } catch (e) {
-      errors.push({ userId, where: "google sweep", message: String(e) })
+      errors.push({ userId, where: "google sweep", message: causeOf(e) })
     }
 
     try {
@@ -170,7 +170,7 @@ export async function googleAutopilot(
           // ONE MEETING'S FAILURE IS ONE MEETING'S. A calendar entry this person
           // cannot open is the ordinary case, not an incident — they are simply
           // not the one who can fetch it, and somebody else's tick will.
-          errors.push({ userId, where: `transcript ${meetingId}`, message: String(e) })
+          errors.push({ userId, where: `transcript ${meetingId}`, message: causeOf(e) })
           // A THROWN try counts against the meeting's cap (a quiet "nothing
           // there yet" never reaches this catch and stays free to retry). Best
           // effort: if the counter itself cannot be written, the error above is
@@ -184,7 +184,7 @@ export async function googleAutopilot(
         }
       }
     } catch (e) {
-      errors.push({ userId, where: "list meetings", message: String(e) })
+      errors.push({ userId, where: "list meetings", message: causeOf(e) })
     }
   }
 

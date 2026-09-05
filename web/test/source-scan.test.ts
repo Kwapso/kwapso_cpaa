@@ -155,6 +155,8 @@ const DIRECT_READDIR: Record<string, string> = {
     "roster read, and it defines a worker as a directory with a wrangler.jsonc — which is the question this suite asks",
   "web/test/linked-emails.test.ts":
     "roster read, twice: the per-worker src/ roots it hands to sourceFiles to find every email-composing function, and the worker directories whose wrangler.jsonc must carry the portal's own origin",
+  "workers/data-ops/test/no-quiet-downgrade.test.ts":
+    "roster read, and it defines a worker exactly as public-surface.test.ts does — a directory with a wrangler.jsonc — because the question it asks is 'does ANY config pin an engine the code does not name', and enumerating them is the whole point: the failure it guards is somebody adding a THIRD config, not somebody forgetting the second",
   "web/test/backup-covers-r2.test.ts":
     "roster read: the workers with a wrangler.jsonc, to build the src/ roots it then hands to sourceFiles and to find each one's r2_buckets",
 }

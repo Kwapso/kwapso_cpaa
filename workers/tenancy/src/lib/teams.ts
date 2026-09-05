@@ -2,6 +2,7 @@
 // (locked architecture), seeded with default roles + dropdown values.
 
 import type { ActiveContext, ReceivedInvite, TeamMeta, TeamSummary } from "@shared/types"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { logActivity } from "@shared/workers/activity"
 import {
   d1CreateDatabase,
@@ -78,7 +79,21 @@ async function stampInviteAccepted(
       `UPDATE invite_logs SET invite_accepted = 1, invite_acceptance_timestamp = ${sqlString(acceptedAt)} WHERE id = ${sqlString(inviteRowId)};`
     )
   } catch (e) {
+    // "AUDIT ONLY" IS NOT "NOBODY NEEDS TO KNOW". The membership started; the
+    // team's own invite record still says it did not. That is a row somebody
+    // will read one day and believe, so the disagreement gets written down
+    // rather than living in a console tail for a day.
     console.error("invite_logs accept stamp failed (audit only):", e)
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      `invites/accept-stamp (team ${teamId})`,
+      new Error(
+        `the invite was accepted and the membership exists, but invite_logs row ${inviteRowId} was NOT stamped accepted, so the team's invite history under-reports it: ${e instanceof Error ? e.message : String(e)}`
+      ),
+      undefined,
+      { teamId }
+    )
   }
 }
 
@@ -103,7 +118,19 @@ async function logMemberJoined(env: Env, teamId: string, actor: Actor): Promise<
       relatedRowId: actor.id,
     })
   } catch (e) {
+    // Same reasoning as the stamp above, and the same R18 stake: the feed is the
+    // only place "when did this person join" is answerable.
     console.error("member-joined activity failed (audit only):", e)
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      `invites/member-joined (team ${teamId})`,
+      new Error(
+        `${actor.name || actor.id} joined the team and the "Member joined" activity row was NOT written, so the feed has a hole where the join is: ${e instanceof Error ? e.message : String(e)}`
+      ),
+      undefined,
+      { teamId, userId: actor.id }
+    )
   }
 }
 

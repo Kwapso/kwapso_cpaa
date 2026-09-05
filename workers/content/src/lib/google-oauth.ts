@@ -463,15 +463,30 @@ async function redeem(
       client_secret: creds.clientSecret,
     }),
   })
-  if (!res.ok)
+  if (!res.ok) {
+    // THE DEAD-CREDENTIAL PATH, and it is the one worth naming. Google answers
+    // this endpoint with `{"error":"invalid_grant","error_description":"Token
+    // has been expired or revoked."}` — the exact sentence somebody needs — and
+    // until 2026-09-05 that body was read by nothing and reached nowhere: the
+    // refusal below carried the product's own wording and the cause was
+    // discarded before anyone could see it. So a revoked grant looked, in the
+    // store, exactly like a transient Google wobble.
+    //
+    // The caller's answer does NOT change (Google's fault is not theirs to fix).
+    // `detail` rides to the central catch, which records it. No secret goes
+    // with it: the body Google returns on a token failure names the error and
+    // nothing about the client secret or the token that was refused.
+    const said = await res.text().catch(() => "")
     throw new GuardError(
       // 502 rather than the status Google sent: the caller did nothing wrong and
       // must not be told to fix their request. A 400 from Google here means a
       // grant that has been revoked at Google's end, and the sentence says so.
       502,
       "google_refused",
-      "Google wouldn't complete that connection. It may have been removed from your Google account. Connect it again."
+      "Google wouldn't complete that connection. It may have been removed from your Google account. Connect it again.",
+      `google POST ${TOKEN_ENDPOINT} (${fields.grant_type ?? "?"}) → ${res.status}: ${said.slice(0, 400)}`
     )
+  }
   const data = (await res.json()) as {
     access_token?: unknown
     refresh_token?: unknown
@@ -479,7 +494,12 @@ async function redeem(
     scope?: unknown
   }
   if (typeof data.access_token !== "string" || !data.access_token)
-    throw new GuardError(502, "google_refused", "Google didn't return a usable connection.")
+    throw new GuardError(
+      502,
+      "google_refused",
+      "Google didn't return a usable connection.",
+      `google POST ${TOKEN_ENDPOINT} (${fields.grant_type ?? "?"}) answered 2xx with NO access_token — the fields it did return were: ${Object.keys(data).join(", ") || "(none)"}`
+    )
   const seconds = typeof data.expires_in === "number" ? data.expires_in : 3_600
   return {
     accessToken: data.access_token,

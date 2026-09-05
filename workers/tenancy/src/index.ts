@@ -111,6 +111,7 @@ import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
 import { logIfSlow, withTiming } from "@shared/workers/timing"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { readOpsDigest, sendOpsDigest } from "./lib/ops-alert"
 import { identityFor } from "@shared/workers/gating"
 import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
@@ -449,7 +450,16 @@ export default {
       logIfSlow(request, route)
       return withTiming(request, res)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       console.error("tenancy worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.
@@ -476,7 +486,7 @@ export default {
    * the core binding. Giving auth a cron of its own to run one delete would be a
    * second unattended schedule, a second deploy surface and a second thing to
    * forget — for no more safety than this line. */
-  async scheduled(_controller, env): Promise<void> {
+  async scheduled(controller, env): Promise<void> {
     // Two independent jobs, two try blocks. A failing size check must not cost
     // the estate its sweep, and a failing sweep must not hide an 80% alarm.
     try {
@@ -535,6 +545,27 @@ export default {
       // invisible — record it to the error store, not just the console.
       console.error("nightly size check failed:", e)
       await recordWorkerError(env.DB, "tenancy", "cron/size-check", e)
+    }
+    // THE THIRD JOB, AND THE ONE THAT READS WHAT THE OTHER TWO WROTE. Its own
+    // try, like the two above and for the same reason: a digest that cannot be
+    // assembled must not cost the estate its sweep or its size alarm.
+    //
+    // It exists because two finished systems were waiting for somebody to come
+    // and look — the error store, which records every failure in eight workers
+    // and told nobody, and the AI meter, which refuses a turn at the cap and
+    // warns before it never. Nothing is written here; it reads three tables and,
+    // on a night with something to say, sends one email to the same ALERT_TO the
+    // size alarm uses. On a quiet night it sends nothing at all.
+    try {
+      const digest = await readOpsDigest(env, new Date(controller.scheduledTime), env.AGENT_MODEL ?? "")
+      console.log(
+        `ops digest: ${digest.fresh.length} new, ${digest.spiking.length} spiking, ${digest.nearQuota.length} near quota, ${digest.spend.turns} assistant turn(s)`
+      )
+      const sent = await sendOpsDigest(env, digest)
+      if (sent.mailed) console.log(`ops digest emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
+    } catch (e) {
+      console.error("nightly ops digest failed:", e)
+      await recordWorkerError(env.DB, "tenancy", "cron/ops-digest", e)
     }
   },
 } satisfies ExportedHandler<Env>

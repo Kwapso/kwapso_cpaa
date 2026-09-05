@@ -7,6 +7,8 @@
 
 import type { D1Database } from "@cloudflare/workers-types"
 
+import type { CoreDb } from "./error-log"
+
 export type D1Rest = {
   accountId: string
   apiToken: string
@@ -43,6 +45,21 @@ export type D1Rest = {
    * handler had to change to be measured. Absent = nobody asked, and the door
    * pays nothing. */
   stats?: { op: string; ms: number }[]
+  /** WHERE A FAILURE ON THIS DOOR IS RECORDED — the global core database, so the
+   * one seam that swallows by contract (`logActivity`) can still leave a row.
+   *
+   * It rides on the config for exactly the reason `stats` does, and the reason is
+   * the whole point: the config is the one thing already threaded to every call
+   * site in the codebase, and `logActivity` has 140 of them. The alternative was a
+   * fifth argument on every one, in five workers, which is the shape that ends
+   * with half the call sites never passing it — and half an audit trail is worse
+   * than none, because it looks complete.
+   *
+   * OPTIONAL, and absent means exactly what it meant before this existed: the
+   * console line and nothing else. A config built by hand in a test does not have
+   * to invent a database, and a caller that has no core binding (neither gateway
+   * has one) is not broken by asking for one. */
+  core?: CoreDb
   /** WHERE A NEW TEAM DATABASE IS BORN — a Cloudflare primary-location hint.
    * Set from `D1_LOCATION` where a deployment sets it; `weur` otherwise. It is
    * on the config rather than passed at the one call site because a database

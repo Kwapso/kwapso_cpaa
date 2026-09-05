@@ -78,9 +78,21 @@ describe("auth validates at the boundary", () => {
   it("answers a refusal as a refusal, not as a crash", () => {
     const at = CODE.indexOf("} catch (e)")
     expect(at, "the central catch must exist").toBeGreaterThan(-1)
-    const body = CODE.slice(at, at + 500)
+    const body = CODE.slice(at, at + 900)
+    // THE BRANCH IS FIRST, and it answers with the refusal's own status.
+    //
+    // This used to match the one-line form `if (e instanceof GuardError) return
+    // fail(` literally, and on 2026-09-05 the branch grew a body — a diagnosed
+    // refusal (gating.ts's `detail`) now records the CAUSE before answering,
+    // because 1,991 of 5,086 live rows recorded the sentence we showed the user
+    // instead of the reason Google gave us. Matching the old shape would have
+    // failed a change that keeps every property this test is about, which is why
+    // the properties are asserted here rather than the punctuation.
     expect(body, "GuardError must be mapped BEFORE anything else").toMatch(
-      /if \(e instanceof GuardError\) return fail\(/
+      /if \(e instanceof GuardError\)/
+    )
+    expect(body, "and the refusal must answer with its own status, code and message").toMatch(
+      /return fail\(e\.status, e\.code, e\.message\)/
     )
     // And it must come first — a recordWorkerError above it would mean every
     // 400 still writes a row to the global database.
@@ -89,5 +101,16 @@ describe("auth validates at the boundary", () => {
     expect(guardAt, "the refusal branch must precede the crash recording").toBeLessThan(
       recordAt === -1 ? Number.MAX_SAFE_INTEGER : recordAt
     )
+    // AN ORDINARY REFUSAL STILL WRITES NOTHING, which is the property the line
+    // above was really defending. Any recording inside the GuardError branch is
+    // gated on `e.detail`, and only a refusal that carries a diagnosis has one —
+    // no permission gate in the codebase sets it. So a 400 is as silent as it
+    // ever was, and a dead Google credential is not.
+    const branch = body.slice(guardAt, body.indexOf("console.error"))
+    if (branch.includes("recordWorkerError"))
+      expect(
+        branch.indexOf("e.detail"),
+        "a recording inside the refusal branch must be gated on e.detail, or every 400 writes a row again"
+      ).toBeLessThan(branch.indexOf("recordWorkerError"))
   })
 })

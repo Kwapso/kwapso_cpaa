@@ -102,6 +102,7 @@ ritual in it names the rest:
 | anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](MCP.md) → [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md) |
 | a table, a column, or a migration | [DATA-MODEL.md](DATA-MODEL.md) → [OPERATIONS.md](OPERATIONS.md) |
 | a Law, or anything a Law names | [RULES.md](RULES.md) + `shared/rules/registry.ts` + its check, all three, or the build fails |
+| anything that spends money — a model call, an email, a cron, a stored file | [COSTS.md](COSTS.md) → `shared/workers/pricing.ts` |
 
 Whatever the row, [EDGE-CASES.md](EDGE-CASES.md) is the one to open when something
 behaves oddly rather than wrongly, it is where the non-obvious traps are written
@@ -203,6 +204,15 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    that protects an invariant (counts, balances, uniqueness).
 5. **[ERROR-HANDLING.md](ERROR-HANDLING.md)**, the error-capture ruleset (the
    one swappable logging seam, the error boundary, never-swallow).
+   **[COSTS.md](COSTS.md)** is the other half of the same question: every surface
+   that bills, what one signup, one import, one assistant reply and one knowledge
+   question actually cost with the arithmetic shown, what the crons and the
+   stored files cost, and what still is not measured. Every price carries the
+   page it was read from and the day it was read, and the numbers themselves are
+   data in `shared/workers/pricing.ts`, so the code, the scripts and the prose
+   cannot drift apart. Two commands reproduce its headline figures without
+   spending anything: `node scripts/measure-preamble.mjs` and
+   `node --experimental-transform-types scripts/ai-spend.mjs`.
 6. **[ROADMAP.md](ROADMAP.md)**, **history, not a plan.** The build record of ONE
    round (Phase C: members, roles & settings), closed 2026-07-02, with the
    type/endpoint contracts each of its phases plugged into. Kept so its decisions

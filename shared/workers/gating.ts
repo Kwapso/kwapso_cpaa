@@ -46,10 +46,53 @@ export class GuardError extends Error {
   constructor(
     public status: number,
     public code: string,
-    message: string
+    message: string,
+    /** WHAT WE KNEW AND THE CALLER IS NOT TOLD — recorded, never returned.
+     *
+     * A GuardError is a CLEAN refusal, and every central catch answers it before
+     * the recorder on purpose: this table is for the unexpected, and logging
+     * every "you may not do that" would bury the rows that matter under the ones
+     * that do not (error-log.ts's own contract says so).
+     *
+     * That reasoning is right for a permission refusal and it was silently WRONG
+     * for the one class of refusal that carries a diagnosis. When Google answers
+     * 401 because somebody revoked the grant, `googleFetch` turns it into a
+     * GuardError — so the person reads "Google wouldn't allow that any more",
+     * which is the correct sentence, and the STATUS and Google's own reason went
+     * to `console.error` and nowhere else, by design. Measured on staging on
+     * 2026-09-05: 1,900+ of 5,086 rows in the error store record the sentence we
+     * showed somebody rather than the cause, and on the interactive path the
+     * store learned nothing at all. Three weeks later "the Google sync stopped"
+     * has no row that says why.
+     *
+     * So a refusal may now carry the thing the tail had. Setting it does not
+     * change one byte of the caller's answer — `fail(status, code, message)` is
+     * untouched — it only means the central catch has something worth recording.
+     * Absent, which is the case for every permission gate in the codebase, and
+     * nothing is recorded, exactly as before.
+     *
+     * NEVER a token, and never a query string: google-api.ts strips both before
+     * it builds this, because that is where a person's search words live. */
+    public detail?: string
   ) {
     super(message)
   }
+}
+
+/** WHAT TO RECORD ABOUT A THROWN THING — the diagnosis where there is one, the
+ * message where there is not.
+ *
+ * The recording seam wants the sentence a developer can act on; the caller wants
+ * the sentence a person can read. For everything except a diagnosed refusal
+ * those are the same string, which is why this reads as a no-op most of the time
+ * and is worth its own name anyway: `String(e)` at a recording site is exactly
+ * how 327 cron rows came to say "Google couldn't answer that just now. Try
+ * again." — our own words, quoted back at us, about a token Google had revoked.
+ *
+ * Use it at every site that turns a caught error into a row. */
+export function causeOf(e: unknown): string {
+  if (e instanceof GuardError) return e.detail ?? e.message
+  return e instanceof Error ? e.message : String(e)
 }
 
 /** WHICH TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY.
@@ -95,6 +138,12 @@ export function d1ConfigFrom(env: GatingEnv): D1Rest {
     accountId: env.CF_ACCOUNT_ID,
     apiToken: env.CF_D1_TOKEN,
     natives: nativeTeamDatabases(env),
+    // WHERE THIS DOOR'S SWALLOWED FAILURES ARE RECORDED (d1-rest.ts says why it
+    // rides on the config). Every worker that builds a data-door config has the
+    // core binding — it is in GatingEnv, because gating reads it on every
+    // request — so the activity writer gets a durable store for free, at every
+    // one of its call sites, without a fifth argument anybody can forget.
+    core: env.DB,
     // Where a NEW team's database is born. See d1CreateDatabase: measured on
     // staging, a database that landed in APAC while its workers sat in WEUR
     // cost about 150ms a trip, which a native binding does not fix — a binding

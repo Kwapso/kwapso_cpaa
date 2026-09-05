@@ -4,6 +4,7 @@
 // sent THROUGH the auth worker (it owns the Resend key). All guards live here.
 
 import { brand } from "@shared/brand"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
@@ -216,6 +217,16 @@ export async function createInvite(
     )
   } catch (e) {
     console.error("invite_logs insert failed (audit only):", e)
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      `invites/audit-row (team ${guard.teamId})`,
+      new Error(
+        `the invite to ${to} was created and routes correctly, but its invite_logs audit row was NOT written, so the team's invite history is missing this one: ${e instanceof Error ? e.message : String(e)}`
+      ),
+      undefined,
+      { teamId: guard.teamId, userId: actor.id }
+    )
   }
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -265,6 +276,26 @@ export async function createInvite(
     },
     base
   )
+
+  // `emailSent: false` REACHED THE CALLER AND NOTHING ELSE. The screen says the
+  // invite exists and the mail did not go — which is honest — but the reason
+  // (Resend refused it, the key expired, the address bounced) was inside
+  // `sendBrandedEmail` and went nowhere. Nobody can answer "why did three
+  // invites this week not send" from a console tail. The invite still stands:
+  // the invite_index row routes the acceptance and the invitee can accept from
+  // their in-app Invitations inbox, which is exactly why this is a record and
+  // not a throw.
+  if (!emailSent)
+    await recordWorkerError(
+      env.DB,
+      "tenancy",
+      `invites/send (team ${guard.teamId})`,
+      new Error(
+        `the invite email to ${to} was NOT delivered. The invite itself exists and can still be accepted from the invitee's in-app Invitations inbox, but nobody has told them it is there.`
+      ),
+      undefined,
+      { teamId: guard.teamId, userId: actor.id }
+    )
 
   return { inviteId, emailSent }
 }

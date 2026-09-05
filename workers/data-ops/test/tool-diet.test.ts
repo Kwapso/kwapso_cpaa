@@ -184,6 +184,57 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     expect(new Set(all.map((t) => t.name)).size, "duplicate tool names in the catalogue").toBe(all.length)
   })
 
+  /** THE BILL HAS A CEILING, AND UNTIL NOW IT DID NOT.
+   *
+   * Every assertion above this one is a FLOOR — "more than 150 tools", "the
+   * filter removed something". Not one of them could ever fail because the
+   * catalogue got bigger, which is the only direction that costs money: the
+   * whole preamble is re-sent on every step of every turn, up to MAX_STEPS = 12.
+   *
+   * Measured 2026-09-05 with `node scripts/measure-preamble.mjs`, which makes no
+   * model call: 165 tools, 107,064 characters of tool JSON, 132,528 with the
+   * system prompt = ~34,672 tokens. At kimi-k2.6's published $0.950/M that is
+   * $0.0329 of input per step, and COSTS.md turns it into $0.1093 for a typical
+   * three-step turn.
+   *
+   * THE BUDGETS BELOW ARE ABOUT 12% ABOVE TODAY. That is deliberate headroom for
+   * ordinary work and far too little for a module's worth of new tools, which is
+   * the event this is for: the next big catalogue addition should arrive as a
+   * decision somebody makes with the price in front of them, not as a number
+   * nobody looked at. Raising them is fine — raising them WITHOUT re-reading
+   * COSTS.md § 2 is what this makes impossible. */
+  it("the catalogue stays inside its stated budget", () => {
+    const chars = JSON.stringify(toolSpecs()).length
+    const PREAMBLE_TOOL_BUDGET = 120_000
+    expect(
+      chars,
+      `the tool catalogue is ${chars.toLocaleString()} chars, past the ${PREAMBLE_TOOL_BUDGET.toLocaleString()} budget. ` +
+        `Every character here is re-sent on every model step of every turn. Run ` +
+        `\`node scripts/measure-preamble.mjs\`, re-do COSTS.md § 2, and raise this on purpose or trim.`
+    ).toBeLessThanOrEqual(PREAMBLE_TOOL_BUDGET)
+  })
+
+  /** …AND THE HALF THE RIGHTS TRIM CANNOT REACH.
+   *
+   * `toolSpecs(held)` keeps a tool with no declared gate, fail-open and
+   * deliberately (tools.ts says why). So an UNGATED tool is sent to every caller
+   * whatever their role, and the ungated set is the floor the trim can never go
+   * below. Measured the same day: 52 of 165, which is 63,659 characters — half
+   * the preamble, paid for by a caller holding no rights at all.
+   *
+   * A ratchet DOWNWARD. R36's `offered-rights` is already pushing this number
+   * down by making an unoffered right a build failure; this stops it climbing
+   * back while nobody is looking, which is the only way it ever moved. */
+  it("the ungated set — sent to everybody, whatever their rights — does not grow", () => {
+    const ungated = toolSpecs(new Set<string>())
+    const UNGATED_CEILING = 52
+    expect(
+      ungated.map((t) => t.name).sort(),
+      `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +
+        `whatever their role. Declare a gate in TOOL_GATES, or raise this ceiling with the reason written down.`
+    ).toHaveLength(UNGATED_CEILING)
+  })
+
   it("an empty sheet still offers every UNGATED tool, and no gated one", () => {
     // A role with nothing at all. Everything TOOL_GATES classifies disappears;
     // everything it does not is kept, because an undeclared gate means "nobody

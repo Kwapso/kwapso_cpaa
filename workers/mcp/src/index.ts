@@ -199,7 +199,16 @@ export default {
           return fail(404, "not_found", "No such MCP action.")
       }
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, new Error(e.detail), requestId(request))
+        return fail(e.status, e.code, e.message)
+      }
       console.error("mcp worker error:", e)
       await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request))
       return fail(500, "internal", "Something went wrong on our side. Try again.")

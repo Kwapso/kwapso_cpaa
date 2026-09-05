@@ -104,6 +104,7 @@
 // the same staff readers; narrowing to one is about a better answer, never about
 // permission.
 
+import { recordWorkerError } from "@shared/workers/error-log"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -1336,9 +1337,24 @@ function embeddableText(_source: unknown, chunk: string): string {
  * failure must not fail an ingest, because the alternative is a knowledge base
  * that refuses to accept a note when Workers AI has a bad minute. A null
  * embedding stores as NULL, that chunk gets no vector, and the source's content
- * hash is left un-stamped so the next sweep tries again. */
+ * hash is left un-stamped so the next sweep tries again.
+ *
+ * AND FOR A YEAR THAT WAS THE WHOLE STORY, WHICH MADE AN OUTAGE INVISIBLE. This
+ * swallows, returns nulls, and `indexSource` then completes and counts the
+ * source as indexed — so `r.error` is never set, the sweep's own R12 recording
+ * sees a clean run, and the assistant answers from a corpus that quietly stopped
+ * growing. "Workers AI had a bad hour" and "there was nothing new to index"
+ * produced the identical, cheerful log line, and the sweep re-read the same rows
+ * every fifteen minutes for as long as it lasted.
+ *
+ * ONE ROW PER CALL, not per batch: a bad hour is one fact, and the recorder's
+ * hourly budget (error-log.ts) is a shared resource this must not spend on
+ * repeats of the same sentence. The count of failed batches rides in the message
+ * instead, which is the number that says how big the hole is. */
 async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
   const out: (number[] | null)[] = []
+  let failedBatches = 0
+  let firstFailure = ""
   for (let i = 0; i < texts.length; i += EMBED_BATCH) {
     const batch = texts.slice(i, i + EMBED_BATCH)
     try {
@@ -1354,9 +1370,20 @@ async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
       // never to swallow — the cron's own failure recording (R12) is what makes
       // this visible to somebody, and it records the run, not each chunk.
       console.error("knowledge embed failed:", e)
+      failedBatches++
+      if (!firstFailure) firstFailure = e instanceof Error ? e.message : String(e)
       for (let j = 0; j < batch.length; j++) out.push(null)
     }
   }
+  if (failedBatches)
+    await recordWorkerError(
+      env.DB,
+      "content",
+      "knowledge/embed",
+      new Error(
+        `${failedBatches} embedding batch(es) of ${Math.ceil(texts.length / EMBED_BATCH)} FAILED, so ${failedBatches * EMBED_BATCH} chunk(s) have no vector and are unfindable by search. The ingest reports success either way and the sweep will re-read these on its next tick, and every tick after that, until it works. First failure: ${firstFailure}`
+      )
+    )
   return out
 }
 
