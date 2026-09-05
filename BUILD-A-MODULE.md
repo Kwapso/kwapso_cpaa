@@ -655,9 +655,18 @@ LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>
 [ ] Activity via useRecordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
 [ ] Every record tab badged from the collection it reveals — Activity = formatCount(activity.total) (R8/R16);
     a tab that shows no collection gets a reasoned RECORD_TAB_COUNT_EXCEPTIONS line
-[ ] Actions carry kit icons from `@shared/ui/icons` (Pencil edit, Power deactivate); destructive = red + confirm
+[ ] Actions carry kit icons from `@shared/ui/foundations/icons` (PencilSimple edit, Power deactivate); destructive = red + confirm
 
-LAYER 6 — tests + ship
+LAYER 6 — words  (every module ships copy, and copy is translated — LANGUAGES.md)
+[ ] Every new product word is in shared/glossary.ts (R6), and the copy uses THAT word (R34)
+[ ] Every user-visible sentence sits inside t("…") — the whole sentence with a {hole},
+    never a fragment like t("of") (R33). A field config's label:/helpText: goes through
+    shared/web/field.tsx instead, because t is a hook and the config is a constant
+[ ] Run `npm run lang` and COMMIT the catalogue change with the code (R28). Both deploy
+    commands refuse on a stale catalogue, so this is not optional — and a sentence missing
+    from the catalogue ships in English to somebody who chose German, silently
+
+LAYER 7 — tests + ship
 [ ] (bespoke detail?) name the file "<module>-detail.tsx" — the R2/R8 census derives it off disk, nothing to register
 [ ] (form dialog?) register in FORM_DIALOGS; build on FormShell + useFormDraft — R4/R7
 [ ] Add a unit test for the lib's business rules

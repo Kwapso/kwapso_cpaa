@@ -372,6 +372,22 @@ somebody else has it), `last_error`, and the audit timestamps. A partial unique
 index (`status <> 'done'`) holds ONE live move per (team, module) — two rows would
 mean two databases and a merged read counting everything twice.
 
+---
+
+## PER-TEAM (each lives in that team's own database)
+
+Everything below this line is **per-team**: it lives in that team's own D1
+database, reached over the REST door, and another team's rows are never in the
+same file. Everything above it is GLOBAL core. That two-tier split is the thing
+this document is organised around, and every other document defers to this one
+for "which tier does this table live in" — so if you are scanning the outline,
+this heading is the boundary.
+
+*(The heading was lost on 2026-08-26 in commit `a9694fbe`, which inserted the
+`team_module_databases` section over the top of it and left the index's link to
+it pointing at nothing. Restored; the anchor
+`#per-team-each-lives-in-that-teams-own-database` resolves again.)*
+
 ### member_roles + role_permissions. KEEP (built; we split Glide's WIDE → TALL)
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,
 then **24 boolean columns** = 6 modules × {read,create,edit,delete}. Modules:
@@ -570,7 +586,7 @@ again. `idx_activity_feed (created_at DESC, id DESC)` serves the unfiltered page
 `related_table IN (…)` page and lets the R16 `COUNT(*)` beside it read an index
 rather than the widest table in the database. (`meetings` has carried exactly this
 index for exactly this reason since `0021`.) The count is still O(rows-it-counts),
-that is R16's price, and it is named in `scaling-review.md`. Per the
+that is R16's price, and it is settled in [ARCHITECTURE.md §7](ARCHITECTURE.md) (the scaling decision, LOCKED). *(It used to cite `scaling-review.md`, the audit report behind that section — deleted 29 Aug 2026 and in no clone; README item 27 says so.)* Per the
 Q3 resolution below, **log EVERYTHING** (creations, edits, activations/
 deactivations, milestones), superseding the earlier "edits/deactivations only",
 the SAME rows are surfaced four ways by the read path

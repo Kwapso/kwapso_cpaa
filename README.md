@@ -45,12 +45,24 @@ default 25, both environments ship **50**, and staging's `AGENT_NO_DAILY_CAP`
 props the refusal door open so the 50 is enforced on production only —
 OPERATIONS.md has both vars) plus a purchasable balance.
 
-One piece of plumbing you will meet in the code: the permission spine is
-currently scoped by a team id — `shared/workers/gating.ts` resolves rights from
-`(teamId, userId)`, and the agency app's deep-link URLs are
-`/t/<teamId>/<module>/<id>`. Nobody at either front door ever sees it (the
-surface is switched off in `shared/product.ts`), and it is scheduled for
-removal.
+One piece of plumbing you will meet in the code: the permission spine is scoped
+by a team id — `shared/workers/gating.ts` resolves rights from `(teamId,
+userId)`, and the agency app's deep-link URLs are `/t/<teamId>/<module>/<id>`.
+Nobody at either front door ever sees it: the team switcher and the teams list
+are hidden and team creation is closed, both from `shared/product.ts`.
+
+**It is HIDDEN, not scheduled for removal, and that is a locked decision.** The
+owner has overruled removal three times, most recently on 3 September 2026, and
+`shared/product.ts` carries the ruling with its measurements attached so a
+fourth proposal starts from facts rather than re-deriving them. The reason is
+that the multi-team plumbing is not a feature kwapso uses, it is the thing that
+gets FORKED for a paying client (BASE-MANUAL.md §5). Two things make this more
+than a preference: `web/test/rules.test.ts` goes red if somebody finishes the
+removal, and `teams.database_id` is also the ownership oracle
+`ourDatabases` filters by — this deployment shares a Cloudflare account with
+other companies, so taking the table away without replacing that filter first
+leaves a fallback between the nightly size cron and another company's
+production database. Read `shared/product.ts` before proposing it again.
 
 Staff manage the roster — Overview, Members, Member roles, Invites — rendered
 by the screen engine rather than living under Settings. A customer's portal
@@ -96,7 +108,7 @@ ritual in it names the rest:
 
 | You are changing… | Read these, then build |
 |---|---|
-| a screen or a form | [CLAUDE.md](CLAUDE.md) → [UI-CONVENTIONS.md](UI-CONVENTIONS.md) → [CACHING.md](CACHING.md) |
+| a screen or a form | [CLAUDE.md](CLAUDE.md) → [UI-CONVENTIONS.md](UI-CONVENTIONS.md) → [CACHING.md](CACHING.md) → [LANGUAGES.md](LANGUAGES.md) if it says a single word to a person |
 | a worker route | [CLAUDE.md](CLAUDE.md) → [CONVENTIONS.md](CONVENTIONS.md) → [DATA-MODEL.md](DATA-MODEL.md) |
 | a whole new module | [BUILD-A-MODULE.md](BUILD-A-MODULE.md) (it lists its own prerequisites) |
 | anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](MCP.md) → [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md) |
@@ -123,6 +135,7 @@ right. This table names the owner for the topics where that has actually happene
 | Worker vs DO class vs DO instance | [DURABLE-OBJECTS.md §1](DURABLE-OBJECTS.md) | ARCHITECTURE §2 keeps the ruling on what gets an instance |
 | Every table and column | [DATA-MODEL.md](DATA-MODEL.md) | everyone links to it; nobody re-lists columns |
 | The Laws themselves | [RULES.md](RULES.md) + `shared/rules/registry.ts` | CLAUDE.md summarises them; BASE-MANUAL §4 explains the safety net |
+| How a sentence gets translated | [LANGUAGES.md](LANGUAGES.md) | RULES.md keeps the four Laws (R28, R33, R34, R44); CONTRIBUTING §3 keeps the commit workflow; UI-CONVENTIONS points here rather than restating it |
 
 **And a number in prose is a number nothing checks.** ARCHITECTURE described the
 portal's allow-list as "fourteen named doors" long after it had grown to
@@ -149,7 +162,7 @@ concrete + checkable:
 
 - **The global habits every Kwapso build follows**, [SWIFT-STRUCK-WAY.md](SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
 - **The two prime directives** (stay lean; obey the Laws), [CLAUDE.md](CLAUDE.md), the entry point.
-- **The Laws of the Base** (R1–R51), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: all 115 named components plus the 3 foundations (icons, tokens, motion) are either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
+- **The Laws of the Base** (R1–R51), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: every component under `components/` plus the 3 foundations (icons, tokens, motion) — the count is derived by `kitInventory()` in `scripts/kit-coverage.mjs` and deliberately not written down here — is either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
 - **Code house style**, [CONVENTIONS.md](CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
 - **UI conventions**, [UI-CONVENTIONS.md](UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
 - **How a screen is arranged**, [UI-RULEBOOK.md](UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `shared/ui/` already ships and the tokens the theme already defines, so every rule in it can be applied from `web/`, `web-portal/` and `shared/` without changing a component.
@@ -227,11 +240,14 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 9. **[SCREEN-ENGINE-PLAN.md](SCREEN-ENGINE-PLAN.md)**, the screen-recipe engine and
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
     **[CONTROL-SWAP-LANES.md](CONTROL-SWAP-LANES.md)** is the other transient
-    one: the 93 hand-written HTML controls split into four non-colliding lanes,
-    with the ruling on which raw elements are legitimately raw (a hidden file
-    input is a mechanism, not a control; a `<form>` is correct HTML) so four
-    parallel sessions reach the same answer instead of four. Delete it when the
-    lanes have landed.
+    one: the 93 hand-written HTML controls split into **three** non-colliding
+    lanes — the document's own § *There is no lane D* shows why the portal's
+    share is one conversion rather than a fourth lane — with the ruling on which
+    raw elements are legitimately raw (a hidden file input is a mechanism, not a
+    control; a `<form>` is correct HTML) so three parallel sessions reach the
+    same answer instead of three different ones. Delete it when the lanes have
+    landed: raw `<button|input|select|textarea>` across `web/`, `web-portal/`
+    and `shared/web/` is down to 15 from 93, so the delete condition is close.
 
     **[LAW-RECONCILIATION.md](LAW-RECONCILIATION.md)** sits beside them and is a
     PROPOSAL rather than a record: the base's seventeen UI laws read against the
@@ -286,6 +302,14 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 15. **[UI-CONVENTIONS.md](UI-CONVENTIONS.md)**, how screens are built: the
     library-is-lego rule, recipe vs. bespoke, the enforced UI Laws, the
     action-icon mapping, and the voice.
+    **[LANGUAGES.md](LANGUAGES.md)** is its sibling and the OWNER of the
+    translation capability: the four languages the app speaks, the one shared
+    definition of what a person reads, `npm run lang`, the three shapes that go
+    wrong (`t("of")` is the classic), and the ceiling that can only fall. Four
+    Laws govern translation and the mechanism used to be explained only inside
+    the law-book, which is the wrong altitude for a mechanism — so a developer
+    adding a screen walked past every document that would have told them a new
+    sentence must be wrapped and catalogued.
 16. **[DURABLE-OBJECTS.md](DURABLE-OBJECTS.md)**, the realtime Durable Object
     (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs. plain
     atomic D1.
@@ -331,16 +355,21 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     files are the evidence for "we decided this, and here is who said so". They are a
     RECORD, never a spec — where a form answer and SCOPE.html disagree, SCOPE wins,
     and where SCOPE is silent, base law applies. They hold no customer data.
-27. **`scaling-review.md`**, the scaling audit (14 Aug 2026): the twelve-dimension
-    score, the platform limits looked up live, **what breaks first and at what size**
-    (the live layer, at roughly 3,000–5,000 concurrent sockets in one team), the twelve
-    repairs that landed, and the eleven items judged too risky to change, each written
-    up as a plan with its tier. **The DECISION it produced is
-    [ARCHITECTURE.md §7](ARCHITECTURE.md) — 78 accepted, LOCKED — and that section is
-    self-sufficient**, because this file (like every audit report here) is git-ignored:
-    a local artifact, not tracked canon, so a fresh clone will not have it. A REPORT,
-    never a rule source: where it and RULES.md disagree, RULES.md wins.
-    `scaling-review.html` is the same thing as a visual scorecard.
+27. **`scaling-review.md`** — **NOT IN THIS REPOSITORY. Do not go looking for it.**
+    It was the scaling audit of 14 Aug 2026 (the twelve-dimension score, the platform
+    limits looked up live, what breaks first and at what size, the twelve repairs that
+    landed and the eleven items judged too risky to change), and it was deleted on
+    29 Aug 2026 in `f17f5501`. It is listed here because two documents still cite it
+    and a reader deserves to know why the citation does not open.
+
+    **The DECISION it produced is [ARCHITECTURE.md §7](ARCHITECTURE.md) — 78 accepted,
+    LOCKED — and that section is self-sufficient**: the live layer as the first
+    ceiling, at roughly 3,000–5,000 concurrent sockets in one team, is written there,
+    not only here. Cite §7. Two notes for anyone tidying this up: `.gitignore` still
+    carries a comment claiming this file is deliberately tracked (it is not tracked and
+    it is not present — both halves are stale), and `DATA-MODEL.md` cites it once for
+    R16's price. Either restore the report or re-point both at §7; leaving it as a name
+    with nothing behind it is the state this entry exists to warn about.
 
 ### Where the code lives
 
@@ -376,16 +405,26 @@ ends and all eight workers, then runs every test, including the law checks that 
 source off disk, a plain `npx tsc --noEmit` proves far less.
 
 **What green looks like:** **exit code 0**, ten workspaces, every suite passing.
-For scale, that is roughly 149 test files and 1,600-odd tests; don't compare
+For scale, that is roughly 315 test files and 4,000-odd tests; don't compare
 against those figures, compare against exit 0, because the suite grows every week.
+**Read the run by its exit code, never by grepping the log** — a suite that fails
+to LOAD prints nothing that looks like a failure.
 
-**Exactly one suite skips itself, and that is correct**:
-`workers/content/test/knowledge-backfill.test.ts` measures the knowledge base over
-the agency's real Glide history, and that data is git-ignored customer material
-(INVENTORY.md § 6). It is absent from every clone, so on your machine this run
-ends `32 passed | 1 skipped` in the content worker. **That skip is green.** A skip
-anywhere else is not, investigate it. The exact count for the commit you are
-standing on:
+**Two things skip on a fresh clone, and both are correct.** Anything else that
+skips is not, investigate it.
+
+1. **`workers/content/test/knowledge-backfill.test.ts`** (one file, three tests)
+   measures the knowledge base over the agency's real Glide history, and that
+   data is git-ignored customer material (INVENTORY.md § 6). It is absent from
+   every clone, so the content worker ends `Test Files 70 passed | 1 skipped`,
+   `Tests 933 passed | 3 skipped`. It is the only whole FILE that skips.
+2. **`web/test/splash.test.ts`** holds eight `it.skipIf(!REQUIRED)` rows that
+   compare the two front doors against their built static export. `npm run check`
+   does not build, so they skip and the web workspace ends `Tests 849 passed |
+   8 skipped`. `npm run check:built` builds first, sets `REQUIRE_EXPORT=1`, and
+   runs them for real.
+
+The exact count for the commit you are standing on:
 
 ```bash
 npm run check 2>&1 | grep -E "Test Files|Tests "

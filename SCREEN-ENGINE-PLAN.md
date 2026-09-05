@@ -53,13 +53,13 @@ agent-editable screens. Lean *within* a robust design.
 |---|---|---|
 | **Recipe schema** | the library's `lib/recipe.ts` (`ScreenRecipe`), today `shared/web/screen-engine/recipe.ts` | Typed, serializable shapes for a screen: type, presentation, data binding, fields, layout, actions, permission gates. The contract both the worker and the engine speak. The LIBRARY owns it (see §10), so the app + engine import the same type. _(Written when the library was the npm package `@kwapso/ui`; it was vendored on 2026-08-22, and when the kit was pinned on 2026-08-25 the engine behaviour moved app-side, so the path is now `@shared/web/screen-engine/recipe`. The layering is unchanged.)_ |
 | **Config / recipe store** | ~~`workers/config` (new)~~ → **UPDATED 2026-06-21: the TENANCY worker**, `GET/POST /api/tenancy/config/screens` (there is NO separate `workers/config`; it was folded into tenancy) | Stores + serves recipes. Merges GLOBAL base recipes (the shipped defaults) with a team's own custom screens/overrides. CRUD actions are agent-callable (an agent can author a screen). |
-| **Screen engine** | `shared/web/screen-engine/` (drawing through the kit's `structures/`; was the library's `registry/collections/screen-*`) | React components that fetch a recipe + data and render the right library pieces, permission-aware. |
+| **Screen engine** | `shared/web/screen-engine/` (drawing through the kit's `components/`; was the library's `registry/collections/screen-*`, then the kit's `structures/` before the v1.1.0 layout move folded controls and structures into one folder) | React components that fetch a recipe + data and render the right library pieces, permission-aware. |
 | **Tenancy actions** | `workers/tenancy` | Members / roles / invites read+write + the guard rules. |
 | **App shell** | `web/` | Top bar + team switcher + bottom tabs (mobile); renders module screens through the engine. |
 
 ## 3 · The recipe schema (the heart)
 
-A screen recipe is serializable JSON, typed in the library (`shared/ui/lib/recipe.ts`, `ScreenRecipe`. See §10):
+A screen recipe is serializable JSON, typed at `shared/web/screen-engine/recipe.ts` (`ScreenRecipe`. See §10). *(It was `shared/ui/lib/recipe.ts` while the engine lived in the library; the config-driven engine moved app-side in the 2026-08-25 reskin and the kit keeps its own, differently-shaped `ScreenRecipe` under `components/screen-renderer/`.)*
 
 - **type**: `list` | `detail` | `edit` | `add` | `confirm` | `custom`
 - **presentation**: `responsive` (default, overlay on desktop, full-screen/
@@ -175,7 +175,7 @@ Decided with the user; do not relitigate without them.
   `shared/ui/`. UPDATED AGAIN 2026-08-25, when the vendored kit became a pinned
   copy of `Kwapso/kwapso-ui-ux`: the config-driven engine BEHAVIOUR now lives
   app-side in `shared/web/screen-engine/` (`recipe.ts` + `screen-renderer.tsx`),
-  drawing through the kit's parts (`shared/ui/structures/screen-renderer`), so
+  drawing through the kit's parts (`shared/ui/components/screen-renderer`), so
   the app's engine work happens in `shared/web/screen-engine/` and a kit-part
   change goes upstream. The layering the decision is
   actually about — the engine renders, the host fetches and gates — is

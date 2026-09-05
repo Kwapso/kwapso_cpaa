@@ -6,7 +6,18 @@ yet obey.
 
 Written during the reskin of 2026-08-22, which vendored the component library
 into this repo (`shared/ui/`) and dressed it in the kit. The rule the reskin
-followed is the kit's own, from `GAPS.md`:
+followed is the kit's own, from its `GAPS.md`:
+
+> **Where these kit documents live.** `GAPS.md`, `responsive.md` and
+> `exclusions.md` are Aurora's own working documents in the design-kit
+> repository, `github.com/Kwapso/kwapso-ui-ux`. **None of them is in this
+> repository, and none of them ships in the vendored copy** —
+> `shared/ui/docs/` carries only ARTIFACT-MAP, BUILD-A-COMPONENT,
+> BUILD-A-SCREEN, RULES and TOKENS. If you are holding this repository and
+> cannot open one of the three, that is expected, not a broken link: ask
+> Aurora, or read the kit repo at the tag in `shared/ui/VERSION.json`. The
+> quotes below are reproduced here so the rule is readable without them.
+
 
 > If anything required by the app is not specified in the kit — a component, a
 > state, a token, a breakpoint behavior — STOP styling that element. Add it to
@@ -74,7 +85,7 @@ The ones with no specimen at all, in the order a person meets them:
 | **Ruling 23 · email** | "a letter, not a banner. Isotype plus one mango button, no colour band" | The template still has its tint band (`accentHex.surface`, `#FFE9B0` — not a kwapso colour). An email cannot read a token, so this is a rewrite rather than a re-tone, and it changes what every login and notification looks like. Not attempted. |
 | **Ruling 34 · icons** | 30 filled glyphs, `fill="currentColor"`, one icon per module for life, "modules are never identified by a letter" | **The app uses Lucide**, which is stroke-based, and CLAUDE.md mandates a Lucide action mapping (`Pencil` edit, `Power` deactivate, `UserMinus` remove, `Ban` revoke, `Plus` create, `Upload` import at `size-3.5`). The kit gives no Lucide equivalents and the two sets do not overlap. This is the biggest unstarted piece of the reskin. |
 | **Ruling 28 · scale control** | `data-scale`, three steps at 13/15/17, both doors default to 15 | The app has its own control with a DIFFERENT value per door, because UI-RULEBOOK L5 locks the portal a step larger. `tokens.css` says CLAUDE.md overrides the kit where they disagree, so the app's stands. See `shared/scale.ts`. |
-| **Responsive** | — | `responsive.md` is unwritten; the kit has no breakpoint specification at all. Both apps keep their existing responsive behaviour. |
+| **Responsive** | — | `responsive.md` (a kit-repo document, not one of ours) is unwritten; the kit has no breakpoint specification at all. Both apps keep their existing responsive behaviour. |
 
 ## 4 · Questions only you can answer
 
@@ -97,13 +108,14 @@ forest dot. Converting them is a real redesign of every collection row and every
 record header. The geometry and the borders are already yours; the dot is not.
 
 **c · `.kw-alert--warning` uses mango.** Your own specimen paints the warning
-alert's dot with `var(--accent)`, and `exclusions.md` says mango is never a
-status. One of the two is wrong.
+alert's dot with `var(--accent)`, and `exclusions.md` (in the kit repo, not
+this one — see the note at the top) says mango is never a status. One of the two
+is wrong.
 
 **d · GAP-10, the paper-tone flip.** Adopted provisionally as your context-class
 pair (`.kw-on-panel` / `.kw-on-page`), because it is the mechanism your specimens
 actually build and it invents nothing. It is at the bottom of
-`shared/ui/styles.css`. `--sheetFlip` / `--cardFlip` are still referenced
+`shared/ui/foundations/tokens/tokens.css`. `--sheetFlip` / `--cardFlip` are still referenced
 nowhere; if they were meant to be the mechanism, they need explaining.
 
 **e · The ghost button.** Your quiet action is `--text`: a 40px underlined label.

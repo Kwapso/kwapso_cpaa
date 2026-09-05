@@ -136,8 +136,8 @@ THE RULING ON WHAT NOT TO CONVERT — obey it, it is why the lanes agree:
     (a key on the src, an onError fallback) — leave it unless you can prove the
     kit's Image does the same. brand-mark's is static art and should convert.
 
-CONVERT: every <button> that is a button → @shared/ui/controls/button/button.
-Every <label> that labels a field → @shared/ui/controls/label/label (already
+CONVERT: every <button> that is a button → @shared/ui/components/button/button.
+Every <label> that labels a field → @shared/ui/components/label/label (already
 imported in three files — copy that pattern). Static <img> → the kit's Image.
 
 R31 IS NEW TODAY: write rounded-[var(--radius)] and rounded-pill. The Tailwind

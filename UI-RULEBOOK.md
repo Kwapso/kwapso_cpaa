@@ -61,7 +61,7 @@ majority of what the owner and Aurora reported, and two of them are one-line fix
 
 ### Finding 1: the card is not pink, it is transparent
 
-The theme is already right. `shared/ui/styles.css` sets
+The theme is already right. `shared/ui/foundations/tokens/tokens.css` sets
 `--card: #f7f2ea` (kw-soft-paper) on `--background: #fffef9` (kw-off-beige). The brand
 site independently sets `--color-scheme--dark-background: #f7f2eb` for every card and
 `--color-scheme--background: #fffdf8` for the page (`brand.css`, confirmed by computed
@@ -843,7 +843,7 @@ The busy label is "Submitting…" everywhere, replacing "Saving…", "Sending…
 
 Implement by giving `FormShell` a footer it renders itself rather than by editing 37 call
 sites one at a time. The library's own `Form` collection already defaults
-`submitLabel: "Submit"` (`shared/ui/structures/form/form.tsx`),
+`submitLabel: "Submit"` (`shared/ui/components/form/form.tsx`),
 so this aligns the host with the library rather than diverging from it.
 
 Evidence: `P-4.10.31` and `P-4.10.36`, the portal's New Ticket form. The button says
@@ -1026,11 +1026,11 @@ it everywhere so the source stops implying a hierarchy that does not exist. Use
 
 One divergence to be aware of and **not** to "fix" unilaterally: the brand site's panel
 radius is **10px** (`--radius--radius: 10px`, 40 rendered elements), while the library's
-is 24px, recorded as a locked "two radii only" decision in `shared/ui/styles.css` (the
+is 24px, recorded as a locked "two radii only" decision in `shared/ui/foundations/tokens/tokens.css` (the
 line number this used to cite no longer resolves — read the radius block in that file).
 The pill value agrees (the site uses 50px, the library uses `rounded-full`). If the 24px
 panels read too soft beside the marketing site, that is a token change in
-`shared/ui/styles.css`, made once — and since 2026-08-22 that file is in this repo, so
+`shared/ui/foundations/tokens/tokens.css`, made once — and since 2026-08-22 that file is in this repo, so
 it is a change this repo makes rather than one it asks for. It is still not a
 per-component override in the host.
 
@@ -1462,7 +1462,7 @@ divides by **ΔL\* ≥ 4**.
 light mode because the contrast between UI elements is much clearer on dark mode". That is
 not a preference, it is arithmetic, and here it is. Measured in a browser against the
 tokens the deployed app actually resolves (`shared/brand.ts` overrides `--background`,
-`--primary` and `--secondary`; the rest come from `shared/ui/styles.css`):
+`--primary` and `--secondary`; the rest come from `shared/ui/foundations/tokens/tokens.css`):
 
 | Boundary | Light ΔL\* | Dark ΔL\* | Dark advantage |
 |---|---|---|---|
@@ -1690,7 +1690,7 @@ Here is what is achievable today without touching the library, and what is not.
   already does it (`web/components/sprints-screen.tsx`), and so does the header band
   (`TypeMark` in `web/components/record-chrome.tsx`).
 - Any **host-composed** row may carry a mark, because the library `List` has the slot:
-  `item.leading` (`shared/ui/structures/list/list.tsx`). Home and Settings use it
+  `item.leading` (`shared/ui/components/list/list.tsx`). Home and Settings use it
   today.
 
 **Not achievable, and do not work around it:** a **recipe-driven** collection row cannot

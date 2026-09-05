@@ -17,14 +17,122 @@ Do not relitigate any "LOCKED" item without the user.
 > app: learning is the one sheet with nothing behind it any more, the module was
 > purged on 17 Aug 2026 (DATA-MODEL.md says what became of its material).
 
+## 0 · The shape, in one picture
+
+Everything below is written as tables and prose, which is where the detail
+belongs. This is the same system drawn once, so a reader arrives with the shape
+already in their head. **It is derived from the wrangler configs** — the service
+bindings, the D1 bindings, the R2 buckets, the Vectorize index and the Durable
+Object classes are each declared in `workers/*/wrangler.jsonc`, so if this
+picture and a config disagree, the config is right.
+
+```mermaid
+flowchart TB
+  staff["Agency staff<br/>agency.kwapso.app"]
+  client["A customer's people<br/>client.kwapso.app"]
+  tool["An outside tool<br/>Bearer token"]
+
+  subgraph public["The only two public doors"]
+    gw["gateway<br/>serves web/ + routes /api/* BY PREFIX"]
+    pgw["portal-gateway<br/>serves web-portal/ + a NAMED ALLOW-LIST"]
+  end
+
+  subgraph brains["Six private workers — workers_dev:false, service bindings only"]
+    auth["auth<br/>sessions, sign-in codes, email"]
+    tenancy["tenancy<br/>teams, roles, invites, recipes,<br/>customer spine, process maps, money"]
+    content["content<br/>tickets + work engine,<br/>knowledge base, Google, crons"]
+    dataops["data-ops<br/>import + the AI agent"]
+    realtime["realtime<br/>the live channel"]
+    mcp["mcp<br/>tokens → team-pinned sessions → tools"]
+  end
+
+  subgraph stores["Storage"]
+    core[("GLOBAL core D1<br/>native env.DB binding")]
+    team[("One D1 per TEAM<br/>over the REST door, CF_D1_TOKEN")]
+    r2[("R2 · media, help-media,<br/>learning-media, internal-media")]
+    vec[("Vectorize<br/>kwapso-knowledge")]
+    do1["Durable Objects<br/>TeamChannel · TeamInterest"]
+  end
+
+  staff --> gw
+  client --> pgw
+  tool --> gw
+
+  gw --> auth & tenancy & content & dataops & realtime & mcp
+  pgw --> auth & tenancy & content & realtime
+
+  auth & tenancy & content & dataops & realtime & mcp --> core
+  tenancy & content & dataops --> team
+  content --> vec
+  gw & auth & content --> r2
+  realtime --> do1
+```
+
+**The three things the picture is for.**
+
+1. **Two public addresses and no third.** Every other worker sets
+   `workers_dev:false` + `preview_urls:false`, so no public route can reach
+   `/internal/*`, the agent, or the act-as-user surface. `doc-claims.test.ts`
+   derives that pair from the configs, so this is checked, not asserted.
+2. **The gateways do not forward the same set.** `gateway` forwards **by
+   prefix** and reaches all six; `portal-gateway` forwards a **named
+   allow-list** and reaches four — it never binds `data-ops` or `mcp`. That
+   asymmetry is why R21 exists: a client login is an ordinary team member at the
+   *agency* hostname too, so every door must refuse a portal caller **at the
+   door**, not by being left off a list.
+3. **Two database tiers, reached two different ways.** The global core is a
+   native `env.DB` binding; a team's own database is reached over the D1 REST
+   door with `CF_D1_TOKEN`. That is what makes isolation physical rather than a
+   query-discipline promise.
+
+**And one request, end to end** — a staff member changes a ticket's status:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant G as gateway
+  participant C as content
+  participant D as team D1 over the REST door
+  participant R as realtime TeamChannel
+
+  B->>G: POST /api/content/help/status (session cookie)
+  G->>C: service binding, cookie forwarded
+  Note over C: gatedBody on help + edit — R10.<br/>refusePortalCaller — R21.<br/>Body fields through the validation seam — R20.
+  C->>D: setStatus — UPDATE carries the current-status predicate (R17)
+  D-->>C: rows changed
+  alt zero rows changed
+    Note over C: already in that state — no activity row, no ping
+  else one row changed
+    C->>D: INSERT INTO activity (…)
+    C->>R: publishChange (R1)
+    R-->>B: the changed ROW over the live channel
+    Note over B: the cached row is PATCHED in place.<br/>The list is never refetched. See CACHING.md
+  end
+  C-->>G: 200 and the refreshed ticket page
+  G-->>B: 200
+```
+
 ## 1 · Data, where things live (LOCKED)
 
-- **Per-team databases.** A small GLOBAL D1 core holds: `users`, `teams`,
-  `team_members` (the card catalog: user → team → role id), `email_change_logs`,
-  and the import registry. Every team then gets **its own D1 database** holding
-  all its tables: roles + permissions, help + threads, invite logs,
-  selectable data, activity, import sessions. Another team's rows are never in
-  the same database, isolation by physics, not by query discipline.
+- **Per-team databases.** A GLOBAL D1 core holds identity and everything that has
+  to be true across teams: `users`, `teams`, `team_members` (the card catalog:
+  user → team → role id), the session and sign-in tables, the MCP tokens, the AI
+  meter (`agent_credits`, `agent_usage`, `agent_usage_log`), the error log, the
+  sharding alarms (`db_alerts`, `db_growth`, `team_module_databases`,
+  `team_module_moves`), `account_activity`, `email_change_logs` and the import
+  registry. Every team then gets **its own D1 database** holding its own tables:
+  roles + permissions, help + threads, invite logs, selectable data, activity,
+  import sessions. Another team's rows are never in the same database, isolation
+  by physics, not by query discipline.
+
+  **[DATA-MODEL.md](DATA-MODEL.md) is the OWNER of the table list, and this is a
+  summary, not the roster.** The list above names the *shapes* of thing that live
+  globally so nobody reasons about the fence with the wrong mental model — a
+  team's AI spend, its error rows and its growth alarms are global, not team-local.
+  For which tier any given table lives in, read DATA-MODEL.md; a second
+  step-by-step list here is exactly what §2 of this file already apologises for.
+  The count on disk is derivable: `grep -h "CREATE TABLE" db/core/*.sql`.
 - **Sharding machinery: BUILT (2026-06-12)** per the locked build-everything
   call: a nightly cron sizes every team database and alarms at 80% of D1's
   10GB cap (`db_alerts`); the **mover** relocates a heavy module to its own
